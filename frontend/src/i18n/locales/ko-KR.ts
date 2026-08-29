@@ -5609,6 +5609,7 @@ export default {
       collecting: '생성된 파일을 저장하는 중…',
       download: '다운로드',
       downloadFailed: '다운로드에 실패했습니다. 다시 시도해 주세요.',
+      downloadDisabled: '이 버전은 파일 다운로드를 지원하지 않습니다',
       inlinePreviewHint: '클릭하여 미리보기',
       inlineMissing: '파일을 사용할 수 없습니다',
     },

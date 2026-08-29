@@ -5609,6 +5609,7 @@ export default {
       collecting: 'Сохранение сгенерированных файлов…',
       download: 'Скачать',
       downloadFailed: 'Не удалось скачать, повторите попытку.',
+      downloadDisabled: 'Скачивание файлов недоступно в этой версии',
       inlinePreviewHint: 'Нажмите для просмотра',
       inlineMissing: 'Файл недоступен',
     },

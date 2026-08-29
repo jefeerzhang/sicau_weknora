@@ -812,6 +812,7 @@ export default {
       collecting: 'Saving generated files…',
       download: 'Download',
       downloadFailed: 'Download failed, please retry.',
+      downloadDisabled: 'File downloads are not available in this version',
       inlinePreviewHint: 'Click to preview',
       inlineMissing: 'File unavailable',
     },
