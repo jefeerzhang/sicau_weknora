@@ -433,6 +433,12 @@
                         <t-icon class="menu-icon" name="poweroff" />
                         <span>{{ agent.disabled_by_me ? $t('agent.enable') : $t('agent.disable') }}</span>
                       </div>
+                      <!-- sicau-v1 ticket 04: 第二套布局分支同样提供设为默认（Admin+） -->
+                      <div v-if="authStore.hasRole('admin')" class="popup-menu-item"
+                        @click="handleSetDefaultAgent(agent)">
+                        <t-icon class="menu-icon" name="star" />
+                        <span>{{ defaultAgentId === agent.id ? t('agent.unsetAsDefault') : t('agent.setAsDefault') }}</span>
+                      </div>
                       <div v-if="!agent.is_builtin && canManageAgent(agent)" class="popup-menu-item delete"
                         @click="handleDelete(agent)">
                         <t-icon class="menu-icon" name="delete" />
