@@ -111,6 +111,9 @@ func RegisterTenantRoutes(
 			// the tenant without an Owner.
 			if memberHandler != nil {
 				g.apiKeyRoute(tenantByID, http.MethodGet, "/members", apiKeyManageMembers(apiKeyFullAccess()), g.Admin(), memberHandler.ListMembers)
+				// sicau-v1 ticket 05: per-member usage aggregates ride the
+				// same Admin+ gate as the roster (ticket 01).
+				g.apiKeyRoute(tenantByID, http.MethodGet, "/member-stats", apiKeyManageMembers(apiKeyFullAccess()), g.Admin(), memberHandler.GetMemberUsageStats)
 				g.apiKeyRoute(tenantByID, http.MethodPost, "/members", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), memberHandler.AddMember)
 				g.apiKeyRoute(tenantByID, http.MethodPut, "/members/:user_id", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), memberHandler.UpdateMemberRole)
 				g.apiKeyRoute(tenantByID, http.MethodDelete, "/members/:user_id", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), memberHandler.RemoveMember)

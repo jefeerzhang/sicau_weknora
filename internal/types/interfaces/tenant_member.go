@@ -68,4 +68,11 @@ type TenantMemberRepository interface {
 	// RemoveOwnerAtomically soft-deletes an Owner row under the same
 	// lock as DemoteOwnerAtomically.
 	RemoveOwnerAtomically(ctx context.Context, userID string, tenantID uint64) error
+
+	// MemberUsageStats aggregates per-user teaching usage (sicau-v1
+	// ticket 05): question count (user-role messages across the user's
+	// sessions in the tenant) and last activity time. Read-only; used by
+	// the Admin+ member page. Users with no sessions are absent from the
+	// result — the frontend renders 0 / "never active" for them.
+	MemberUsageStats(ctx context.Context, tenantID uint64) ([]types.TenantMemberUsageStat, error)
 }

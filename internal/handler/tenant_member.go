@@ -97,6 +97,31 @@ func parseTenantIDFromPath(c *gin.Context) (uint64, bool) {
 // @Success      200  {object}  map[string]interface{}
 // @Security     Bearer
 // @Router       /tenants/{id}/members [get]
+// GetMemberUsageStats returns per-member question counts and last activity
+// (sicau-v1 ticket 05). Registered Admin+ — same gate as the roster itself
+// (ticket 01): students never see who is in the workspace, let alone how
+// active each member is.
+func (h *TenantMemberHandler) GetMemberUsageStats(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID, ok := parseTenantIDFromPath(c)
+	if !ok {
+		return
+	}
+
+	stats, err := h.memberService.MemberUsageStats(ctx, tenantID)
+	if err != nil {
+		c.Error(apperrors.NewInternalServerError("Failed to load member usage stats").WithDetails(err.Error()))
+		return
+	}
+	if stats == nil {
+		stats = []types.TenantMemberUsageStat{}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    gin.H{"stats": stats},
+	})
+}
+
 func (h *TenantMemberHandler) ListMembers(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID, ok := parseTenantIDFromPath(c)

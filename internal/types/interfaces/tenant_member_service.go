@@ -51,4 +51,9 @@ type TenantMemberService interface {
 	// RemoveMember soft-deletes the membership while enforcing the
 	// "cannot remove the last active Owner" invariant.
 	RemoveMember(ctx context.Context, userID string, tenantID uint64) error
+
+	// MemberUsageStats aggregates per-user question counts and last
+	// activity for the tenant (sicau-v1 ticket 05). Admin+ page only;
+	// count granularity by design — no message content is exposed.
+	MemberUsageStats(ctx context.Context, tenantID uint64) ([]types.TenantMemberUsageStat, error)
 }

@@ -290,3 +290,22 @@ func (r *tenantMemberRepository) HasAnyMembers(ctx context.Context, tenantID uin
 	}
 	return true, nil
 }
+
+// MemberUsageStats aggregates per-user teaching usage for the tenant
+// (sicau-v1 ticket 05): user-role message count and last session activity.
+// LEFT JOIN keeps question-less sessions counted toward last_active; users
+// with no sessions at all are absent — the frontend shows 0/"never".
+func (r *tenantMemberRepository) MemberUsageStats(ctx context.Context, tenantID uint64) ([]types.TenantMemberUsageStat, error) {
+	var stats []types.TenantMemberUsageStat
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT s.user_id AS user_id,
+		       COUNT(m.id) AS question_count,
+		       MAX(s.updated_at) AS last_active_at
+		FROM sessions s
+		LEFT JOIN messages m
+		       ON m.session_id = s.id AND m.role = 'user'
+		WHERE s.tenant_id = ? AND s.deleted_at IS NULL
+		GROUP BY s.user_id`,
+		tenantID).Scan(&stats).Error
+	return stats, err
+}

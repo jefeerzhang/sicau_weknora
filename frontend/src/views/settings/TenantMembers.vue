@@ -351,6 +351,12 @@
                 </div>
               </template>
               <template #joined_at="{ row }">{{ formatDate(row.joined_at) }}</template>
+              <template #question_count="{ row }">
+                {{ usageStats.get(row.user_id)?.question_count ?? 0 }}
+              </template>
+              <template #last_active_at="{ row }">
+                {{ formatLastActive(usageStats.get(row.user_id)?.last_active_at) }}
+              </template>
               <template #actions="{ row }">
                 <t-popconfirm
                   v-if="canManage && row.user_id !== currentUserId"
@@ -525,6 +531,7 @@ import {
   removeMember,
   type TenantMember,
   type TenantRole,
+  getMemberUsageStats,
 } from '@/api/tenant/members'
 import {
   listTenantInvitations,
@@ -735,6 +742,9 @@ const columns = computed(() => [
   { colKey: 'member', title: t('tenantMember.columns.member'), ellipsis: true, minWidth: 132 },
   { colKey: 'role', title: t('tenantMember.columns.role'), width: 128 },
   { colKey: 'joined_at', title: t('tenantMember.columns.joinedAt'), width: 154 },
+  // sicau-v1 ticket 05: 教学参与统计（仅计数粒度，见 ADR-009-2）
+  { colKey: 'question_count', title: t('tenantMember.columns.questionCount'), width: 104, align: 'center' },
+  { colKey: 'last_active_at', title: t('tenantMember.columns.lastActive'), width: 150 },
   { colKey: 'actions', title: t('tenantMember.columns.operations'), width: 88, align: 'left' },
 ])
 
@@ -802,6 +812,26 @@ function rememberMembersForAudit(rows: TenantMember[]) {
   }
 }
 
+// sicau-v1 ticket 05: 成员使用统计（仅计数与最后活跃，不含任何内容）。
+// 接口 Admin+；失败静默降级为"无统计"，不阻塞成员列表本身。
+const usageStats = ref<Map<string, { question_count: number; last_active_at: string | null }>>(new Map())
+
+async function loadUsageStats() {
+  if (!activeTenantId.value) return
+  try {
+    const resp = await getMemberUsageStats(activeTenantId.value)
+    const list = resp?.data?.stats ?? []
+    usageStats.value = new Map(list.map(s => [s.user_id, s]))
+  } catch {
+    usageStats.value = new Map()
+  }
+}
+
+function formatLastActive(value: string | null | undefined): string {
+  if (!value) return t('tenantMember.stats.neverActive')
+  return formatDate(value)
+}
+
 async function loadMembers() {
   if (!activeTenantId.value) {
     return
@@ -827,6 +857,7 @@ async function loadMembers() {
       }
       members.value = resp.data.members ?? []
       membersTotal.value = total
+      void loadUsageStats()
       if (typeof resp.data.page === 'number' && resp.data.page > 0) {
         membersPage.value = resp.data.page
       }

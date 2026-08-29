@@ -58,3 +58,25 @@ func TestTenantMemberRoutePolicies_PinnedToAdmin(t *testing.T) {
 		})
 	}
 }
+
+// TestMemberStatsRoutePolicy_PinnedToAdmin pins ticket 05: per-member
+// usage aggregates ride the same Admin+ gate as the roster.
+func TestMemberStatsRoutePolicy_PinnedToAdmin(t *testing.T) {
+	src, err := os.ReadFile("routes_auth_tenant.go")
+	if err != nil {
+		t.Fatalf("read routes_auth_tenant.go: %v", err)
+	}
+	found := false
+	for _, line := range strings.Split(string(src), "\n") {
+		if !strings.Contains(line, `http.MethodGet, "/member-stats"`) {
+			continue
+		}
+		found = true
+		if !strings.Contains(line, "g.Admin()") {
+			t.Fatalf("member-stats must be Admin+, got:\n%s", strings.TrimSpace(line))
+		}
+	}
+	if !found {
+		t.Fatal("GET /member-stats registration not found; update this tripwire if the route moved")
+	}
+}
