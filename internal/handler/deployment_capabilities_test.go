@@ -61,12 +61,18 @@ func readFrontendDeploymentCapabilityKeys() ([]string, error) {
 	}
 
 	var keys []string
-	for _, line := range strings.Split(string(match[1]), "\n") {
-		line = strings.TrimSpace(strings.TrimRight(line, ","))
+	// Normalize CRLF first: Windows checkouts carry "\r" past the "\n" split,
+	// which used to defeat the trailing-comma trim and poison every key with
+	// a stale "'," suffix. Strip both quote styles — formatting is the
+	// frontend's business, this parser only wants the key strings.
+	for _, line := range strings.Split(strings.ReplaceAll(string(match[1]), "\r\n", "\n"), "\n") {
+		line = strings.TrimSpace(line)
+		line = strings.TrimRight(line, ",")
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		line = strings.Trim(line, `'`)
+		line = strings.Trim(line, `'"`)
 		keys = append(keys, line)
 	}
 	return keys, nil
