@@ -102,14 +102,15 @@ func RegisterTenantRoutes(
 			tenantByID.PUT("/api-principal-config", g.Owner(), handler.UpdateAPIPrincipalConfig)
 			tenantByID.POST("/api-principal-test-token", g.Owner(), handler.CreateAPIPrincipalTestToken)
 
-			// Tenant member management (PR 3 of #1303). Listing is
-			// Viewer+ so any active member can see the roster; mutation
-			// is Owner+ because membership changes are the highest-impact
+			// Tenant member management (PR 3 of #1303). sicau-v1 ticket 01:
+			// listing the roster is Admin+ — students (viewers) must never
+			// see who else is in the course workspace. Mutation stays
+			// Owner+ because membership changes are the highest-impact
 			// tenant op. /:id/leave is Viewer+ — any member can quit on
 			// their own; the service still rejects when it would leave
 			// the tenant without an Owner.
 			if memberHandler != nil {
-				g.apiKeyRoute(tenantByID, http.MethodGet, "/members", apiKeyManageMembers(apiKeyFullAccess()), g.Viewer(), memberHandler.ListMembers)
+				g.apiKeyRoute(tenantByID, http.MethodGet, "/members", apiKeyManageMembers(apiKeyFullAccess()), g.Admin(), memberHandler.ListMembers)
 				g.apiKeyRoute(tenantByID, http.MethodPost, "/members", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), memberHandler.AddMember)
 				g.apiKeyRoute(tenantByID, http.MethodPut, "/members/:user_id", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), memberHandler.UpdateMemberRole)
 				g.apiKeyRoute(tenantByID, http.MethodDelete, "/members/:user_id", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), memberHandler.RemoveMember)
@@ -119,14 +120,14 @@ func RegisterTenantRoutes(
 			// Tenant invitation flow. The UI-driven "Invite Member"
 			// button hits POST /invitations rather than POST /members,
 			// so the invitee gets to confirm via /me/invitations
-			// before any tenant_members row is written. List is
-			// Viewer+ so any member can see pending invites in the
-			// management view; create/revoke are Owner+ to match the
+			// before any tenant_members row is written. Listing is
+			// Admin+ (sicau-v1 ticket 01: pending invites carry
+			// invitee emails); create/revoke are Owner+ to match the
 			// existing /members mutation gates. nil-skip pattern
 			// mirrors memberHandler above for environments built
 			// without the invitation dependency wired.
 			if invitationHandler != nil {
-				g.apiKeyRoute(tenantByID, http.MethodGet, "/invitations", apiKeyManageMembers(apiKeyFullAccess()), g.Viewer(), invitationHandler.ListTenantInvitations)
+				g.apiKeyRoute(tenantByID, http.MethodGet, "/invitations", apiKeyManageMembers(apiKeyFullAccess()), g.Admin(), invitationHandler.ListTenantInvitations)
 				g.apiKeyRoute(tenantByID, http.MethodPost, "/invitations", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), invitationHandler.CreateInvitation)
 				g.apiKeyRoute(tenantByID, http.MethodDelete, "/invitations/:inv_id", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), invitationHandler.RevokeInvitation)
 				// Share-link create lives under /invite-links so the URL

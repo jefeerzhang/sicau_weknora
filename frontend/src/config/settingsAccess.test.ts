@@ -8,7 +8,10 @@ import {
 } from './settingsAccess'
 
 test('management shortcuts are stricter than read-only settings pages', () => {
-  assert.equal(SETTINGS_SECTION_MIN_ROLE.members, 'viewer')
+  // sicau-v1 ticket 01: the roster itself is Admin+ (names/emails/student
+  // IDs), so the members section is no longer a viewer-readable page — the
+  // "stricter shortcut" rationale below keeps applying to models only.
+  assert.equal(SETTINGS_SECTION_MIN_ROLE.members, 'admin')
   assert.equal(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.members, 'owner')
   assert.equal(SETTINGS_SECTION_MIN_ROLE.models, 'viewer')
   assert.equal(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.models, 'admin')

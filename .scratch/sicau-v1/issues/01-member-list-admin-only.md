@@ -4,10 +4,13 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** done (commit 待填：成员/邀请列表守卫 Admin+)
 
-- [ ] 学生账号（viewer）打开前端设置后，看不到任何成员管理/成员列表入口
-- [ ] 学生账号直接请求成员列表 API 返回 403（权限不足），而非脱敏数据
-- [ ] 教师（owner/admin）成员管理页功能不变：仍可查看名单、添加成员、改角色、移除成员
-- [ ] 排查其他可能向 viewer 泄露成员身份信息的接口（用户名/邮箱/学号字段），确认均已封闭或脱敏
-- [ ] 前端对 403 场景不弹原始报错（入口已隐藏，正常流程不应触发）
+- [x] 学生账号（viewer）打开前端设置后，看不到任何成员管理/成员列表入口
+- [x] 学生账号直接请求成员列表 API 返回 403（权限不足），而非脱敏数据
+- [x] 教师（owner/admin）成员管理页功能不变：仍可查看名单、添加成员、改角色、移除成员
+- [x] 排查其他可能向 viewer 泄露成员身份信息的接口（用户名/邮箱/学号字段），确认均已封闭或脱敏
+  - GET /invitations（含被邀请人邮箱）一并收紧为 Admin+
+  - TenantInfo 退出空间门禁仅 owner 拉名单（学生路径本来就不触接口），无需改
+  - MyInvitationsDialog / GlobalInvitationBell 只含本人数据；TenantSelector 只含空间名
+- [x] 前端对 403 场景不弹原始报错（入口已隐藏，深链落入 role-denied 兜底页）
