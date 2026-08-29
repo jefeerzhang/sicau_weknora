@@ -219,7 +219,8 @@
                         clearable />
                     </t-form-item>
                     <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
-                      <t-select v-model="addForm.role" :options="roleOptions" :popup-props="roleSelectPopupProps" />
+                      <!-- sicau-v1 ticket 02: invitations are viewer-only; the role is fixed server-side -->
+                      <t-tag theme="default" size="large">{{ $t('tenantMember.role.viewer') }}</t-tag>
                     </t-form-item>
                   </t-form>
                   <div v-else class="invite-confirm-body">
@@ -268,8 +269,8 @@
                     </p>
                     <t-form :data="shareLinkForm" :label-width="80">
                       <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
-                        <t-select v-model="shareLinkForm.role" :options="roleOptions"
-                          :popup-props="roleSelectPopupProps" />
+                        <!-- sicau-v1 ticket 02: share links are viewer-only; the role is fixed server-side -->
+                        <t-tag theme="default" size="large">{{ $t('tenantMember.role.viewer') }}</t-tag>
                       </t-form-item>
                     </t-form>
                   </div>
@@ -563,7 +564,9 @@ const invitePopupVisible = ref(false)
 // invite). shareLinkResult is non-null after a successful create —
 // the popup then switches into "here's your link, copy it" mode.
 const shareLinkPopupVisible = ref(false)
-const shareLinkForm = reactive<{ role: TenantRole }>({ role: 'contributor' })
+// sicau-v1 ticket 02: invitations are viewer-only (ADR-009-4); the server
+// rejects anything above viewer, so both forms pin the role client-side too.
+const shareLinkForm = reactive<{ role: TenantRole }>({ role: 'viewer' })
 const creatingShareLink = ref(false)
 const shareLinkResult = ref<TenantInvitation | null>(null)
 // Two-step invite inside the popup: 'form' renders the email/role inputs;
@@ -634,7 +637,7 @@ let auditScrollObserver: IntersectionObserver | null = null
 // should be a deliberate promote step after the user accepts.
 const addForm = reactive<{ email: string; role: TenantRole }>({
   email: '',
-  role: 'contributor',
+  role: 'viewer',
 })
 
 // Role-aware gates. The server enforces every mutation; UI gates here

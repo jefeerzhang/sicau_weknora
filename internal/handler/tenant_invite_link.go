@@ -81,6 +81,14 @@ func (h *TenantInvitationHandler) CreateInviteLink(c *gin.Context) {
 		c.Error(apperrors.NewValidationError("role must be one of owner/admin/contributor/viewer"))
 		return
 	}
+	// sicau-v1 ticket 02 (ADR-009-4): a share link is a bearer credential —
+	// anyone holding the URL joins with the link's role. This deployment
+	// pins it to viewer; collaborators are added via member management.
+	if req.Role != types.TenantRoleViewer {
+		c.Error(apperrors.NewValidationError(
+			"share link role is fixed to viewer; add collaborators via member management"))
+		return
+	}
 
 	caller, _ := types.UserIDFromContext(ctx)
 	var invitedBy *string

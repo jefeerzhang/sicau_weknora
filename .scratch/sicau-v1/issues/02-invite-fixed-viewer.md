@@ -4,10 +4,12 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] 教师在成员管理页生成分享链接，界面无角色选择控件（或控件固定显示 viewer 且不可改）
-- [ ] 用该链接注册的新学生进入空间后角色为 viewer（只读）
-- [ ] 直接调用邀请创建 API 并传入 owner/admin/contributor 角色时，后端拒绝（400/403），不产生高权限邀请
-- [ ] 通过"添加成员"正规流程（Owner+）仍可授予 contributor 及以上角色
-- [ ] invite_only 模式下链接注册全流程回归通过（含过期链接被拒的既有行为）
+- [x] 教师在成员管理页生成分享链接，界面无角色选择控件（固定显示 viewer 标签）
+- [x] 用该链接注册的新学生进入空间后角色为 viewer（只读）
+- [x] 直接调用邀请创建 API 并传入 owner/admin/contributor 角色时，后端拒绝（400），不产生高权限邀请
+  - 覆盖两条创建路径：POST /invitations 与 POST /invite-links
+- [x] 通过"添加成员"正规流程（Owner+）仍可授予 contributor 及以上角色
+- [x] invite_only 模式下链接注册全流程回归通过（含过期链接被拒的既有行为）
+- 附带修复：ko-KR / ru-RU 缺失的 platform.highlight / loginFeature / note 键（locale 审计 527/527 全绿）

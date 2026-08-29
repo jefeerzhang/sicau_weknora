@@ -2209,7 +2209,17 @@ export default {
     pinned: '고정됨'
   },
   platform: {
-    subtitle: '대규모 언어 모델 기반 엔터프라이즈 지식 프레임워크',
+    subtitle: '대규모 언어 모델 기반 지식베이스',
+    note: '본 시스템은 오픈소스 프로젝트 ',
+    noteSuffix: ' 을(를) 기반으로 구축되어 사천농업대학교의 교육·연구 문서 검색에 맞춰 커스터마이징되었습니다.',
+    loginFeature1: '실제 자료',
+    loginFeature2: '실제 사례',
+    loginFeature3: '멀티모달 문서 & ReAct',
+    highlight: {
+      ragDesc: '하이브리드 검색 · 정밀 리콜',
+      agentDesc: '다단계 추론 · 도구 호출',
+      wikiDesc: '자동 추출 · 구조 연결',
+    },
     description: 'RAG 검색, 에이전트 추론, Wiki 지식베이스로 문서를 진정으로 이해하고 활용합니다',
     rag: 'RAG 강화 생성',
     agent: 'ReAct 에이전트',

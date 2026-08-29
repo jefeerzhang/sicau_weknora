@@ -128,7 +128,9 @@ func TestCreateInvitation_AutoAcceptEnabled_AddsMemberDirectly(t *testing.T) {
 	}
 	r := newAutoAcceptTestRouter(h)
 
-	w := postAutoAcceptInvitation(t, r, `{"email":"bob@x.com","role":"contributor"}`)
+	// sicau-v1 ticket 02: invitations are viewer-only; the auto-accept
+	// mechanics under test are role-agnostic, so use the allowed role.
+	w := postAutoAcceptInvitation(t, r, `{"email":"bob@x.com","role":"viewer"}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
@@ -234,6 +236,11 @@ func TestCreateInvitation_AutoAccept_UnknownEmailReturns404(t *testing.T) {
 }
 
 func TestCreateInvitation_AutoAccept_APICannotAssignOwnerReturns403(t *testing.T) {
+	// sicau-v1 ticket 02: the handler now rejects every role above viewer
+	// with 400 before the API-key owner-assignment guard can fire, so an
+	// owner-assignment attempt surfaces as the viewer-only validation
+	// error instead of 403. The service-level ErrAPIKeyCannotAssignOwner
+	// guard itself remains covered by the member-service tests.
 	users := &autoAcceptUserSvc{user: &types.User{ID: "u-bob", Email: "bob@x.com"}}
 	members := &autoAcceptMemberSvc{addErr: service.ErrAPIKeyCannotAssignOwner}
 	invites := &autoAcceptInvitationSvc{}
@@ -246,8 +253,8 @@ func TestCreateInvitation_AutoAccept_APICannotAssignOwnerReturns403(t *testing.T
 	r := newAutoAcceptTestRouter(h)
 
 	w := postAutoAcceptInvitation(t, r, `{"email":"bob@x.com","role":"owner"}`)
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("status=%d body=%s, want 403", w.Code, w.Body.String())
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s, want 400", w.Code, w.Body.String())
 	}
 }
 
@@ -284,7 +291,9 @@ func TestCreateInvitation_AutoAccept_AdoptsTenantlessInviteeHomeTenant(t *testin
 	}
 	r := newAutoAcceptTestRouter(h)
 
-	w := postAutoAcceptInvitation(t, r, `{"email":"bob@x.com","role":"contributor"}`)
+	// sicau-v1 ticket 02: viewer-only invitations — use the allowed role;
+	// the tenantless-home-tenant adoption under test is role-agnostic.
+	w := postAutoAcceptInvitation(t, r, `{"email":"bob@x.com","role":"viewer"}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
