@@ -1276,7 +1276,8 @@ onUnmounted(() => detachAuditInfiniteScroll())
 watch(invitePopupVisible, (open) => {
   if (!open) return
   addForm.email = ''
-  addForm.role = 'contributor'
+  // sicau-v1 ticket 02: 邀请固定 viewer（服务端同样拒绝更高角色）
+  addForm.role = 'viewer'
   addDialogStep.value = 'form'
 })
 
@@ -1284,7 +1285,8 @@ watch(invitePopupVisible, (open) => {
 // the previous result on a fresh click.
 watch(shareLinkPopupVisible, (open) => {
   if (!open) return
-  shareLinkForm.role = 'contributor'
+  // sicau-v1 ticket 02: 分享链接固定 viewer（服务端同样拒绝更高角色）
+  shareLinkForm.role = 'viewer'
   shareLinkResult.value = null
 })
 
