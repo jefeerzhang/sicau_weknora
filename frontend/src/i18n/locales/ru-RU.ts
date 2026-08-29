@@ -119,6 +119,7 @@ export default {
     }
   },
   tenantMember: {
+    stats: { neverActive: 'Без активности' },
     title: 'Участники',
     sectionDescription: 'Приглашайте коллег в пространство и управляйте их ролями. Добавлять и удалять участников может только Владелец.',
     learnRbacGuide: 'Подробнее о RBAC',
@@ -211,6 +212,8 @@ export default {
       member: 'Имя и email',
       role: 'Роль',
       joinedAt: 'Дата вступления',
+      questionCount: 'Вопросов',
+      lastActive: 'Последняя активность',
       operations: 'Действия'
     },
     permissions: {
@@ -5596,6 +5599,12 @@ export default {
     }
   },
   agent: {
+  setAsDefault: 'Назначить по умолчанию',
+  unsetAsDefault: 'Убрать по умолчанию',
+  defaultBadge: 'По умолчанию',
+  defaultAgentSet: 'Агент по умолчанию установлен',
+  defaultAgentCleared: 'Агент по умолчанию сброшен',
+  defaultAgentSetFailed: 'Не удалось назначить агента по умолчанию',
     taskLabel: 'Задача:',
     think: 'Размышление',
     copy: 'Копировать',

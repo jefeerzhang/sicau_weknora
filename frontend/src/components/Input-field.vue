@@ -4,7 +4,8 @@ import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
 import { onBeforeRouteUpdate } from 'vue-router';
 import { MessagePlugin } from "tdesign-vue-next";
-import { useSettingsStore } from '@/stores/settings';
+import { useSettingsStore, markAgentExplicitlyChosen, EXPLICIT_AGENT_CHOSEN_KEY } from '@/stores/settings';
+import { getDefaultAgentId } from '@/api/tenant';
 import { useUIStore } from '@/stores/ui';
 import { useMenuStore } from '@/stores/menu';
 import { listKnowledgeBases, searchKnowledge, batchQueryKnowledge, listKnowledgeTags } from '@/api/knowledge-base';
@@ -150,7 +151,10 @@ const agentModeDropdownStyle = ref<Record<string, string>>({});
 
 const selectedAgentId = computed({
   get: () => settingsStore.selectedAgentId || BUILTIN_QUICK_ANSWER_ID,
-  set: (val: string) => settingsStore.selectAgent(val)
+  set: (val: string) => {
+    markAgentExplicitlyChosen();
+    settingsStore.selectAgent(val);
+  }
 });
 const selectedAgent = computed(() => {
   // When a shared-agent source tenant is set, resolve from sharedAgents FIRST.
@@ -849,10 +853,29 @@ const loadAgents = async (force = false) => {
   try {
     await chatResources.ensureAgents(force);
     ensureSelectedAgentNotDisabled();
+    await applyWorkspaceDefaultAgent();
   } catch (error) {
     console.error('Failed to load agents:', error);
   }
 };
+
+// sicau-v1 ticket 04: 应用空间默认 Agent（课程场景：学生零操作进入可提问状态）。
+// 规则：成员显式选过 Agent（localStorage 旗标）或本地已持久化非内置选择时，
+// 以本地为准；否则在空间设置了默认且该 Agent 仍存在时自动选中。
+// 默认 Agent 已被删除则静默忽略（等于无默认），不报错。
+async function applyWorkspaceDefaultAgent() {
+  try {
+    if (localStorage.getItem(EXPLICIT_AGENT_CHOSEN_KEY) === '1') return;
+    if ((settingsStore.settings.selectedAgentId || '') !== BUILTIN_QUICK_ANSWER_ID) return;
+    const res = await getDefaultAgentId();
+    const defaultId = res?.data?.agent_id;
+    if (!defaultId) return;
+    if (!agents.value.some(a => a.id === defaultId)) return;
+    settingsStore.selectAgent(defaultId);
+  } catch (error) {
+    console.warn('[InputField] apply workspace default agent failed:', error);
+  }
+}
 
 // 默认选中的 builtin（builtin-quick-answer）也可能被当前空间管理员停用。
 // 列表加载完后做一次纠偏：若当前选中的是本空间停用的 agent（仅限「我的/builtin」，
@@ -2102,6 +2125,7 @@ const selectAgentMode = async (mode: 'quick-answer' | 'smart-reasoning') => {
   if (shouldEnableAgent !== isAgentEnabled.value) {
     settingsStore.toggleAgent(shouldEnableAgent);
     // 同时更新选中的智能体
+    markAgentExplicitlyChosen();
     settingsStore.selectAgent(shouldEnableAgent ? BUILTIN_SMART_REASONING_ID : BUILTIN_QUICK_ANSWER_ID);
     MessagePlugin.success(shouldEnableAgent ? t('input.messages.agentSwitchedOn') : t('input.messages.agentSwitchedOff'));
   }
@@ -2143,6 +2167,7 @@ const handleSelectAgent = async (agent: CustomAgent, sourceTenantId?: string) =>
     return;
   }
 
+  markAgentExplicitlyChosen();
   settingsStore.selectAgent(agent.id, sourceTenantId);
   settingsStore.toggleAgent(!!isAgentType);
 

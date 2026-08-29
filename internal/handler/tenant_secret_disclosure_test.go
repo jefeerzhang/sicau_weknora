@@ -52,6 +52,9 @@ func (s *stubTenantService) GetTenantByIDForUser(context.Context, uint64, string
 func (s *stubTenantService) GetWeKnoraCloudCredentials(context.Context) *types.WeKnoraCloudCredentials {
 	return nil
 }
+func (s *stubTenantService) UpdateTenantDefaultAgentID(context.Context, uint64, string) error {
+	return nil
+}
 
 func newTenantHandlerTestEngine(t *testing.T, role types.TenantRole, tenant *types.Tenant) *gin.Engine {
 	t.Helper()

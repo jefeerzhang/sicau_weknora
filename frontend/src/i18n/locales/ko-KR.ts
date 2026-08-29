@@ -119,6 +119,7 @@ export default {
     }
   },
   tenantMember: {
+    stats: { neverActive: '활동 없음' },
     title: '멤버 관리',
     sectionDescription: '워크스페이스에 동료를 초대하고 역할을 관리합니다. 소유자만 멤버를 추가하거나 제거할 수 있습니다.',
     learnRbacGuide: 'RBAC 알아보기',
@@ -211,6 +212,8 @@ export default {
       member: '이름 · 이메일',
       role: '역할',
       joinedAt: '가입일',
+      questionCount: '질문 수',
+      lastActive: '마지막 활동',
       operations: '작업'
     },
     permissions: {
@@ -5596,6 +5599,12 @@ export default {
     }
   },
   agent: {
+  setAsDefault: '스페이스 기본으로 설정',
+  unsetAsDefault: '스페이스 기본 해제',
+  defaultBadge: '기본',
+  defaultAgentSet: '스페이스 기본 에이전트로 설정되었습니다',
+  defaultAgentCleared: '스페이스 기본 설정이 해제되었습니다',
+  defaultAgentSetFailed: '기본 에이전트 설정에 실패했습니다',
     taskLabel: '작업:',
     think: '사고',
     copy: '복사',

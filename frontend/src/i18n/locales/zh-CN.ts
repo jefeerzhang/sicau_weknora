@@ -119,6 +119,7 @@ export default {
     }
   },
   tenantMember: {
+    stats: { neverActive: '从未活跃' },
     title: '成员管理',
     sectionDescription: '邀请伙伴加入当前空间并分配角色。只有 Owner 可以新增或移除成员。',
     learnRbacGuide: '了解 RBAC',
@@ -211,6 +212,8 @@ export default {
       member: '姓名与邮箱',
       role: '角色',
       joinedAt: '加入时间',
+      questionCount: '提问数',
+      lastActive: '最后活跃',
       operations: '操作'
     },
     permissions: {
@@ -5598,6 +5601,12 @@ export default {
     }
   },
   agent: {
+  setAsDefault: '设为空间默认',
+  unsetAsDefault: '取消空间默认',
+  defaultBadge: '默认',
+  defaultAgentSet: '已设为空间默认',
+  defaultAgentCleared: '已取消空间默认',
+  defaultAgentSetFailed: '设置默认智能体失败',
     taskLabel: '任务:',
     think: '思考',
     copy: '复制',

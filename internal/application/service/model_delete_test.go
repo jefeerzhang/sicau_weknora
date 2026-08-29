@@ -205,6 +205,9 @@ func (s *stubTenantServiceForModelDelete) GetTenantByIDForUser(context.Context, 
 func (s *stubTenantServiceForModelDelete) GetWeKnoraCloudCredentials(context.Context) *types.WeKnoraCloudCredentials {
 	return nil
 }
+func (s *stubTenantServiceForModelDelete) UpdateTenantDefaultAgentID(context.Context, uint64, string) error {
+	return nil
+}
 
 func TestDeleteModel_RejectsWhenUsedByMemory(t *testing.T) {
 	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(1))

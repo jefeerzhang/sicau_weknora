@@ -118,6 +118,15 @@ func (r *tenantRepository) UpdateTenant(ctx context.Context, tenant *types.Tenan
 	return r.db.WithContext(ctx).Model(&types.Tenant{}).Where("id = ?", tenant.ID).Updates(tenant).Error
 }
 
+// UpdateTenantDefaultAgentID sets or clears the workspace default agent.
+// Map-based on purpose: gorm Updates(struct) skips zero values, so an
+// empty agentID (clearing the default) would never persist.
+func (r *tenantRepository) UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error {
+	return r.db.WithContext(ctx).Model(&types.Tenant{}).
+		Where("id = ?", tenantID).
+		Update("default_agent_id", agentID).Error
+}
+
 // DeleteTenant soft-deletes the tenant and every active membership row
 // for that tenant in one transaction. Without the membership purge,
 // /auth/me still lists the defunct tenant (name lookup fails → UI shows

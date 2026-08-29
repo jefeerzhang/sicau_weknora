@@ -799,6 +799,12 @@ export default {
     }
   },
   agent: {
+  setAsDefault: 'Set as workspace default',
+  unsetAsDefault: 'Unset workspace default',
+  defaultBadge: 'Default',
+  defaultAgentSet: 'Workspace default agent set',
+  defaultAgentCleared: 'Workspace default agent cleared',
+  defaultAgentSetFailed: 'Failed to set the default agent',
     taskLabel: 'Task:',
     think: 'Thinking',
     copy: 'Copy',
@@ -6453,10 +6459,13 @@ export default {
       createOwnKB: 'Create and edit own KBs and agents',
       readAll: 'Read workspace content'
     },
+        stats: { neverActive: 'Never active' },
     columns: {
       member: 'Name & email',
       role: 'Role',
       joinedAt: 'Joined',
+      questionCount: 'Questions',
+      lastActive: 'Last active',
       operations: 'Actions'
     },
     role: {

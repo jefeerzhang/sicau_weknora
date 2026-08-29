@@ -358,3 +358,26 @@ export async function searchTenants(params: SearchTenantsParams = {}): Promise<S
     }
   }
 }
+
+
+// sicau-v1 ticket 04: workspace default agent. GET is member-readable,
+// PUT is Admin+ — mirrored from the backend tenant-KV guards.
+export async function getDefaultAgentId(): Promise<{ success: boolean; data?: { agent_id: string }; message?: string }> {
+  try {
+    const response = await get('/api/v1/tenants/kv/default-agent-id')
+    return response as unknown as { success: boolean; data?: { agent_id: string }; message?: string }
+  } catch (error: any) {
+    return { success: false, message: error.message }
+  }
+}
+
+export async function putDefaultAgentId(
+  agentId: string,
+): Promise<{ success: boolean; data?: { agent_id: string }; message?: string }> {
+  try {
+    const response = await put('/api/v1/tenants/kv/default-agent-id', { agent_id: agentId })
+    return response as unknown as { success: boolean; data?: { agent_id: string }; message?: string }
+  } catch (error: any) {
+    return { success: false, message: error.message }
+  }
+}

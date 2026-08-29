@@ -1332,6 +1332,9 @@ func (h *TenantHandler) GetTenantKV(c *gin.Context) {
 	case "retrieval-config":
 		h.GetTenantRetrievalConfig(c)
 		return
+	case "default-agent-id":
+		h.GetTenantDefaultAgent(c)
+		return
 	case "memory-config":
 		h.GetTenantMemoryConfig(c)
 		return
@@ -1382,6 +1385,9 @@ func (h *TenantHandler) UpdateTenantKV(c *gin.Context) {
 		return
 	case "retrieval-config":
 		h.updateTenantRetrievalConfigInternal(c)
+		return
+	case "default-agent-id":
+		h.updateTenantDefaultAgentInternal(c)
 		return
 	case "memory-config":
 		h.updateTenantMemoryConfigInternal(c)
@@ -1744,6 +1750,63 @@ func (h *TenantHandler) GetTenantRetrievalConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    data,
+	})
+}
+
+// GetTenantDefaultAgent returns the workspace default agent id
+// (sicau-v1 ticket 04). Empty string means no default is set.
+func (h *TenantHandler) GetTenantDefaultAgent(c *gin.Context) {
+	tenant, _ := types.TenantInfoFromContext(c.Request.Context())
+	if tenant == nil {
+		logger.Error(c.Request.Context(), "Workspace is empty")
+		c.Error(errors.NewBadRequestError("Workspace is empty"))
+		return
+	}
+	agentID := ""
+	if tenant.DefaultAgentID != nil {
+		agentID = *tenant.DefaultAgentID
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    gin.H{"agent_id": agentID},
+	})
+}
+
+// updateTenantDefaultAgentInternal sets or clears the workspace default
+// agent. Existence of the agent inside the workspace is enforced at apply
+// time by the frontend; the server pins the format and persists via the
+// map-based update so clearing works.
+func (h *TenantHandler) updateTenantDefaultAgentInternal(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var req struct {
+		AgentID string `json:"agent_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(errors.NewValidationError("Invalid request data").WithDetails(err.Error()))
+		return
+	}
+	req.AgentID = strings.TrimSpace(req.AgentID)
+	if len(req.AgentID) > 36 {
+		c.Error(errors.NewBadRequestError("agent_id too long"))
+		return
+	}
+
+	tenant, _ := types.TenantInfoFromContext(ctx)
+	if tenant == nil {
+		logger.Error(ctx, "Workspace is empty")
+		c.Error(errors.NewBadRequestError("Workspace is empty"))
+		return
+	}
+
+	if err := h.service.UpdateTenantDefaultAgentID(ctx, tenant.ID, req.AgentID); err != nil {
+		logger.ErrorWithFields(ctx, err, nil)
+		c.Error(errors.NewInternalServerError("Failed to update default agent").WithDetails(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    gin.H{"agent_id": req.AgentID},
 	})
 }
 

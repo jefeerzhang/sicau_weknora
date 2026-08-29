@@ -193,6 +193,10 @@
                   <div v-else-if="agent.avatar" class="builtin-avatar agent-emoji">{{ agent.avatar }}</div>
                   <AgentAvatar v-else :name="agent.name" size="small" />
                   <span class="card-title" :title="agent.name">{{ agent.name }}</span>
+                  <t-tag v-if="defaultAgentId === agent.id" theme="success" variant="light" size="small"
+                    class="default-agent-badge">
+                    {{ t('agent.defaultBadge') }}
+                  </t-tag>
                 </div>
                 <t-popup
                   v-if="agent.isMine && (canManageAgent(agent) || authStore.hasRole('contributor') || authStore.hasRole('admin'))"
@@ -214,6 +218,12 @@
                         @click="handleToggleDisabled(agent)">
                         <t-icon class="menu-icon" name="poweroff" />
                         <span>{{ agent.disabled_by_me ? $t('agent.enable') : $t('agent.disable') }}</span>
+                      </div>
+                      <!-- sicau-v1 ticket 04: 仅本空间 Admin+ 可设默认；共享 agent 不参与（需 source tenant 语义） -->
+                      <div v-if="authStore.hasRole('admin')" class="popup-menu-item"
+                        @click="handleSetDefaultAgent(agent)">
+                        <t-icon class="menu-icon" name="star" />
+                        <span>{{ defaultAgentId === agent.id ? t('agent.unsetAsDefault') : t('agent.setAsDefault') }}</span>
                       </div>
                       <div v-if="!agent.is_builtin && canManageAgent(agent)" class="popup-menu-item delete"
                         @click="handleDelete(agent)"><t-icon class="menu-icon" name="delete" /><span>{{
@@ -395,6 +405,10 @@
                   <div v-else-if="agent.avatar" class="builtin-avatar agent-emoji">{{ agent.avatar }}</div>
                   <AgentAvatar v-else :name="agent.name" size="small" />
                   <span class="card-title" :title="agent.name">{{ agent.name }}</span>
+                  <t-tag v-if="defaultAgentId === agent.id" theme="success" variant="light" size="small"
+                    class="default-agent-badge">
+                    {{ t('agent.defaultBadge') }}
+                  </t-tag>
                 </div>
                 <t-popup v-if="canManageAgent(agent) || authStore.hasRole('contributor') || authStore.hasRole('admin')"
                   :visible="openMoreAgentId === agent.id" trigger="hover" overlayClassName="card-more-popup"
@@ -816,13 +830,14 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin, Icon as TIcon } from 'tdesign-vue-next'
 import { deleteAgent, copyAgent, type CustomAgent } from '@/api/agent'
+import { getDefaultAgentId, putDefaultAgentId } from '@/api/tenant'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { formatStringDate } from '@/utils/index'
 import { useI18n } from 'vue-i18n'
 import { createSessions } from '@/api/chat/index'
 import { useOrganizationStore } from '@/stores/organization'
 import { setSharedAgentDisabledByMe, listOrganizationSharedAgents } from '@/api/organization'
-import { useSettingsStore } from '@/stores/settings'
+import { useSettingsStore, markAgentExplicitlyChosen, EXPLICIT_AGENT_CHOSEN_KEY } from '@/stores/settings'
 import { useMenuStore } from '@/stores/menu'
 import type { SharedAgentInfo, OrganizationSharedAgentItem } from '@/api/organization'
 import AgentEditorModal from './AgentEditorModal.vue'
@@ -1212,8 +1227,38 @@ watch(creatorFilter, () => {
   fetchList(true)
 })
 
+// sicau-v1 ticket 04: 当前空间默认 Agent（用于菜单文案与卡片徽标）
+const defaultAgentId = ref('')
+const defaultAgentLoading = ref(false)
+
+async function loadDefaultAgentId() {
+  if (defaultAgentLoading.value) return
+  defaultAgentLoading.value = true
+  try {
+    const res = await getDefaultAgentId()
+    defaultAgentId.value = res?.data?.agent_id || ''
+  } catch {
+    defaultAgentId.value = ''
+  } finally {
+    defaultAgentLoading.value = false
+  }
+}
+
+/** 设为/取消空间默认 Agent（Admin+；服务端同样只放行 Admin+ 与 viewer 语义） */
+async function handleSetDefaultAgent(agent: CustomAgent) {
+  const target = defaultAgentId.value === agent.id ? '' : agent.id
+  const res = await putDefaultAgentId(target)
+  if (res?.success) {
+    defaultAgentId.value = target
+    MessagePlugin.success(target ? t('agent.defaultAgentSet') : t('agent.defaultAgentCleared'))
+  } else {
+    MessagePlugin.error(res?.message || t('agent.defaultAgentSetFailed'))
+  }
+}
+
 onMounted(() => {
   fetchList()
+  loadDefaultAgentId()
   window.addEventListener('openAgentEditor', handleOpenAgentEditor as EventListener)
 })
 
@@ -1276,6 +1321,7 @@ async function handleUseSharedAgentInChat(shared: SharedAgentInfo) {
   closeSharedAgentDetail()
   const settingsStore = useSettingsStore()
   const menuStore = useMenuStore()
+  markAgentExplicitlyChosen()
   settingsStore.selectAgent(shared.agent.id, String(shared.source_tenant_id))
   try {
     const res = await createSessions({})

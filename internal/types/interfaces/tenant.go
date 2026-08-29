@@ -38,6 +38,9 @@ type TenantService interface {
 	GetTenantByIDForUser(ctx context.Context, tenantID uint64, userID string) (*types.Tenant, error)
 	// GetWeKnoraCloudCredentials returns the decrypted WeKnoraCloud credentials for the current tenant.
 	GetWeKnoraCloudCredentials(ctx context.Context) *types.WeKnoraCloudCredentials
+	// UpdateTenantDefaultAgentID sets or clears the workspace default agent
+	// (sicau-v1 ticket 04). Empty agentID clears the default.
+	UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error
 }
 
 // TenantRepository defines the tenant repository interface
@@ -54,6 +57,10 @@ type TenantRepository interface {
 	SearchTenants(ctx context.Context, keyword string, tenantID uint64, page, pageSize int) ([]*types.Tenant, int64, error)
 	// UpdateTenant updates a tenant
 	UpdateTenant(ctx context.Context, tenant *types.Tenant) error
+	// UpdateTenantDefaultAgentID sets or clears (empty string) the workspace
+	// default agent (sicau-v1 ticket 04). Map-based on purpose: the generic
+	// struct Updates() skips zero values, so clearing would never persist.
+	UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error
 	// DeleteTenant deletes a tenant
 	DeleteTenant(ctx context.Context, id uint64) error
 	// AdjustStorageUsed adjusts the storage used for a tenant

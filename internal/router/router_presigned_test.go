@@ -69,6 +69,9 @@ func (s *stubTenantService) GetTenantByIDForUser(context.Context, uint64, string
 func (s *stubTenantService) GetWeKnoraCloudCredentials(context.Context) *types.WeKnoraCloudCredentials {
 	panic("unexpected")
 }
+func (s *stubTenantService) UpdateTenantDefaultAgentID(context.Context, uint64, string) error {
+	return nil
+}
 
 // setupPresignedTestServer wires presignedFileHandler with a real local file
 // service rooted at a temp dir, returning the engine, baseDir, and the
