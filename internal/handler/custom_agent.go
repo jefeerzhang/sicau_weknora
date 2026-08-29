@@ -236,6 +236,24 @@ func (h *CustomAgentHandler) ListAgents(c *gin.Context) {
 		agents = filtered
 	}
 
+	// sicau-v1: course workspaces pin students (viewers) to the workspace
+	// default agent — a viewer's agent list is exactly that one agent.
+	// Workspaces without a default (or Admin+ callers) keep the full list.
+	// Applies after the creator filter so both compose.
+	if tenant, _ := types.TenantInfoFromContext(ctx); tenant != nil &&
+		tenant.DefaultAgentID != nil && *tenant.DefaultAgentID != "" {
+		if types.TenantRoleFromContext(ctx) == types.TenantRoleViewer {
+			pinned := make([]*types.CustomAgent, 0, 1)
+			for _, ag := range agents {
+				if ag.ID == *tenant.DefaultAgentID {
+					pinned = append(pinned, ag)
+					break
+				}
+			}
+			agents = pinned
+		}
+	}
+
 	// Per-tenant "disabled by me" for own agents (only affects this tenant's conversation dropdown)
 	tenantIDVal, exists := c.Get(types.TenantIDContextKey.String())
 	if !exists {
