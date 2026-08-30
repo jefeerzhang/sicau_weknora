@@ -136,11 +136,97 @@ func (h *MeNoteHandler) Delete(c *gin.Context) {
 // leaked), anything else passes through for the error middleware.
 func mapNoteError(err error) error {
 	switch {
-	case errors.Is(err, types.ErrNoteLimitReached), errors.Is(err, types.ErrNoteTooLarge):
+	case errors.Is(err, types.ErrNoteLimitReached), errors.Is(err, types.ErrNoteTooLarge),
+		errors.Is(err, types.ErrNoteImageLimitReached), errors.Is(err, types.ErrNoteImageTooLarge),
+		errors.Is(err, types.ErrNoteImageTypeUnsupport):
 		return apperrors.NewValidationError(err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		return apperrors.NewNotFoundError("note not found")
 	default:
 		return err
 	}
+}
+
+// UploadImage godoc
+// @Summary      上传笔记图片
+// @Description  multipart 上传（字段名 file），≤2MB；类型按 magic bytes 嗅探，仅 png/jpeg/gif/webp；每人 ≤200 张
+// @Tags         Me
+// @Accept       multipart/form-data
+// @Param        file  formData  file  true  "图片文件"
+// @Success      201  {object}  map[string]interface{}  "{"url":"/api/v1/me/notes/images/<id>","id":"<id>"}"
+// @Failure      400  {object}  apperrors.AppError
+// @Security     Bearer
+// @Router       /me/notes/images [post]
+func (h *MeNoteHandler) UploadImage(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.Error(apperrors.NewValidationError("file field is required"))
+		return
+	}
+	f, err := file.Open()
+	if err != nil {
+		c.Error(apperrors.NewValidationError("cannot open uploaded file").WithDetails(err.Error()))
+		return
+	}
+	defer f.Close()
+	data := make([]byte, file.Size+1)
+	n, err := f.Read(data)
+	if err != nil && n == 0 {
+		c.Error(apperrors.NewValidationError("empty upload"))
+		return
+	}
+	data = data[:n]
+
+	image, err := h.service.CreateImage(c.Request.Context(), data)
+	if err != nil {
+		c.Error(mapNoteError(err))
+		return
+	}
+	url := types.NoteImageURLPrefix + image.ID
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"data":    gin.H{"id": image.ID, "url": url, "mime": image.Mime},
+	})
+}
+
+// GetImage godoc
+// @Summary      读取笔记图片
+// @Description  返回图片字节；仅 owner 可读（非本人 404）。带 private immutable 缓存头与 ETag
+// @Tags         Me
+// @Param        id  path  string  true  "图片 ID"
+// @Success      200  {file}  binary
+// @Failure      404  {object}  apperrors.AppError
+// @Security     Bearer
+// @Router       /me/notes/images/{id} [get]
+func (h *MeNoteHandler) GetImage(c *gin.Context) {
+	image, err := h.service.GetImage(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.Error(mapNoteError(err))
+		return
+	}
+	etag := `"` + image.ID + `"`
+	c.Header("Cache-Control", "private, max-age=31536000, immutable")
+	c.Header("ETag", etag)
+	if c.GetHeader("If-None-Match") == etag {
+		c.Status(http.StatusNotModified)
+		return
+	}
+	c.Data(http.StatusOK, image.Mime, image.Bytes)
+}
+
+// DeleteImage godoc
+// @Summary      删除笔记图片
+// @Description  删除本人图片并即时释放配额
+// @Tags         Me
+// @Param        id  path  string  true  "图片 ID"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      404  {object}  apperrors.AppError
+// @Security     Bearer
+// @Router       /me/notes/images/{id} [delete]
+func (h *MeNoteHandler) DeleteImage(c *gin.Context) {
+	if err := h.service.DeleteImage(c.Request.Context(), c.Param("id")); err != nil {
+		c.Error(mapNoteError(err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }

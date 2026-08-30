@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,8 +22,11 @@ const (
 
 // Sentinel errors mapped by handlers: both limits surface as 400.
 var (
-	ErrNoteLimitReached = errors.New("note limit reached (200 notes per user)")
-	ErrNoteTooLarge     = errors.New("note content too large (max 1MB)")
+	ErrNoteLimitReached       = errors.New("note limit reached (200 notes per user)")
+	ErrNoteTooLarge           = errors.New("note content too large (max 1MB)")
+	ErrNoteImageLimitReached  = errors.New("note image limit reached (200 images per user)")
+	ErrNoteImageTooLarge      = errors.New("note image too large (max 2MB)")
+	ErrNoteImageTypeUnsupport = errors.New("image type must be png/jpeg/gif/webp")
 )
 
 // TenantNote is one user's private Markdown note inside a workspace.
@@ -71,3 +75,61 @@ type TenantNoteImage struct {
 
 // TableName pins the table so GORM's pluralizer cannot drift.
 func (TenantNoteImage) TableName() string { return "tenant_note_images" }
+
+// NoteImageURLPrefix is the markdown-facing URL stem for note images.
+// Handlers mount the full route under /api/v1/me/notes/images/<id>.
+const NoteImageURLPrefix = "/api/v1/me/notes/images/"
+
+// ExtractNoteImageIDs pulls every note-image id referenced by a Markdown
+// body. Used by the post-delete GC to reclaim images that only the deleted
+// note referenced (ticket 07). UUID chars contain no LIKE wildcards, so the
+// repository's LIKE-based reference check is safe.
+func ExtractNoteImageIDs(content string) []string {
+	const marker = NoteImageURLPrefix
+	var ids []string
+	for i := strings.Index(content, marker); i >= 0; i = strings.Index(content, marker) {
+		rest := content[i+len(marker):]
+		end := 0
+		for end < len(rest) && isNoteImageIDChar(rest[end]) {
+			end++
+		}
+		if end >= 36 {
+			ids = append(ids, rest[:36])
+		}
+		next := strings.Index(rest, marker)
+		if next < 0 {
+			break
+		}
+		content = rest
+	}
+	return ids
+}
+
+func isNoteImageIDChar(b byte) bool {
+	return b >= '0' && b <= '9' || b >= 'a' && b <= 'f' || b >= 'A' && b <= 'F' || b == '-'
+}
+
+// DetectNoteImageMime sniffs the payload's magic bytes (the multipart
+// Content-Type header is client-controlled and untrustworthy, notes
+// ticket 07). Returns "" for anything outside the whitelist.
+func DetectNoteImageMime(data []byte) string {
+	if len(data) < 12 {
+		return ""
+	}
+	switch {
+	// PNG
+	case data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G':
+		return "image/png"
+	// JPEG
+	case data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF:
+		return "image/jpeg"
+	// GIF87a / GIF89a
+	case string(data[:6]) == "GIF87a", string(data[:6]) == "GIF89a":
+		return "image/gif"
+	// WEBP: RIFF....WEBP
+	case string(data[0:4]) == "RIFF" && string(data[8:12]) == "WEBP":
+		return "image/webp"
+	default:
+		return ""
+	}
+}

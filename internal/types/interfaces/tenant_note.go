@@ -37,6 +37,26 @@ type TenantNoteRepository interface {
 	// CountByUser returns how many notes the user owns in the tenant
 	// (exposed for tests and the image-GC sanity checks).
 	CountByUser(ctx context.Context, tenantID uint64, userID string) (int64, error)
+
+	// CreateImage stores a note image inside the per-user count-limit
+	// transaction (≤200 images). Returns types.ErrNoteImageLimitReached
+	// at the cap.
+	CreateImage(ctx context.Context, tenantID uint64, userID string, image *types.TenantNoteImage) error
+
+	// GetImageByID returns the image only when the (tenant, user) pair
+	// owns it; gorm.ErrRecordNotFound otherwise (no existence leak).
+	GetImageByID(ctx context.Context, tenantID uint64, userID, imageID string) (*types.TenantNoteImage, error)
+
+	// DeleteImage removes an owned image (owner-controlled quota release).
+	DeleteImage(ctx context.Context, tenantID uint64, userID, imageID string) error
+
+	// CountImagesByUser returns how many images the user owns in the tenant.
+	CountImagesByUser(ctx context.Context, tenantID uint64, userID string) (int64, error)
+
+	// DeleteUnreferencedImages GCs candidate images that no remaining note
+	// of this user references (ticket 07: run after a note deletion). Best-
+	// effort per candidate; returns the first hard error only.
+	DeleteUnreferencedImages(ctx context.Context, tenantID uint64, userID, deletedNoteID string, candidateIDs []string) error
 }
 
 // TenantNoteService is the business layer over TenantNoteRepository: it
@@ -62,4 +82,14 @@ type TenantNoteService interface {
 
 	// Delete removes an owned note.
 	Delete(ctx context.Context, noteID string) error
+
+	// CreateImage stores an uploaded note image (sniffed mime from bytes;
+	// service validates size/type/count before calling).
+	CreateImage(ctx context.Context, data []byte) (types.TenantNoteImage, error)
+
+	// GetImage returns an owned image (non-owned/missing → 404 via handler).
+	GetImage(ctx context.Context, imageID string) (*types.TenantNoteImage, error)
+
+	// DeleteImage removes an owned image (releases quota).
+	DeleteImage(ctx context.Context, imageID string) error
 }

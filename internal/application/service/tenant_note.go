@@ -104,11 +104,65 @@ func (s *tenantNoteService) Delete(ctx context.Context, noteID string) error {
 	if err != nil {
 		return err
 	}
+	note, err := s.repo.GetByID(ctx, tenantID, userID, noteID)
+	if err != nil {
+		return err
+	}
 	if err := s.repo.Delete(ctx, tenantID, userID, noteID); err != nil {
 		return err
 	}
-	// ticket 07 接入：图片 GC —— 回收仅被被删笔记引用的图片（no-op until then）。
+	// ticket 07：图片 GC —— 回收仅被被删笔记引用的图片，即时释放配额。
+	// Best-effort：GC 失败不影响笔记删除本身。
+	if ids := types.ExtractNoteImageIDs(note.Content); len(ids) > 0 {
+		if gcErr := s.repo.DeleteUnreferencedImages(ctx, tenantID, userID, noteID, ids); gcErr != nil {
+			logger.Warnf(ctx, "[notes] image GC after delete failed: note=%s err=%v", noteID, gcErr)
+		}
+	}
 	return nil
+}
+
+// CreateImage validates an uploaded note image (magic-byte sniffed type,
+// ≤2MB, ≤200/user) and stores it. The multipart Content-Type header is
+// ignored — sniffing wins (notes ticket 07).
+func (s *tenantNoteService) CreateImage(ctx context.Context, data []byte) (types.TenantNoteImage, error) {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return types.TenantNoteImage{}, err
+	}
+	if len(data) > types.MaxNoteImageBytes {
+		return types.TenantNoteImage{}, types.ErrNoteImageTooLarge
+	}
+	mime := types.DetectNoteImageMime(data)
+	if mime == "" {
+		return types.TenantNoteImage{}, types.ErrNoteImageTypeUnsupport
+	}
+	image := types.TenantNoteImage{
+		TenantID: tenantID,
+		UserID:   userID,
+		Mime:     mime,
+		Bytes:    data,
+	}
+	if err := s.repo.CreateImage(ctx, tenantID, userID, &image); err != nil {
+		return types.TenantNoteImage{}, err
+	}
+	logger.Infof(ctx, "[notes] stored image %s (%d bytes, %s) for user %s", image.ID, len(data), mime, userID)
+	return image, nil
+}
+
+func (s *tenantNoteService) GetImage(ctx context.Context, imageID string) (*types.TenantNoteImage, error) {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetImageByID(ctx, tenantID, userID, imageID)
+}
+
+func (s *tenantNoteService) DeleteImage(ctx context.Context, imageID string) error {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return err
+	}
+	return s.repo.DeleteImage(ctx, tenantID, userID, imageID)
 }
 
 // validateNoteContent enforces the per-note size limit (UTF-8 bytes).

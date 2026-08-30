@@ -81,6 +81,9 @@ func noteTestRouter(h *MeNoteHandler) *gin.Engine {
 		me.GET("/:id", h.Get)
 		me.PUT("/:id", h.Update)
 		me.DELETE("/:id", h.Delete)
+		me.POST("/images", h.UploadImage)
+		me.GET("/images/:id", h.GetImage)
+		me.DELETE("/images/:id", h.DeleteImage)
 	}
 	return r
 }
@@ -180,5 +183,101 @@ func TestNotes_UpdateForeignOrMissingIs404(t *testing.T) {
 	w := doNote(t, r, http.MethodPut, "/me/notes/n-5", `{"content":"x"}`)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status=%d body=%s, want 404", w.Code, w.Body.String())
+	}
+}
+
+// --- ticket 07：图片端点 ---
+
+type fakeNoteImageService struct {
+	interfaces.TenantNoteService
+	image        types.TenantNoteImage
+	imageErr     error
+	createCalled bool
+	deleteCalled bool
+	deleteID     string
+	deleteErr    error
+}
+
+func (s *fakeNoteImageService) CreateImage(ctx context.Context, data []byte) (types.TenantNoteImage, error) {
+	s.createCalled = true
+	if s.imageErr != nil {
+		return types.TenantNoteImage{}, s.imageErr
+	}
+	return s.image, nil
+}
+
+func (s *fakeNoteImageService) GetImage(ctx context.Context, imageID string) (*types.TenantNoteImage, error) {
+	if s.imageErr != nil {
+		return nil, s.imageErr
+	}
+	img := s.image
+	return &img, nil
+}
+
+func (s *fakeNoteImageService) DeleteImage(ctx context.Context, imageID string) error {
+	s.deleteCalled = true
+	s.deleteID = imageID
+	return s.deleteErr
+}
+
+func TestNotes_UploadImageReturns201WithCapabilityURL(t *testing.T) {
+	png := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 1, 2, 3, 4, 5, 6, 7, 8}
+	svc := &fakeNoteImageService{image: types.TenantNoteImage{ID: "img-1", Mime: "image/png"}}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	req := httptest.NewRequest(http.MethodPost, "/me/notes/images", nil)
+	// 手工组 multipart（避免引入 mime/multipart 依赖断言）
+	body := &bytes.Buffer{}
+	body.WriteString("--X\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.png\"\r\n")
+	body.WriteString("Content-Type: image/png\r\n\r\n")
+	body.Write(png)
+	body.WriteString("\r\n--X--\r\n")
+	req = httptest.NewRequest(http.MethodPost, "/me/notes/images", body)
+	req.Header.Set("Content-Type", "multipart/form-data; boundary=X")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "/api/v1/me/notes/images/img-1") {
+		t.Fatalf("expected capability url, got %s", w.Body.String())
+	}
+}
+
+func TestNotes_UploadOversizeMapsTo400(t *testing.T) {
+	svc := &fakeNoteImageService{imageErr: types.ErrNoteImageTooLarge}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	req := httptest.NewRequest(http.MethodPost, "/me/notes/images", nil)
+	body := &bytes.Buffer{}
+	body.WriteString("--X\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.png\"\r\n\r\nbig\r\n--X--\r\n")
+	req = httptest.NewRequest(http.MethodPost, "/me/notes/images", body)
+	req.Header.Set("Content-Type", "multipart/form-data; boundary=X")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s, want 400", w.Code, w.Body.String())
+	}
+}
+
+func TestNotes_GetImageForeignOrMissingIs404(t *testing.T) {
+	svc := &fakeNoteImageService{imageErr: gorm.ErrRecordNotFound}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	w := doNote(t, r, http.MethodGet, "/me/notes/images/img-x", "")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%s, want 404", w.Code, w.Body.String())
+	}
+}
+
+func TestNotes_DeleteImagePassesID(t *testing.T) {
+	svc := &fakeNoteImageService{}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	w := doNote(t, r, http.MethodDelete, "/me/notes/images/img-7", "")
+	if w.Code != http.StatusOK || !svc.deleteCalled || svc.deleteID != "img-7" {
+		t.Fatalf("status=%d called=%v id=%q", w.Code, svc.deleteCalled, svc.deleteID)
 	}
 }
