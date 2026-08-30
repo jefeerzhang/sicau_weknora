@@ -108,8 +108,13 @@ const noteImageObjectURLs = ref<string[]>([])
 
 const dirty = computed(() => content.value !== savedContent.value)
 
-// sicau-v1 notes N-3：安全预览管线与 wiki/manual editor 同源
-const previewHTML = computed(() => sanitizeHTML(safeMarkdownToHTML(content.value)))
+// sicau-v1 notes N-3：预览管线与 manual editor 同源——
+// 去脚本标签 → marked 渲染 → DOMPurify 清理
+const previewHTML = computed(() => {
+    if (!content.value) return ''
+    const html = marked.parse(safeMarkdownToHTML(content.value), { async: false })
+    return sanitizeHTML(html as string)
+})
 
 function formatDate(value: string): string {
     if (!value) return ''
