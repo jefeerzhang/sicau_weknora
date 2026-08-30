@@ -51,6 +51,13 @@
                         <template #icon><t-icon name="browse" /></template>
                         {{ $t('notes.preview') }}
                     </t-button>
+                    <!-- sicau-v1 ticket 09: 贴图（仅编辑模式可用） -->
+                    <t-button v-if="!previewMode" variant="text" size="small" :loading="uploadingImage"
+                        :title="$t('notes.insertImage')" @click="imageInputRef?.click()">
+                        <template #icon><t-icon name="image" /></template>
+                    </t-button>
+                    <input ref="imageInputRef" type="file" accept="image/png,image/jpeg,image/gif,image/webp"
+                        style="display: none" @change="onImageFileChange" />
                     <span class="notes-editor-spacer"></span>
                     <span v-if="dirty" class="notes-unsaved">{{ $t('notes.unsaved') }}</span>
                     <span v-else-if="justSaved" class="notes-saved">{{ $t('notes.saved') }}</span>
@@ -59,7 +66,8 @@
                     </t-button>
                 </div>
                 <textarea v-if="!previewMode" ref="editorRef" v-model="content" class="notes-editor"
-                    :placeholder="$t('notes.placeholder')" @keydown="onEditorKeydown"></textarea>
+                    :placeholder="$t('notes.placeholder')" @keydown="onEditorKeydown"
+                    @paste="onEditorPaste"></textarea>
                 <div v-else class="notes-preview markdown-body" v-html="previewHTML"></div>
             </template>
             <div v-else class="notes-empty-hint notes-editor-empty">
@@ -70,13 +78,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, nextTick } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { marked } from 'marked'
 import { useI18n } from 'vue-i18n'
 import { createNote, deleteNote, getNote, listNotes, updateNote, type MyNoteListItem } from '@/api/me/notes'
 import { safeMarkdownToHTML, sanitizeHTML } from '@/utils/security'
+import { fetchNoteImageBlob, uploadNoteImage } from '@/api/me/notes'
 
 const { t } = useI18n()
 
@@ -90,7 +99,12 @@ const saving = ref(false)
 const previewMode = ref(false)
 const justSaved = ref(false)
 const editorRef = ref<HTMLTextAreaElement | null>(null)
+const imageInputRef = ref<HTMLInputElement | null>(null)
+const uploadingImage = ref(false)
 let savedTimer: ReturnType<typeof setTimeout> | null = null
+// sicau-v1 ticket 09: 预览里笔记图片经认证取回后的 objectURL，
+// 组件卸载/重渲染时统一回收。
+const noteImageObjectURLs = ref<string[]>([])
 
 const dirty = computed(() => content.value !== savedContent.value)
 
@@ -118,6 +132,7 @@ async function loadList() {
 }
 
 async function openNote(id: string) {
+    revokeNoteImageURLs()
     const resp = await getNote(id)
     if (!resp.success || !resp.data) {
         MessagePlugin.error(resp.message || t('notes.loadFailed'))
@@ -220,6 +235,99 @@ function onEditorKeydown(e: KeyboardEvent) {
     }
 }
 
+// sicau-v1 ticket 09: 在光标处插入文本（贴图引用等）
+function insertAtCursor(text: string) {
+    const el = editorRef.value
+    if (!el) {
+        content.value += text
+        return
+    }
+    const start = el.selectionStart ?? content.value.length
+    const end = el.selectionEnd ?? start
+    content.value = content.value.slice(0, start) + text + content.value.slice(end)
+    nextTick(() => {
+        el.focus()
+        const pos = start + text.length
+        el.setSelectionRange(pos, pos)
+    })
+}
+
+async function uploadAndInsertImage(file: File) {
+    if (uploadingImage.value) return
+    uploadingImage.value = true
+    try {
+        const resp = await uploadNoteImage(file)
+        if (!resp.success || !resp.data) {
+            MessagePlugin.error(resp.message || t('notes.imageUploadFailed'))
+            return
+        }
+        insertAtCursor(`
+![](${resp.data.url})
+`)
+        MessagePlugin.success(t('notes.imageInserted'))
+    } finally {
+        uploadingImage.value = false
+    }
+}
+
+function onImageFileChange(e: Event) {
+    const input = e.target as HTMLInputElement
+    const file = input.files?.[0]
+    if (file) void uploadAndInsertImage(file)
+    input.value = ''
+}
+
+function onEditorPaste(e: ClipboardEvent) {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of items) {
+        if (item.type.startsWith('image/')) {
+            const file = item.getAsFile()
+            if (file) {
+                e.preventDefault()
+                void uploadAndInsertImage(file)
+            }
+            return
+        }
+    }
+}
+
+// 预览渲染后，把指向 /me/notes/images 的 <img> 换成认证取回的 objectURL；
+// 其余外链图片交由浏览器原生加载。
+async function hydrateNoteImages() {
+    if (!previewMode.value) return
+    await nextTick()
+    const pane = document.querySelector('.notes-preview')
+    if (!pane) return
+    const imgs = Array.from(pane.querySelectorAll('img')) as HTMLImageElement[]
+    for (const img of imgs) {
+        const src = img.getAttribute('src') || ''
+        if (!src.startsWith('/api/v1/me/notes/images/')) continue
+        img.setAttribute('src', '')
+        try {
+            const blob = await fetchNoteImageBlob(src)
+            const url = URL.createObjectURL(blob)
+            noteImageObjectURLs.value.push(url)
+            img.src = url
+        } catch {
+            img.alt = t('notes.imageLoadFailed')
+        }
+    }
+}
+
+watch(previewHTML, () => { void hydrateNoteImages() })
+watch(previewMode, (on) => { if (on) void hydrateNoteImages() })
+
+function revokeNoteImageURLs() {
+    for (const url of noteImageObjectURLs.value) URL.revokeObjectURL(url)
+    noteImageObjectURLs.value = []
+}
+
+onBeforeUnmount(() => {
+    revokeNoteImageURLs()
+    window.removeEventListener('beforeunload', beforeUnload)
+})
+
 function beforeUnload(e: BeforeUnloadEvent) {
     if (dirty.value) {
         e.preventDefault()
@@ -232,9 +340,7 @@ onMounted(() => {
     window.addEventListener('beforeunload', beforeUnload)
 })
 
-onBeforeUnmount(() => {
-    window.removeEventListener('beforeunload', beforeUnload)
-})
+
 
 onBeforeRouteLeave(() => {
     if (dirty.value && !window.confirm(t('notes.leaveConfirm'))) return false

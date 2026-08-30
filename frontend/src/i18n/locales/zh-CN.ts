@@ -2214,6 +2214,10 @@ export default {
     pinned: '已置顶'
   },
   notes: {
+    insertImage: '插入图片',
+    imageInserted: '图片已插入',
+    imageUploadFailed: '图片上传失败',
+    imageLoadFailed: '图片加载失败',
     title: '我的笔记',
     newNote: '新建笔记',
     untitled: '无标题',

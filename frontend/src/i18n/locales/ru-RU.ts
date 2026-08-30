@@ -2212,6 +2212,10 @@ export default {
     pinned: 'Закреплено'
   },
   notes: {
+    insertImage: 'Вставить изображение',
+    imageInserted: 'Изображение вставлено',
+    imageUploadFailed: 'Не удалось загрузить изображение',
+    imageLoadFailed: 'Не удалось открыть изображение',
     title: 'Мои заметки',
     newNote: 'Новая заметка',
     untitled: 'Без названия',

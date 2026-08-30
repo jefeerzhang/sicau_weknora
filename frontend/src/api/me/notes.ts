@@ -3,7 +3,7 @@
  * The backend derives the caller from the auth context — no user ids in
  * payloads. List items carry a server-derived title, never the content.
  */
-import { get, post, put, del } from '@/utils/request'
+import { del, get, getDown, post, postUpload, put } from '@/utils/request'
 
 export interface MyNoteListItem {
   id: string
@@ -38,4 +38,30 @@ export async function updateNote(noteId: string, content: string): Promise<Notes
 
 export async function deleteNote(noteId: string): Promise<NotesResponse<null>> {
   return (await del(`/api/v1/me/notes/${noteId}`)) as unknown as NotesResponse<null>
+}
+
+/**
+ * sicau-v1 ticket 09: note image upload (multipart, ≤2MB, sniffed type
+ * server-side). Returns the capability-URL-shaped markdown source plus the
+ * image id for quota bookkeeping.
+ */
+export async function uploadNoteImage(
+  file: File,
+): Promise<{ success: boolean; data?: { id: string; url: string; mime: string }; message?: string }> {
+  const form = new FormData();
+  form.append('file', file);
+  return (await postUpload('/api/v1/me/notes/images', form)) as unknown as {
+    success: boolean
+    data?: { id: string; url: string; mime: string }
+    message?: string
+  }
+}
+
+/**
+ * Authed fetch of a note image as a Blob — the <img> pipeline must go
+ * through this (bearer token per request), never a bare <img src>.
+ * Mirrors utils/request getDown.
+ */
+export async function fetchNoteImageBlob(url: string): Promise<Blob> {
+  return (await getDown(url)) as unknown as Blob
 }

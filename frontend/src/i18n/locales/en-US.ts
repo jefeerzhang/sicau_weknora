@@ -4423,6 +4423,10 @@ export default {
     }
   },
   notes: {
+    insertImage: 'Insert image',
+    imageInserted: 'Image inserted',
+    imageUploadFailed: 'Image upload failed',
+    imageLoadFailed: 'Image failed to load',
     title: 'My Notes',
     newNote: 'New note',
     untitled: 'Untitled',

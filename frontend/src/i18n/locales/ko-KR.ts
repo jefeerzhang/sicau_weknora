@@ -2212,6 +2212,10 @@ export default {
     pinned: '고정됨'
   },
   notes: {
+    insertImage: '이미지 삽입',
+    imageInserted: '이미지가 삽입되었습니다',
+    imageUploadFailed: '이미지 업로드에 실패했습니다',
+    imageLoadFailed: '이미지를 불러오지 못했습니다',
     title: '내 노트',
     newNote: '새 노트',
     untitled: '제목 없음',
