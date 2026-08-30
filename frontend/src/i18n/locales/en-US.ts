@@ -2,6 +2,7 @@ export default {
   menu: {
     knowledgeBase: 'Knowledge Base',
     notes: 'My Notes',
+    announcements: 'Announcements',
     agents: 'Agents',
     organizations: 'Shared Spaces',
     newChat: 'New Chat',
@@ -4450,6 +4451,30 @@ export default {
     loadFailed: 'Failed to load note',
     leaveConfirm: 'You have unsaved changes. Leave anyway?',
     placeholder: 'Write in Markdown — the first line becomes the title…',
+  },
+
+  announcements: {
+    titlePlaceholder: 'Announcement title',
+    contentPlaceholder: 'Body (Markdown supported)…',
+    addFiles: 'Add attachments',
+    publish: 'Publish',
+    loading: 'Loading…',
+    empty: 'No announcements yet',
+    postFailed: 'Failed to publish',
+    posted: 'Announcement published',
+    titleRequired: 'Title is required',
+    fileTooLarge: 'File exceeds 50MB: {name}',
+    tooManyFiles: 'At most 5 attachments',
+    deleteFailed: 'Failed to delete',
+    deleteConfirm: 'Delete this announcement? Attachments and comments will be removed too',
+    downloadFailed: 'Attachment download failed',
+    comments: 'Comments',
+    noComments: 'No comments yet',
+    commentPlaceholder: 'Write a comment…',
+    send: 'Send',
+    commentFailed: 'Comment failed',
+    commentDeleteFailed: 'Failed to delete comment',
+    unknownAuthor: 'Unknown',
   },
 
   platform: {

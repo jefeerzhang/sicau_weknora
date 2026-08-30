@@ -14,9 +14,9 @@ type TenantAnnouncementRepository interface {
 	// Create inserts an announcement with its attachment metadata.
 	Create(ctx context.Context, announcement *types.Announcement) error
 
-	// ListHead returns announcements ordered by created_at DESC with a
-	// bounded content head (list cards show title + author only).
-	ListHead(ctx context.Context, tenantID uint64) ([]*types.Announcement, error)
+	// List returns announcements ordered by created_at DESC, full bodies
+	// included (the board renders bodies inline).
+	List(ctx context.Context, tenantID uint64) ([]*types.Announcement, error)
 
 	// GetByID returns the full announcement.
 	GetByID(ctx context.Context, tenantID uint64, announcementID string) (*types.Announcement, error)

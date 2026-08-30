@@ -21,17 +21,15 @@ func (r *tenantAnnouncementRepository) Create(ctx context.Context, announcement 
 	return r.db.WithContext(ctx).Create(announcement).Error
 }
 
-// ListHead selects a bounded content head — list cards render title and
-// author only, so pulling every full notice body is waste.
-func (r *tenantAnnouncementRepository) ListHead(ctx context.Context, tenantID uint64) ([]*types.Announcement, error) {
-	var notes []*types.Announcement
+// List returns announcements ordered by created_at DESC with full bodies —
+// notice bodies are short and the board renders them inline.
+func (r *tenantAnnouncementRepository) List(ctx context.Context, tenantID uint64) ([]*types.Announcement, error) {
+	var announcements []*types.Announcement
 	err := r.db.WithContext(ctx).
-		Table("announcements").
-		Select("id, tenant_id, user_id, title, LEFT(content, ?) AS content, attachments, created_at, updated_at", 2048).
 		Where("tenant_id = ?", tenantID).
 		Order("created_at DESC").
-		Scan(&notes).Error
-	return notes, err
+		Find(&announcements).Error
+	return announcements, err
 }
 
 func (r *tenantAnnouncementRepository) GetByID(ctx context.Context, tenantID uint64, announcementID string) (*types.Announcement, error) {

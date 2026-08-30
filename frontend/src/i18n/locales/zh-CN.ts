@@ -2243,6 +2243,30 @@ export default {
     placeholder: '用 Markdown 记录，首行将成为标题…',
   },
 
+  announcements: {
+    titlePlaceholder: '公告标题',
+    contentPlaceholder: '正文（支持 Markdown）…',
+    addFiles: '添加附件',
+    publish: '发布公告',
+    loading: '加载中…',
+    empty: '还没有公告',
+    postFailed: '发布公告失败',
+    posted: '公告已发布',
+    titleRequired: '请填写公告标题',
+    fileTooLarge: '文件超过 50MB：{name}',
+    tooManyFiles: '附件最多 5 个',
+    deleteFailed: '删除失败',
+    deleteConfirm: '确定删除该公告？附件与留言将一并删除',
+    downloadFailed: '附件下载失败',
+    comments: '留言',
+    noComments: '还没有留言',
+    commentPlaceholder: '写下你的留言…',
+    send: '发送',
+    commentFailed: '留言失败',
+    commentDeleteFailed: '删除留言失败',
+    unknownAuthor: '未知用户',
+  },
+
   platform: {
     subtitle: '大模型驱动的知识库',
     note: '本系统基于开源项目 ',
@@ -6675,6 +6699,7 @@ export default {
   menu: {
     knowledgeBase: '知识库',
     notes: '我的笔记',
+    announcements: '公告板',
     agents: '智能体',
     organizations: '共享空间',
     newChat: '新对话',

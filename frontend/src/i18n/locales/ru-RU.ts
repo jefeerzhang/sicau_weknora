@@ -2241,6 +2241,30 @@ export default {
     placeholder: 'Пишите в Markdown — первая строка станет заголовком…',
   },
 
+  announcements: {
+    titlePlaceholder: 'Заголовок объявления',
+    contentPlaceholder: 'Текст (поддерживается Markdown)…',
+    addFiles: 'Добавить вложения',
+    publish: 'Опубликовать',
+    loading: 'Загрузка…',
+    empty: 'Объявлений пока нет',
+    postFailed: 'Не удалось опубликовать',
+    posted: 'Объявление опубликовано',
+    titleRequired: 'Укажите заголовок',
+    fileTooLarge: 'Файл больше 50 МБ: {name}',
+    tooManyFiles: 'Не более 5 вложений',
+    deleteFailed: 'Не удалось удалить',
+    deleteConfirm: 'Удалить объявление? Вложения и комментарии будут удалены',
+    downloadFailed: 'Не удалось скачать вложение',
+    comments: 'Комментарии',
+    noComments: 'Комментариев пока нет',
+    commentPlaceholder: 'Напишите комментарий…',
+    send: 'Отправить',
+    commentFailed: 'Не удалось оставить комментарий',
+    commentDeleteFailed: 'Не удалось удалить комментарий',
+    unknownAuthor: 'Неизвестно',
+  },
+
   platform: {
     subtitle: 'База знаний на основе больших языковых моделей',
     note: 'Система построена на open-source проекте ',
@@ -6673,6 +6697,7 @@ export default {
   menu: {
     knowledgeBase: 'База знаний',
     notes: 'Мои заметки',
+    announcements: 'Объявления',
     agents: 'Агенты',
     organizations: 'Общие пространства',
     newChat: 'Новый диалог',

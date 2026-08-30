@@ -2241,6 +2241,30 @@ export default {
     placeholder: 'Markdown로 기록하세요 — 첫 줄이 제목이 됩니다…',
   },
 
+  announcements: {
+    titlePlaceholder: '공지 제목',
+    contentPlaceholder: '본문(Markdown 지원)…',
+    addFiles: '첨부 파일 추가',
+    publish: '게시',
+    loading: '불러오는 중…',
+    empty: '아직 공지가 없습니다',
+    postFailed: '게시에 실패했습니다',
+    posted: '공지가 게시되었습니다',
+    titleRequired: '제목을 입력하세요',
+    fileTooLarge: '파일이 50MB를 초과합니다: {name}',
+    tooManyFiles: '첨부 파일은 최대 5개입니다',
+    deleteFailed: '삭제에 실패했습니다',
+    deleteConfirm: '이 공지를 삭제할까요? 첨부 파일과 댓글도 함께 삭제됩니다',
+    downloadFailed: '첨부 파일 다운로드에 실패했습니다',
+    comments: '댓글',
+    noComments: '아직 댓글이 없습니다',
+    commentPlaceholder: '댓글을 입력하세요…',
+    send: '보내기',
+    commentFailed: '댓글 작성에 실패했습니다',
+    commentDeleteFailed: '댓글 삭제에 실패했습니다',
+    unknownAuthor: '알 수 없음',
+  },
+
   platform: {
     subtitle: '대규모 언어 모델 기반 지식베이스',
     note: '본 시스템은 오픈소스 프로젝트 ',
@@ -6673,6 +6697,7 @@ export default {
   menu: {
     knowledgeBase: '지식베이스',
     notes: '내 노트',
+    announcements: '공지사항',
     agents: '에이전트',
     organizations: '공유 공간',
     newChat: '새 대화',

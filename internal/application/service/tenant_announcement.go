@@ -82,7 +82,7 @@ func (s *tenantAnnouncementService) List(ctx context.Context) ([]*types.Announce
 	if err != nil {
 		return nil, err
 	}
-	announcements, err := s.repo.ListHead(ctx, tenantID)
+	announcements, err := s.repo.List(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}
