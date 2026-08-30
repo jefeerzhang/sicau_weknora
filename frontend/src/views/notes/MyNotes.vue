@@ -172,7 +172,19 @@ async function loadList() {
 
 // ---------- 自动保存核心（N-4 v2） ----------
 
+// persist 是唯一入口：保证同一时刻只有一个保存请求在途（inFlight），
+// 在途时后来者等它落地后按最新 dirty 决定是否重存，避免静默丢内容。
 async function persist(): Promise<boolean> {
+    if (inFlight) return inFlight
+    inFlight = doPersist()
+    try {
+        return await inFlight
+    } finally {
+        inFlight = null
+    }
+}
+
+async function doPersist(): Promise<boolean> {
     if (saving.value) return true
     saving.value = true
     try {
@@ -235,6 +247,7 @@ async function flushSave() {
         clearTimeout(autoSaveTimer)
         autoSaveTimer = null
     }
+    // Ctrl+S / 手动保存：等在途请求落地后再补存最新内容
     if (inFlight) await inFlight
     if (isNewDraft.value && content.value === '') return
     if (!dirty.value) return
