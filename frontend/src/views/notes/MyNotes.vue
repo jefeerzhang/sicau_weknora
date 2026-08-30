@@ -4,23 +4,34 @@
         <aside class="notes-list-pane">
             <div class="notes-list-header">
                 <span class="notes-list-title">{{ $t('notes.title') }}</span>
-                <t-button theme="primary" variant="text" size="small" :loading="creating"
-                    @click="handleCreate">
+                <t-button theme="primary" variant="text" size="small" @click="handleCreate">
                     <template #icon><t-icon name="add" /></template>
                     {{ $t('notes.newNote') }}
                 </t-button>
             </div>
             <div class="notes-list-body">
                 <div v-if="listLoading" class="notes-empty-hint">{{ $t('notes.loading') }}</div>
-                <div v-else-if="notes.length === 0" class="notes-empty-hint">
+                <div v-else-if="notes.length === 0 && !isNewDraft" class="notes-empty-hint">
                     {{ $t('notes.empty') }}
                 </div>
-                <div v-for="item in notes" :key="item.id" class="note-list-item" :class="{
-                    'is-active': item.id === currentId,
-                    'is-dirty': item.id === currentId && dirty
-                }" @click="switchTo(item.id)">
-                    <div class="note-item-title">{{ item.title || $t('notes.untitled') }}<span v-if="item.id === currentId && dirty"
+                <!-- sicau-v1 N-4(v2)：草稿态也在列表顶部呈现（未落库前即可见） -->
+                <div v-if="isNewDraft" class="note-list-item is-active">
+                    <div class="note-item-title">{{ deriveLocalTitle(content) || $t('notes.untitled') }}<span
                             class="note-dirty-dot">●</span></div>
+                    <div class="note-item-meta">
+                        <span>{{ $t('notes.draft') }}</span>
+                        <t-button theme="danger" variant="text" shape="square" size="small"
+                            @click.stop="discardDraft">
+                            <template #icon><t-icon name="delete" size="13px" /></template>
+                        </t-button>
+                    </div>
+                </div>
+                <div v-for="item in notes" :key="item.id" class="note-list-item" :class="{
+                    'is-active': item.id === selectedKey,
+                    'is-dirty': item.id === selectedKey && dirty
+                }" @click="switchTo(item.id)">
+                    <div class="note-item-title">{{ item.title || $t('notes.untitled') }}<span
+                            v-if="item.id === selectedKey && dirty" class="note-dirty-dot">●</span></div>
                     <div class="note-item-meta">
                         <span>{{ formatDate(item.updated_at) }}</span>
                         <t-popconfirm :content="$t('notes.deleteConfirm')"
@@ -39,7 +50,7 @@
 
         <!-- 右：编辑/预览 -->
         <section class="notes-editor-pane">
-            <template v-if="currentId">
+            <template v-if="currentId || isNewDraft">
                 <div class="notes-editor-bar">
                     <t-button variant="text" size="small" :class="{ 'is-active': !previewMode }"
                         @click="previewMode = false">
@@ -59,19 +70,24 @@
                     <input ref="imageInputRef" type="file" accept="image/png,image/jpeg,image/gif,image/webp"
                         style="display: none" @change="onImageFileChange" />
                     <span class="notes-editor-spacer"></span>
-                    <span v-if="dirty" class="notes-unsaved">{{ $t('notes.unsaved') }}</span>
+                    <!-- sicau-v1 N-4(v2)：自动保存状态机 -->
+                    <span v-if="saving" class="notes-unsaved">{{ $t('notes.savingNow') }}</span>
+                    <span v-else-if="autoSaveFailed && dirty" class="notes-unsaved notes-unsaved--error">
+                        {{ $t('notes.autoSaveRetry') }}
+                    </span>
                     <span v-else-if="justSaved" class="notes-saved">{{ $t('notes.saved') }}</span>
-                    <t-button theme="primary" size="small" :loading="saving" @click="saveCurrent(true)">
+                    <span v-else-if="dirty" class="notes-unsaved">{{ $t('notes.unsaved') }}</span>
+                    <t-button theme="primary" size="small" :loading="saving" @click="flushSave()">
                         {{ $t('notes.save') }}
                     </t-button>
                 </div>
                 <textarea v-if="!previewMode" ref="editorRef" v-model="content" class="notes-editor"
                     :placeholder="$t('notes.placeholder')" @keydown="onEditorKeydown"
-                    @paste="onEditorPaste"></textarea>
+                    @paste="onEditorPaste" @input="scheduleAutoSave"></textarea>
                 <div v-else class="notes-preview markdown-body" v-html="previewHTML"></div>
             </template>
             <div v-else class="notes-empty-hint notes-editor-empty">
-                {{ notes.length === 0 ? $t('notes.empty') : $t('notes.selectHint') }}
+                {{ notes.length === 0 && !isNewDraft ? $t('notes.empty') : $t('notes.selectHint') }}
             </div>
         </section>
     </div>
@@ -91,24 +107,31 @@ const { t } = useI18n()
 
 const notes = ref<MyNoteListItem[]>([])
 const currentId = ref('')
+// sicau-v1 notes N-4(v2)：延迟创建——「新建」先进草稿态，
+// 首次自动保存才真正 POST，空草稿切走不留痕。
+const isNewDraft = ref(false)
 const content = ref('')
 const savedContent = ref('')
 const listLoading = ref(false)
-const creating = ref(false)
 const saving = ref(false)
 const previewMode = ref(false)
 const justSaved = ref(false)
+// 自动保存失败：保留 dirty + 一次性提示，继续输入自动重试
+const autoSaveFailed = ref(false)
 const editorRef = ref<HTMLTextAreaElement | null>(null)
 const imageInputRef = ref<HTMLInputElement | null>(null)
 const uploadingImage = ref(false)
 let savedTimer: ReturnType<typeof setTimeout> | null = null
-// sicau-v1 ticket 09: 预览里笔记图片经认证取回后的 objectURL，
-// 组件卸载/重渲染时统一回收。
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+let inFlight: Promise<boolean> | null = null
+// 预览里笔记图片经认证取回后的 objectURL，统一回收
 const noteImageObjectURLs = ref<string[]>([])
 
 const dirty = computed(() => content.value !== savedContent.value)
+// 当前激活键：草稿态为 'new'，真实笔记为其 id
+const selectedKey = computed(() => (isNewDraft.value ? 'new' : currentId.value))
 
-// sicau-v1 notes N-3：预览管线与 manual editor 同源——
+// N-3：预览管线与 manual editor 同源——
 // 去脚本标签 → marked 渲染 → DOMPurify 清理
 const previewHTML = computed(() => {
     if (!content.value) return ''
@@ -124,6 +147,17 @@ function formatDate(value: string): string {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+// 与后端派生规则一致的本地镜像（仅用于列表即时反馈）
+function deriveLocalTitle(text: string): string {
+    for (const line of text.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+        const stripped = trimmed.replace(/^#+\s*/, '').trim()
+        return (stripped || trimmed).slice(0, 50)
+    }
+    return ''
+}
+
 async function loadList() {
     listLoading.value = true
     try {
@@ -136,7 +170,131 @@ async function loadList() {
     }
 }
 
+// ---------- 自动保存核心（N-4 v2） ----------
+
+async function persist(): Promise<boolean> {
+    if (saving.value) return true
+    saving.value = true
+    try {
+        if (isNewDraft.value) {
+            const resp = await createNote(content.value)
+            if (!resp.success || !resp.data) {
+                throw new Error(resp.message || t('notes.saveFailed'))
+            }
+            isNewDraft.value = false
+            currentId.value = resp.data.id
+            savedContent.value = content.value
+            notes.value.unshift({
+                id: resp.data.id,
+                title: deriveLocalTitle(content.value),
+                updated_at: resp.data.updated_at,
+            })
+        } else {
+            const resp = await updateNote(currentId.value, content.value)
+            if (!resp.success) {
+                throw new Error(resp.message || t('notes.saveFailed'))
+            }
+            savedContent.value = content.value
+            const item = notes.value.find(n => n.id === currentId.value)
+            if (item) {
+                item.title = deriveLocalTitle(content.value)
+                item.updated_at = new Date().toISOString()
+            }
+        }
+        autoSaveFailed.value = false
+        justSaved.value = true
+        if (savedTimer) clearTimeout(savedTimer)
+        savedTimer = setTimeout(() => { justSaved.value = false }, 2000)
+        return true
+    } catch (err: any) {
+        // Q3(a)：保留 dirty + 一次性错误提示，继续输入自动重试
+        autoSaveFailed.value = true
+        MessagePlugin.error(err?.message || t('notes.saveFailed'))
+        return false
+    } finally {
+        saving.value = false
+    }
+}
+
+function scheduleAutoSave() {
+    if (isNewDraft.value && content.value === '') return // 空草稿不触发
+    if (!dirty.value) return
+    if (autoSaveTimer) clearTimeout(autoSaveTimer)
+    autoSaveTimer = setTimeout(() => {
+        autoSaveTimer = null
+        if (inFlight) {
+            scheduleAutoSave() // 保存中又有改动 → 顺延
+            return
+        }
+        if (dirty.value) void persist()
+    }, 1500)
+}
+
+async function flushSave() {
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer)
+        autoSaveTimer = null
+    }
+    if (inFlight) await inFlight
+    if (isNewDraft.value && content.value === '') return
+    if (!dirty.value) return
+    await persist()
+}
+
+async function ensurePersisted(): Promise<boolean> {
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer)
+        autoSaveTimer = null
+    }
+    if (isNewDraft.value && content.value === '') {
+        resetDraft()
+        return true
+    }
+    if (inFlight) await inFlight
+    if (!dirty.value) return true
+    return await persist()
+}
+
+function resetDraft() {
+    isNewDraft.value = false
+    currentId.value = ''
+    content.value = ''
+    savedContent.value = ''
+    autoSaveFailed.value = false
+}
+
+// ---------- 交互 ----------
+
+async function handleCreate() {
+    if (selectedKey.value === 'new') return
+    if (!(await ensurePersisted())) return
+    revokeNoteImageURLs()
+    isNewDraft.value = true
+    currentId.value = ''
+    content.value = ''
+    savedContent.value = ''
+    previewMode.value = false
+    autoSaveFailed.value = false
+    nextTick(() => editorRef.value?.focus())
+}
+
+function discardDraft() {
+    resetDraft()
+}
+
+async function switchTo(id: string) {
+    if (id === selectedKey.value) return
+    if (!(await ensurePersisted())) return
+    await openNote(id)
+}
+
 async function openNote(id: string) {
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer)
+        autoSaveTimer = null
+    }
+    isNewDraft.value = false
+    autoSaveFailed.value = false
     revokeNoteImageURLs()
     const resp = await getNote(id)
     if (!resp.success || !resp.data) {
@@ -150,39 +308,14 @@ async function openNote(id: string) {
     nextTick(() => editorRef.value?.focus())
 }
 
-async function switchTo(id: string) {
-    if (id === currentId.value) return
-    if (dirty.value && !window.confirm(t('notes.leaveConfirm'))) return
-    await openNote(id)
-}
-
-async function handleCreate() {
-    if (creating.value) return
-    creating.value = true
-    try {
-        const resp = await createNote('')
-        if (!resp.success || !resp.data) {
-            MessagePlugin.error(resp.message || t('notes.createFailed'))
+async function handleDelete(id: string) {
+    if (id === selectedKey.value) {
+        if (!(await ensurePersisted())) return
+        if (isNewDraft.value) {
+            discardDraft()
             return
         }
-        // 列表头部插入，避免整表重拉；标题由后端派生（空内容 → 无标题）
-        notes.value.unshift({
-            id: resp.data.id,
-            title: '',
-            updated_at: resp.data.updated_at,
-        })
-        currentId.value = resp.data.id
-        content.value = ''
-        savedContent.value = ''
-        previewMode.value = false
-        nextTick(() => editorRef.value?.focus())
-    } finally {
-        creating.value = false
     }
-}
-
-async function handleDelete(id: string) {
-    if (id === currentId.value && dirty.value && !window.confirm(t('notes.leaveConfirm'))) return
     const resp = await deleteNote(id)
     if (!resp.success) {
         MessagePlugin.error(resp.message || t('notes.deleteFailed'))
@@ -190,57 +323,19 @@ async function handleDelete(id: string) {
     }
     notes.value = notes.value.filter(n => n.id !== id)
     if (currentId.value === id) {
-        currentId.value = ''
-        content.value = ''
-        savedContent.value = ''
+        resetDraft()
     }
-}
-
-async function saveCurrent(explicit: boolean) {
-    if (!currentId.value || saving.value) return
-    saving.value = true
-    try {
-        const resp = await updateNote(currentId.value, content.value)
-        if (!resp.success) {
-            MessagePlugin.error(resp.message || t('notes.saveFailed'))
-            return
-        }
-        savedContent.value = content.value
-        // 本地同步列表标题与时间（后端派生规则：首个 # 行 / 首行）
-        const item = notes.value.find(n => n.id === currentId.value)
-        if (item) {
-            item.title = deriveLocalTitle(content.value)
-            item.updated_at = new Date().toISOString()
-        }
-        if (explicit) {
-            justSaved.value = true
-            if (savedTimer) clearTimeout(savedTimer)
-            savedTimer = setTimeout(() => { justSaved.value = false }, 2000)
-        }
-    } finally {
-        saving.value = false
-    }
-}
-
-// 与后端派生规则一致的本地镜像（仅用于列表即时反馈）
-function deriveLocalTitle(text: string): string {
-    for (const line of text.split('\n')) {
-        const trimmed = line.trim()
-        if (!trimmed) continue
-        const stripped = trimmed.replace(/^#+\s*/, '').trim()
-        return (stripped || trimmed).slice(0, 50)
-    }
-    return ''
 }
 
 function onEditorKeydown(e: KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
-        saveCurrent(true)
+        void flushSave()
     }
 }
 
-// sicau-v1 ticket 09: 在光标处插入文本（贴图引用等）
+// ---------- 贴图（ticket 09） ----------
+
 function insertAtCursor(text: string) {
     const el = editorRef.value
     if (!el) {
@@ -266,9 +361,7 @@ async function uploadAndInsertImage(file: File) {
             MessagePlugin.error(resp.message || t('notes.imageUploadFailed'))
             return
         }
-        insertAtCursor(`
-![](${resp.data.url})
-`)
+        insertAtCursor(`\n![](${resp.data.url})\n`)
         MessagePlugin.success(t('notes.imageInserted'))
     } finally {
         uploadingImage.value = false
@@ -297,8 +390,8 @@ function onEditorPaste(e: ClipboardEvent) {
     }
 }
 
-// 预览渲染后，把指向 /me/notes/images 的 <img> 换成认证取回的 objectURL；
-// 其余外链图片交由浏览器原生加载。
+// ---------- 预览图片 hydration（ticket 09） ----------
+
 async function hydrateNoteImages() {
     if (!previewMode.value) return
     await nextTick()
@@ -328,13 +421,10 @@ function revokeNoteImageURLs() {
     noteImageObjectURLs.value = []
 }
 
-onBeforeUnmount(() => {
-    revokeNoteImageURLs()
-    window.removeEventListener('beforeunload', beforeUnload)
-})
+// ---------- 生命周期与守卫 ----------
 
 function beforeUnload(e: BeforeUnloadEvent) {
-    if (dirty.value) {
+    if (dirty.value || inFlight || (isNewDraft.value && content.value !== '')) {
         e.preventDefault()
         e.returnValue = ''
     }
@@ -345,11 +435,15 @@ onMounted(() => {
     window.addEventListener('beforeunload', beforeUnload)
 })
 
+onBeforeUnmount(() => {
+    if (autoSaveTimer) clearTimeout(autoSaveTimer)
+    revokeNoteImageURLs()
+    window.removeEventListener('beforeunload', beforeUnload)
+})
 
-
-onBeforeRouteLeave(() => {
-    if (dirty.value && !window.confirm(t('notes.leaveConfirm'))) return false
-    return true
+onBeforeRouteLeave(async () => {
+    // 冲刷优先：离开前落库；仅自动保存失败时拦截
+    return await ensurePersisted()
 })
 </script>
 
@@ -470,6 +564,10 @@ onBeforeRouteLeave(() => {
     .notes-unsaved {
         font-size: 11px;
         color: var(--td-warning-color);
+    }
+
+    .notes-unsaved--error {
+        color: var(--td-error-color);
     }
 
     .notes-saved {
