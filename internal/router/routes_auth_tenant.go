@@ -222,6 +222,9 @@ func RegisterMyNoteRoutes(r *gin.RouterGroup, h *handler.MeNoteHandler) {
 		me.GET("/:id", h.Get)
 		me.PUT("/:id", h.Update)
 		me.DELETE("/:id", h.Delete)
+		me.POST("/images", h.UploadImage)
+		me.GET("/images/:id", h.GetImage)
+		me.DELETE("/images/:id", h.DeleteImage)
 	}
 }
 
