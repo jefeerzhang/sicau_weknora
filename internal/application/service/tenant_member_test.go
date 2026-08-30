@@ -248,6 +248,12 @@ func (r *fakeTenantMemberRepo) RemoveOwnerAtomically(
 	return nil
 }
 
+// MemberUsageStats — sicau-v1 ticket 05 interface surface; these tests
+// exercise membership invariants only, so the aggregate is a stub.
+func (r *fakeTenantMemberRepo) MemberUsageStats(context.Context, uint64) ([]types.TenantMemberUsageStat, error) {
+	return nil, nil
+}
+
 // Compile-time guard so the test stays in sync with the interface.
 var _ interfaces.TenantMemberRepository = (*fakeTenantMemberRepo)(nil)
 

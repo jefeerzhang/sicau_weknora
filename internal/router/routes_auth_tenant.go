@@ -206,6 +206,25 @@ func RegisterMyEnvVarRoutes(r *gin.RouterGroup, h *handler.MeEnvVarHandler) {
 	}
 }
 
+// RegisterMyNoteRoutes registers the per-user notes CRUD surface
+// (sicau-v1 notes, /me/notes). Web JWT path ONLY — see notes design §7:
+// IM synthetic accounts share a user_id, so this must never hang off IM
+// auth. No role gate: every authenticated member manages their own notes;
+// isolation is structural (owner-scoped queries, no cross-user endpoint).
+func RegisterMyNoteRoutes(r *gin.RouterGroup, h *handler.MeNoteHandler) {
+	if h == nil {
+		return
+	}
+	me := r.Group("/me/notes")
+	{
+		me.GET("", h.List)
+		me.POST("", h.Create)
+		me.GET("/:id", h.Get)
+		me.PUT("/:id", h.Update)
+		me.DELETE("/:id", h.Delete)
+	}
+}
+
 // RegisterAuthRoutes registers authentication routes
 func RegisterAuthRoutes(r *gin.RouterGroup, handler *handler.AuthHandler, g *rbacGuards) {
 	r.POST("/auth/register", handler.Register)

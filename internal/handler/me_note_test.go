@@ -1,0 +1,184 @@
+package handler
+
+// sicau-v1 notes: /me/notes CRUD. The handler maps service sentinels to
+// HTTP (limits → 400, missing/foreign → 404); owner isolation itself lives
+// in the service/repository (queries filter by ctx-derived tenant+user),
+// so these tests pin the HTTP surface and the error mapping.
+
+import (
+	"bytes"
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+type fakeNoteService struct {
+	interfaces.TenantNoteService
+	list        []types.TenantNoteListItem
+	created     string
+	updateID    string
+	updateBody  string
+	deleteID    string
+	getID       string
+	getResult   *types.TenantNote
+	getErr      error
+	createErr   error
+	updateErr   error
+	deleteErr   error
+}
+
+func (s *fakeNoteService) List(ctx context.Context) ([]types.TenantNoteListItem, error) {
+	return s.list, nil
+}
+
+func (s *fakeNoteService) Create(ctx context.Context, content string) (types.TenantNote, error) {
+	if s.createErr != nil {
+		return types.TenantNote{}, s.createErr
+	}
+	s.created = content
+	return types.TenantNote{ID: "n-1", Content: content}, nil
+}
+
+func (s *fakeNoteService) Get(ctx context.Context, noteID string) (*types.TenantNote, error) {
+	s.getID = noteID
+	if s.getErr != nil {
+		return nil, s.getErr
+	}
+	return s.getResult, nil
+}
+
+func (s *fakeNoteService) Update(ctx context.Context, noteID string, content string) error {
+	s.updateID = noteID
+	s.updateBody = content
+	return s.updateErr
+}
+
+func (s *fakeNoteService) Delete(ctx context.Context, noteID string) error {
+	s.deleteID = noteID
+	return s.deleteErr
+}
+
+func noteTestRouter(h *MeNoteHandler) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		ctx := context.WithValue(c.Request.Context(), types.UserIDContextKey, "u-student")
+		ctx = context.WithValue(ctx, types.TenantIDContextKey, uint64(7))
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	}, errorCapture())
+	me := r.Group("/me/notes")
+	{
+		me.GET("", h.List)
+		me.POST("", h.Create)
+		me.GET("/:id", h.Get)
+		me.PUT("/:id", h.Update)
+		me.DELETE("/:id", h.Delete)
+	}
+	return r
+}
+
+func doNote(t *testing.T, r *gin.Engine, method, path, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	var req *http.Request
+	if body == "" {
+		req = httptest.NewRequest(method, path, nil)
+	} else {
+		req = httptest.NewRequest(method, path, bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestNotes_CreateReturns201(t *testing.T) {
+	svc := &fakeNoteService{}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	w := doNote(t, r, http.MethodPost, "/me/notes", `{"content":"# 笔记标题\n正文"}`)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if svc.created != "# 笔记标题\n正文" {
+		t.Fatalf("content not passed through: %q", svc.created)
+	}
+}
+
+func TestNotes_LimitMapsTo400(t *testing.T) {
+	svc := &fakeNoteService{createErr: types.ErrNoteLimitReached}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	w := doNote(t, r, http.MethodPost, "/me/notes", `{"content":"x"}`)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s, want 400", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "200 notes") {
+		t.Fatalf("expected limit message, got %s", w.Body.String())
+	}
+}
+
+func TestNotes_TooLargeMapsTo400(t *testing.T) {
+	svc := &fakeNoteService{createErr: types.ErrNoteTooLarge}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	w := doNote(t, r, http.MethodPost, "/me/notes", `{"content":"x"}`)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s, want 400", w.Code, w.Body.String())
+	}
+}
+
+func TestNotes_GetForeignOrMissingIs404(t *testing.T) {
+	svc := &fakeNoteService{getErr: gorm.ErrRecordNotFound}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	w := doNote(t, r, http.MethodGet, "/me/notes/some-id", "")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%s, want 404", w.Code, w.Body.String())
+	}
+}
+
+func TestNotes_GetHappyPath(t *testing.T) {
+	svc := &fakeNoteService{getResult: &types.TenantNote{ID: "n-9", Content: "hello"}}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	w := doNote(t, r, http.MethodGet, "/me/notes/n-9", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if svc.getID != "n-9" {
+		t.Fatalf("id not passed to service: %q", svc.getID)
+	}
+}
+
+func TestNotes_UpdateAndDeletePassIDs(t *testing.T) {
+	svc := &fakeNoteService{}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	w := doNote(t, r, http.MethodPut, "/me/notes/n-5", `{"content":"updated"}`)
+	if w.Code != http.StatusOK || svc.updateID != "n-5" || svc.updateBody != "updated" {
+		t.Fatalf("update: status=%d id=%q body=%q", w.Code, svc.updateID, svc.updateBody)
+	}
+
+	w = doNote(t, r, http.MethodDelete, "/me/notes/n-5", "")
+	if w.Code != http.StatusOK || svc.deleteID != "n-5" {
+		t.Fatalf("delete: status=%d id=%q", w.Code, svc.deleteID)
+	}
+}
+
+func TestNotes_UpdateForeignOrMissingIs404(t *testing.T) {
+	svc := &fakeNoteService{updateErr: gorm.ErrRecordNotFound}
+	r := noteTestRouter(&MeNoteHandler{service: svc})
+
+	w := doNote(t, r, http.MethodPut, "/me/notes/n-5", `{"content":"x"}`)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%s, want 404", w.Code, w.Body.String())
+	}
+}
