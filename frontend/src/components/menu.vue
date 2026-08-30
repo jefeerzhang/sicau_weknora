@@ -86,7 +86,7 @@
                         <div class="menu_item-box">
                             <div class="menu_icon">
                                 <img class="icon"
-                                    :src="getImgSrc(item.icon == 'zhishiku' ? knowledgeIcon : item.icon == 'agent' ? agentIcon : item.icon == 'organization' ? organizationIcon : item.icon == 'logout' ? logoutIcon : item.icon == 'setting' ? settingIcon : prefixIcon)"
+                                    :src="getImgSrc(item.icon == 'notes' ? '/src/assets/img/notes.svg' : item.icon == 'zhishiku' ? knowledgeIcon : item.icon == 'agent' ? agentIcon : item.icon == 'organization' ? organizationIcon : item.icon == 'logout' ? logoutIcon : item.icon == 'setting' ? settingIcon : prefixIcon)"
                                     alt="">
                             </div>
                             <template v-if="!uiStore.sidebarCollapsed">

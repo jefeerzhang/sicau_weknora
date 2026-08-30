@@ -140,6 +140,12 @@ const router = createRouter({
           meta: { requiresInit: true, requiresAuth: true, requiredCapability: 'agents' }
         },
         {
+          path: "notes",
+          name: "myNotes",
+          component: () => import("../views/notes/MyNotes.vue"),
+          meta: { requiresInit: true, requiresAuth: true }
+        },
+        {
           path: "integrations",
           redirect: (to) => {
             const tab = typeof to.query.tab === 'string' ? to.query.tab : undefined

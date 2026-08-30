@@ -1,6 +1,7 @@
 export default {
   menu: {
     knowledgeBase: 'Knowledge Base',
+    notes: 'My Notes',
     agents: 'Agents',
     organizations: 'Shared Spaces',
     newChat: 'New Chat',
@@ -4421,6 +4422,28 @@ export default {
       large: 'Large'
     }
   },
+  notes: {
+    title: 'My Notes',
+    newNote: 'New note',
+    untitled: 'Untitled',
+    loading: 'Loading…',
+    empty: 'No notes yet — create one from the top right',
+    selectHint: 'Pick a note on the left, or create one',
+    edit: 'Edit',
+    preview: 'Preview',
+    save: 'Save',
+    saved: 'Saved',
+    unsaved: 'Unsaved changes',
+    saveFailed: 'Failed to save',
+    createFailed: 'Failed to create note',
+    delete: 'Delete',
+    deleteFailed: 'Failed to delete',
+    deleteConfirm: 'Delete this note?',
+    loadFailed: 'Failed to load note',
+    leaveConfirm: 'You have unsaved changes. Leave anyway?',
+    placeholder: 'Write in Markdown — the first line becomes the title…',
+  },
+
   platform: {
     subtitle: 'LLM-Powered Knowledge Base',
     note: 'This system is built on the open-source project ',

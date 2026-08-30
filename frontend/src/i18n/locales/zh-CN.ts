@@ -2213,6 +2213,28 @@ export default {
     earlier: '更早',
     pinned: '已置顶'
   },
+  notes: {
+    title: '我的笔记',
+    newNote: '新建笔记',
+    untitled: '无标题',
+    loading: '加载中…',
+    empty: '还没有笔记，点右上角新建',
+    selectHint: '选择左侧笔记，或新建一篇',
+    edit: '编辑',
+    preview: '预览',
+    save: '保存',
+    saved: '已保存',
+    unsaved: '未保存',
+    saveFailed: '保存失败',
+    createFailed: '创建笔记失败',
+    delete: '删除',
+    deleteFailed: '删除失败',
+    deleteConfirm: '确定删除这篇笔记？',
+    loadFailed: '笔记加载失败',
+    leaveConfirm: '有未保存的更改，确定离开？',
+    placeholder: '用 Markdown 记录，首行将成为标题…',
+  },
+
   platform: {
     subtitle: '大模型驱动的知识库',
     note: '本系统基于开源项目 ',
@@ -6644,6 +6666,7 @@ export default {
   },
   menu: {
     knowledgeBase: '知识库',
+    notes: '我的笔记',
     agents: '智能体',
     organizations: '共享空间',
     newChat: '新对话',

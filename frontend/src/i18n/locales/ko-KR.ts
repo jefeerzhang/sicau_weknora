@@ -2211,6 +2211,28 @@ export default {
     earlier: '이전',
     pinned: '고정됨'
   },
+  notes: {
+    title: '내 노트',
+    newNote: '새 노트',
+    untitled: '제목 없음',
+    loading: '불러오는 중…',
+    empty: '아직 노트가 없습니다. 오른쪽 위에서 만들어 보세요',
+    selectHint: '왼쪽에서 노트를 선택하거나 새로 만드세요',
+    edit: '편집',
+    preview: '미리보기',
+    save: '저장',
+    saved: '저장됨',
+    unsaved: '저장되지 않은 변경 사항',
+    saveFailed: '저장에 실패했습니다',
+    createFailed: '노트 생성에 실패했습니다',
+    delete: '삭제',
+    deleteFailed: '삭제에 실패했습니다',
+    deleteConfirm: '이 노트를 삭제할까요?',
+    loadFailed: '노트를 불러오지 못했습니다',
+    leaveConfirm: '저장되지 않은 변경 사항이 있습니다. 떠나시겠습니까?',
+    placeholder: 'Markdown로 기록하세요 — 첫 줄이 제목이 됩니다…',
+  },
+
   platform: {
     subtitle: '대규모 언어 모델 기반 지식베이스',
     note: '본 시스템은 오픈소스 프로젝트 ',
@@ -6642,6 +6664,7 @@ export default {
   },
   menu: {
     knowledgeBase: '지식베이스',
+    notes: '내 노트',
     agents: '에이전트',
     organizations: '공유 공간',
     newChat: '새 대화',
