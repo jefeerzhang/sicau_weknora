@@ -58,8 +58,11 @@ func RegisterSessionRoutes(
 		sessions.DELETE("/:id", handler.DeleteSession)
 		sessions.DELETE("/:id/messages", handler.ClearSessionMessages)
 		sessions.POST("/:session_id/generate_title", handler.GenerateTitle)
-		sessions.POST("/:session_id/attachments", handler.UploadTemporaryDocument)
-		sessions.GET("/:id/attachments", handler.ListTemporaryDocuments)
+		// sicau-v1: course students (viewers) cannot upload chat
+		// attachments — pure Q&A deployment (design ADR-009-6 pattern,
+		// backend-enforced rather than frontend-hidden only).
+		sessions.POST("/:session_id/attachments", g.Contributor(), handler.UploadTemporaryDocument)
+		sessions.GET("/:id/attachments", g.Contributor(), handler.ListTemporaryDocuments)
 		sessions.GET("/:id/attachments/:attachment_id", handler.GetTemporaryDocument)
 		sessions.GET("/:id/attachments/:attachment_id/preview", handler.PreviewTemporaryDocument)
 		sessions.DELETE("/:id/attachments/:attachment_id", handler.DeleteTemporaryDocument)

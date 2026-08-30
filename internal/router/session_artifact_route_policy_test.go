@@ -53,3 +53,39 @@ func TestSessionArtifactRoutePolicies_RequireContributor(t *testing.T) {
 		})
 	}
 }
+
+// TestSessionAttachmentUploadPolicy_RequireContributor pins sicau-v1
+// ticket (attachments off for students): uploading chat attachments is
+// Contributor+. The paired GET list keeps the same guard so a viewer
+// cannot even enumerate their (or anyone's) temporary attachment rows.
+func TestSessionAttachmentUploadPolicy_RequireContributor(t *testing.T) {
+	src, err := os.ReadFile("routes_chat.go")
+	if err != nil {
+		t.Fatalf("read routes_chat.go: %v", err)
+	}
+	cases := []struct {
+		label  string
+		needle string
+	}{
+		{"attachment upload", `"/:session_id/attachments"`},
+		{"attachment list", `"/:id/attachments"`},
+	}
+	lines := strings.Split(string(src), "\n")
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			found := false
+			for _, line := range lines {
+				if !strings.Contains(line, tc.needle) || !strings.Contains(line, "sessions.") {
+					continue
+				}
+				found = true
+				if !strings.Contains(line, "g.Contributor()") {
+					t.Fatalf("route %s must require Contributor, got:\n%s", tc.needle, strings.TrimSpace(line))
+				}
+			}
+			if !found {
+				t.Fatalf("registration for %s not found; update this tripwire if the route moved", tc.needle)
+			}
+		})
+	}
+}

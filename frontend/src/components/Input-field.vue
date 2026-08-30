@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { onBeforeRouteUpdate } from 'vue-router';
 import { MessagePlugin } from "tdesign-vue-next";
 import { useSettingsStore, markAgentExplicitlyChosen, EXPLICIT_AGENT_CHOSEN_KEY } from '@/stores/settings';
+import { useAuthStore } from '@/stores/auth';
 import { getDefaultAgentId } from '@/api/tenant';
 import { useUIStore } from '@/stores/ui';
 import { useMenuStore } from '@/stores/menu';
@@ -47,6 +48,7 @@ import { SKILL_ICON, type MentionItem, type MentionItemType, type MentionRequest
 const route = useRoute();
 const router = useRouter();
 const settingsStore = useSettingsStore();
+const authStore = useAuthStore();
 const uiStore = useUIStore();
 const orgStore = useOrganizationStore();
 const menuStore = useMenuStore();
@@ -96,7 +98,9 @@ const handleDroppedFiles = (files: File[]) => {
     }
   }
 
-  if (attachmentFiles.length > 0) {
+  // sicau-v1：学生 viewer 不支持附件（与隐藏的上传按钮一致）
+  const attachmentsBlocked = !authStore.hasRole('contributor');
+  if (attachmentFiles.length > 0 && !attachmentsBlocked) {
     attachmentUploadRef.value?.addFiles(attachmentFiles);
   }
 };
@@ -2628,8 +2632,8 @@ defineExpose({
             </div>
           </t-tooltip>
 
-          <!-- 附件上传按钮 -->
-          <t-tooltip placement="top" theme="light" :popupProps="{ overlayClassName: 'input-field-tooltip' }">
+          <!-- 附件上传按钮（sicau-v1：学生 viewer 不展示，后端同步拒绝） -->
+          <t-tooltip v-if="authStore.hasRole('contributor')" placement="top" theme="light" :popupProps="{ overlayClassName: 'input-field-tooltip' }">
             <template #content>
               <span>{{ uploadedAttachments.length > 0 ? $t('chat.attachmentWithCount', {
                 count: uploadedAttachments.length
