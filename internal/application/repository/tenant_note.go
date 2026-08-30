@@ -109,6 +109,18 @@ func (r *tenantNoteRepository) CreateImage(ctx context.Context, tenantID uint64,
 		if count >= types.MaxNoteImagesPerUser {
 			return types.ErrNoteImageLimitReached
 		}
+		// Per-user storage budget (100MB): SUM of existing image bytes plus
+		// the incoming upload must stay under the cap.
+		var used int64
+		if err := tx.Model(&types.TenantNoteImage{}).
+			Where("tenant_id = ? AND user_id = ?", tenantID, userID).
+			Select("COALESCE(SUM(LENGTH(bytes)), 0)").
+			Scan(&used).Error; err != nil {
+			return err
+		}
+		if used+int64(len(image.Bytes)) > types.MaxNoteImageStoragePerUser {
+			return types.ErrNoteImageQuotaExceeded
+		}
 		return tx.Create(image).Error
 	})
 }

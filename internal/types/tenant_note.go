@@ -16,6 +16,9 @@ const (
 	MaxNoteContentBytes    = 1 << 20 // 1MB per note (UTF-8 bytes)
 	MaxNoteImagesPerUser   = 200
 	MaxNoteImageBytes      = 2 << 20 // 2MB per image
+	// MaxNoteImageStoragePerUser caps the SUM of a user's image bytes
+	// (sicau-v1: user-requested 100MB personal image budget).
+	MaxNoteImageStoragePerUser = 100 << 20 // 100MB
 	NoteTitleMaxRunes      = 50
 	NotePreviewContentHead = 4096 // bytes of content fetched for title derivation
 )
@@ -27,6 +30,7 @@ var (
 	ErrNoteImageLimitReached  = errors.New("note image limit reached (200 images per user)")
 	ErrNoteImageTooLarge      = errors.New("note image too large (max 2MB)")
 	ErrNoteImageTypeUnsupport = errors.New("image type must be png/jpeg/gif/webp")
+	ErrNoteImageQuotaExceeded = errors.New("image storage quota exceeded (100MB per user)")
 )
 
 // TenantNote is one user's private Markdown note inside a workspace.

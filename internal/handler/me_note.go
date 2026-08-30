@@ -138,7 +138,7 @@ func mapNoteError(err error) error {
 	switch {
 	case errors.Is(err, types.ErrNoteLimitReached), errors.Is(err, types.ErrNoteTooLarge),
 		errors.Is(err, types.ErrNoteImageLimitReached), errors.Is(err, types.ErrNoteImageTooLarge),
-		errors.Is(err, types.ErrNoteImageTypeUnsupport):
+		errors.Is(err, types.ErrNoteImageTypeUnsupport), errors.Is(err, types.ErrNoteImageQuotaExceeded):
 		return apperrors.NewValidationError(err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		return apperrors.NewNotFoundError("note not found")

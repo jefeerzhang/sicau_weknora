@@ -2218,6 +2218,7 @@ export default {
     imageInserted: '图片已插入',
     imageUploadFailed: '图片上传失败',
     imageLoadFailed: '图片加载失败',
+    imageQuotaExceeded: '图片空间已满（每人 100MB），请删除部分图片后再上传',
     title: '我的笔记',
     newNote: '新建笔记',
     untitled: '无标题',

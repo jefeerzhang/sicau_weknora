@@ -281,3 +281,18 @@ func TestNotes_DeleteImagePassesID(t *testing.T) {
 		t.Fatalf("status=%d called=%v id=%q", w.Code, svc.deleteCalled, svc.deleteID)
 	}
 }
+
+// --- 100MB per-user image quota (user revision) ---
+
+func TestDetectNoteImageMime_Whitelist(t *testing.T) {
+	png := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0}
+	if types.DetectNoteImageMime(png) != "image/png" {
+		t.Fatal("png should sniff to image/png")
+	}
+	if types.DetectNoteImageMime([]byte("GIF89axxxxxx")) != "image/gif" {
+		t.Fatal("GIF89a should sniff to image/gif")
+	}
+	if types.DetectNoteImageMime([]byte("<script>x</script>")) != "" {
+		t.Fatal("non-image must not pass sniffing")
+	}
+}

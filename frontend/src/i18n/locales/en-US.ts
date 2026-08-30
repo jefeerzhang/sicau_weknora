@@ -4427,6 +4427,7 @@ export default {
     imageInserted: 'Image inserted',
     imageUploadFailed: 'Image upload failed',
     imageLoadFailed: 'Image failed to load',
+    imageQuotaExceeded: 'Image storage is full (100MB per user) — delete some images first',
     title: 'My Notes',
     newNote: 'New note',
     untitled: 'Untitled',

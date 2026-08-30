@@ -358,7 +358,12 @@ async function uploadAndInsertImage(file: File) {
     try {
         const resp = await uploadNoteImage(file)
         if (!resp.success || !resp.data) {
-            MessagePlugin.error(resp.message || t('notes.imageUploadFailed'))
+            const msg = resp.message || t('notes.imageUploadFailed')
+            if (msg.includes('100MB')) {
+                MessagePlugin.warning(t('notes.imageQuotaExceeded'))
+            } else {
+                MessagePlugin.error(msg)
+            }
             return
         }
         insertAtCursor(`\n![](${resp.data.url})\n`)

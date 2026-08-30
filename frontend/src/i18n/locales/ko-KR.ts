@@ -2216,6 +2216,7 @@ export default {
     imageInserted: '이미지가 삽입되었습니다',
     imageUploadFailed: '이미지 업로드에 실패했습니다',
     imageLoadFailed: '이미지를 불러오지 못했습니다',
+    imageQuotaExceeded: '이미지 저장 공간이 가득 찼습니다 (사용자당 100MB) — 일부 이미지를 삭제한 후 다시 시도하세요',
     title: '내 노트',
     newNote: '새 노트',
     untitled: '제목 없음',
