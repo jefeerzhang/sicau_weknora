@@ -86,7 +86,7 @@
                         <div class="menu_item-box">
                             <div class="menu_icon">
                                 <img class="icon"
-                                    :src="getImgSrc(item.icon == 'notes' ? '/src/assets/img/notes.svg' : item.icon == 'zhishiku' ? knowledgeIcon : item.icon == 'agent' ? agentIcon : item.icon == 'organization' ? organizationIcon : item.icon == 'logout' ? logoutIcon : item.icon == 'setting' ? settingIcon : prefixIcon)"
+                                    :src="getImgSrc(item.icon == 'notes' ? notesIcon : item.icon == 'zhishiku' ? knowledgeIcon : item.icon == 'agent' ? agentIcon : item.icon == 'organization' ? organizationIcon : item.icon == 'logout' ? logoutIcon : item.icon == 'setting' ? settingIcon : prefixIcon)"
                                     alt="">
                             </div>
                             <template v-if="!uiStore.sidebarCollapsed">
@@ -435,14 +435,15 @@ const getIconActiveState = (itemPath: string) => {
 
 // 分离上下两部分菜单（使用 visibleMenuArr 以便 lite 模式过滤 logout）
 const topMenuItems = computed<MenuItem[]>(() => {
+    // sicau-v1 notes：「我的笔记」与知识库/智能体同级展示
     return (visibleMenuArr.value as unknown as MenuItem[]).filter((item: MenuItem) =>
-        item.path === 'knowledge-bases' || item.path === 'agents' || item.path === 'organizations' || item.path === 'creatChat'
+        item.path === 'knowledge-bases' || item.path === 'agents' || item.path === 'organizations' || item.path === 'creatChat' || item.path === 'notes'
     );
 });
 
 const bottomMenuItems = computed<MenuItem[]>(() => {
     return (visibleMenuArr.value as unknown as MenuItem[]).filter((item: MenuItem) => {
-        if (item.path === 'knowledge-bases' || item.path === 'agents' || item.path === 'organizations' || item.path === 'creatChat') {
+        if (item.path === 'knowledge-bases' || item.path === 'agents' || item.path === 'organizations' || item.path === 'creatChat' || item.path === 'notes') {
             return false;
         }
         return true;
@@ -1029,6 +1030,7 @@ watch([() => route.name, () => route.params], (newvalue, oldvalue) => {
         loadCurrentKbInfo((newvalue[1] as any)?.kbId as string);
     }
 });
+let notesIcon = ref('notes.svg');
 let knowledgeIcon = ref('zhishiku-green.svg');
 let prefixIcon = ref('prefixIcon.svg');
 let logoutIcon = ref('logout.svg');
@@ -1049,6 +1051,9 @@ const getIcon = (path: string) => {
 
     // 智能体图标：只在智能体页面显示绿色
     agentIcon.value = agentsActiveState ? 'agent-green.svg' : 'agent.svg';
+
+    // 笔记图标：只在笔记页面显示绿色
+    notesIcon.value = route.name === 'myNotes' ? 'notes-green.svg' : 'notes.svg';
 
     // 组织图标：只在组织页面显示绿色
     organizationIcon.value = organizationsActiveState ? 'organization-green.svg' : 'organization.svg';
