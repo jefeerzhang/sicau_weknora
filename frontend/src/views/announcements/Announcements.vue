@@ -166,8 +166,10 @@ async function handlePost() {
     posting.value = true
     try {
         const resp = await createAnnouncement(form.title.trim(), form.content, form.files)
-        if (!resp.success || !resp.data) {
-            MessagePlugin.error(resp.message || t('announcements.postFailed'))
+        if (!resp || !resp.success || !resp.data) {
+            const msg = (resp && resp.message) || t('announcements.postFailed')
+            MessagePlugin.error(msg)
+            console.error('[announcements] post failed:', resp, msg)
             return
         }
         MessagePlugin.success(t('announcements.posted'))
@@ -175,6 +177,11 @@ async function handlePost() {
         form.content = ''
         form.files = []
         await load()
+    } catch (err) {
+        // surface network/runtime errors that the backend response shape
+        // can't capture (axios network error, FileService unreachable, ...)
+        console.error('[announcements] post threw:', err)
+        MessagePlugin.error(t('announcements.postFailed'))
     } finally {
         posting.value = false
     }
