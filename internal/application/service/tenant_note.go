@@ -96,7 +96,37 @@ func (s *tenantNoteService) Update(ctx context.Context, noteID string, content s
 	if err := validateNoteContent(content); err != nil {
 		return err
 	}
-	return s.repo.UpdateContent(ctx, tenantID, userID, noteID, content)
+	old, err := s.repo.GetByID(ctx, tenantID, userID, noteID)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.UpdateContent(ctx, tenantID, userID, noteID, content); err != nil {
+		return err
+	}
+	// GC images that this note used to reference but the new content does
+	// not. deletedNoteID is left empty so the updated row itself is
+	// scanned (its new body no longer matches the removed ids).
+	removed := imageIDsRemoved(old.Content, content)
+	if len(removed) > 0 {
+		if gcErr := s.repo.DeleteUnreferencedImages(ctx, tenantID, userID, "", removed); gcErr != nil {
+			logger.Warnf(ctx, "[notes] image GC after update failed: note=%s err=%v", noteID, gcErr)
+		}
+	}
+	return nil
+}
+
+func imageIDsRemoved(before, after string) []string {
+	keep := make(map[string]struct{})
+	for _, id := range types.ExtractNoteImageIDs(after) {
+		keep[id] = struct{}{}
+	}
+	var out []string
+	for _, id := range types.ExtractNoteImageIDs(before) {
+		if _, ok := keep[id]; !ok {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 func (s *tenantNoteService) Delete(ctx context.Context, noteID string) error {

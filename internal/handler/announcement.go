@@ -7,6 +7,7 @@ package handler
 
 import (
 	"errors"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -39,6 +40,33 @@ func mapAnnouncementError(err error) error {
 	return err
 }
 
+// publicAnnouncement copies a for JSON so FileService storage paths never
+// leave the process. Download still resolves path via a fresh service.Get.
+func publicAnnouncement(a *types.Announcement) *types.Announcement {
+	if a == nil {
+		return nil
+	}
+	out := *a
+	if len(a.Attachments) == 0 {
+		out.Attachments = []types.AnnouncementAttachment{}
+		return &out
+	}
+	atts := make([]types.AnnouncementAttachment, len(a.Attachments))
+	for i, att := range a.Attachments {
+		atts[i] = types.AnnouncementAttachment{Name: att.Name, Size: att.Size}
+	}
+	out.Attachments = atts
+	return &out
+}
+
+func publicAnnouncements(items []*types.Announcement) []*types.Announcement {
+	out := make([]*types.Announcement, 0, len(items))
+	for _, a := range items {
+		out = append(out, publicAnnouncement(a))
+	}
+	return out
+}
+
 // List godoc
 // @Summary      公告列表
 // @Description  全员可读；按创建时间倒序；不含正文与留言
@@ -52,7 +80,7 @@ func (h *MeAnnouncementHandler) List(c *gin.Context) {
 		c.Error(mapAnnouncementError(err))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"announcements": items}})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"announcements": publicAnnouncements(items)}})
 }
 
 // Create godoc
@@ -102,7 +130,7 @@ func (h *MeAnnouncementHandler) Create(c *gin.Context) {
 		c.Error(mapAnnouncementError(err))
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"success": true, "data": announcement})
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": publicAnnouncement(announcement)})
 }
 
 // Get godoc
@@ -119,7 +147,7 @@ func (h *MeAnnouncementHandler) Get(c *gin.Context) {
 		c.Error(mapAnnouncementError(err))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": announcement})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": publicAnnouncement(announcement)})
 }
 
 // Delete godoc
@@ -174,7 +202,11 @@ func (h *MeAnnouncementHandler) DownloadAttachment(c *gin.Context) {
 	}
 	defer stream.Close()
 
-	c.Header("Content-Disposition", "attachment; filename=\""+strings.ReplaceAll(att.Name, "\"", "")+"\"")
+	cd := mime.FormatMediaType("attachment", map[string]string{"filename": att.Name})
+	if cd == "" {
+		cd = "attachment"
+	}
+	c.Header("Content-Disposition", cd)
 	c.DataFromReader(http.StatusOK, att.Size, "application/octet-stream", stream, nil)
 }
 

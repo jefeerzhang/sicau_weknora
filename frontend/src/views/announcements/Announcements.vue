@@ -101,6 +101,7 @@ import {
     type AnnouncementCommentItem, type AnnouncementListItem,
 } from '@/api/me/announcements'
 import { safeMarkdownToHTML, sanitizeHTML } from '@/utils/security'
+import { canDeleteAnnouncement } from './canDeleteAnnouncement'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -136,11 +137,13 @@ function formatSize(bytes: number): string {
     return bytes + ' B'
 }
 
-// 删除权限与后端同语义：作者或 admin（前端只控制按钮可见性）
-function canDelete(item: { author_name?: string }): boolean {
-    if (authStore.canAccessAllTenants || authStore.hasRole('admin') || authStore.hasRole('owner')) return true
-    // 后端按 user_id 判作者；卡片上没有 user_id，作者本人删除走确认失败兜底
-    return item.author_name === authStore.user?.username
+// 删除权限与后端同语义：作者（user_id）或 admin/owner
+function canDelete(item: { user_id?: string }): boolean {
+    return canDeleteAnnouncement({
+        announcementUserId: item.user_id || '',
+        viewerUserId: authStore.user?.id,
+        isAdminOrOwner: !!(authStore.canAccessAllTenants || authStore.hasRole('admin') || authStore.hasRole('owner')),
+    })
 }
 
 function canDeleteComment(c: { user_id: string }): boolean {

@@ -63,9 +63,9 @@ func RegisterSessionRoutes(
 		// backend-enforced rather than frontend-hidden only).
 		sessions.POST("/:session_id/attachments", g.Contributor(), handler.UploadTemporaryDocument)
 		sessions.GET("/:id/attachments", g.Contributor(), handler.ListTemporaryDocuments)
-		sessions.GET("/:id/attachments/:attachment_id", handler.GetTemporaryDocument)
-		sessions.GET("/:id/attachments/:attachment_id/preview", handler.PreviewTemporaryDocument)
-		sessions.DELETE("/:id/attachments/:attachment_id", handler.DeleteTemporaryDocument)
+		sessions.GET("/:id/attachments/:attachment_id", g.Contributor(), handler.GetTemporaryDocument)
+		sessions.GET("/:id/attachments/:attachment_id/preview", g.Contributor(), handler.PreviewTemporaryDocument)
+		sessions.DELETE("/:id/attachments/:attachment_id", g.Contributor(), handler.DeleteTemporaryDocument)
 		sessions.POST("/:session_id/stop", handler.StopSession)
 		// POST and DELETE share this path but gin maintains a separate radix tree
 		// per HTTP verb, and the existing trees use different wildcard names

@@ -191,6 +191,32 @@ func TestAnnouncements_Comments_Permissions(t *testing.T) {
 	}
 }
 
+// CreateComment rejects bodies over 4KiB so a single comment cannot
+// balloon the comments table (announcements design §3 plain-text notes).
+func TestAnnouncements_CreateComment_RejectsTooLarge(t *testing.T) {
+	tc := newAnnouncementTestCtx(t)
+	ann, err := tc.svc.Create(tc.ctx(), "t", "c", nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	studentCtx := tc.withCaller(context.Background(), types.TenantRoleViewer, "u-student")
+
+	atLimit := strings.Repeat("a", 4096)
+	if _, err := tc.svc.CreateComment(studentCtx, ann.ID, atLimit); err != nil {
+		t.Fatalf("4KiB comment must be accepted: %v", err)
+	}
+
+	tooBig := strings.Repeat("b", 4097)
+	_, err = tc.svc.CreateComment(studentCtx, ann.ID, tooBig)
+	if err == nil {
+		t.Fatal("4KiB+1 comment must be rejected")
+	}
+	var appErr *apperrors.AppError
+	if !errors.As(err, &appErr) || appErr.HTTPCode != 400 {
+		t.Fatalf("want validation 400, got %T %v", err, err)
+	}
+}
+
 // Ticket 12: deleting someone else's comment must look exactly like
 // deleting a missing one (404), never a 403 — existence is not leaked.
 func TestAnnouncements_DeleteComment_ForeignLooksLikeMissing(t *testing.T) {

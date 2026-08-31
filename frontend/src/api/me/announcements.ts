@@ -7,7 +7,6 @@ import { del, get, getDown, post, postUpload } from '@/utils/request'
 
 export interface AnnouncementAttachment {
   name: string
-  path: string
   size: number
 }
 
@@ -16,6 +15,7 @@ export interface Announcement {
   title: string
   content: string
   attachments: AnnouncementAttachment[]
+  user_id?: string
   author_name?: string
   created_at: string
   updated_at: string
@@ -25,6 +25,7 @@ export interface AnnouncementListItem {
   id: string
   title: string
   content: string
+  user_id?: string
   author_name?: string
   attachments: AnnouncementAttachment[]
   created_at: string

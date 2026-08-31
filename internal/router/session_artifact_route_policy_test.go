@@ -69,6 +69,9 @@ func TestSessionAttachmentUploadPolicy_RequireContributor(t *testing.T) {
 	}{
 		{"attachment upload", `"/:session_id/attachments"`},
 		{"attachment list", `"/:id/attachments"`},
+		{"attachment get", `"/:id/attachments/:attachment_id"`},
+		{"attachment preview", `"/:id/attachments/:attachment_id/preview"`},
+		{"attachment delete", `"/:id/attachments/:attachment_id"`},
 	}
 	lines := strings.Split(string(src), "\n")
 	for _, tc := range cases {
@@ -76,6 +79,16 @@ func TestSessionAttachmentUploadPolicy_RequireContributor(t *testing.T) {
 			found := false
 			for _, line := range lines {
 				if !strings.Contains(line, tc.needle) || !strings.Contains(line, "sessions.") {
+					continue
+				}
+				// Prefer the longest matching needle: get/preview/delete
+				// share a prefix with list (`/:id/attachments`), so skip
+				// shorter registrations when looking for a longer path.
+				if tc.needle == `"/:id/attachments"` &&
+					(strings.Contains(line, ":attachment_id") || strings.Contains(line, "preview")) {
+					continue
+				}
+				if tc.needle == `"/:id/attachments/:attachment_id"` && strings.Contains(line, "preview") {
 					continue
 				}
 				found = true

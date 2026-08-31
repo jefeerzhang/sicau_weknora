@@ -8,6 +8,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,6 +22,9 @@ import (
 
 type fakeAnnouncementService struct {
 	interfaces.TenantAnnouncementService
+	list             []*types.Announcement
+	get              *types.Announcement
+	create           *types.Announcement
 	getErr           error
 	deleteErr        error
 	listCommentsErr  error
@@ -30,6 +34,9 @@ type fakeAnnouncementService struct {
 }
 
 func (s *fakeAnnouncementService) List(ctx context.Context) ([]*types.Announcement, error) {
+	if len(s.list) > 0 {
+		return s.list, nil
+	}
 	return []*types.Announcement{}, nil
 }
 
@@ -37,7 +44,17 @@ func (s *fakeAnnouncementService) Get(ctx context.Context, announcementID string
 	if s.getErr != nil {
 		return nil, s.getErr
 	}
+	if s.get != nil {
+		return s.get, nil
+	}
 	return &types.Announcement{ID: announcementID, Title: "t"}, nil
+}
+
+func (s *fakeAnnouncementService) Create(ctx context.Context, title, content string, files []interfaces.AnnouncementUploadFile) (*types.Announcement, error) {
+	if s.create != nil {
+		return s.create, nil
+	}
+	return &types.Announcement{ID: "a-new", Title: title, Content: content}, nil
 }
 
 func (s *fakeAnnouncementService) Delete(ctx context.Context, announcementID string) error {
@@ -176,5 +193,88 @@ func TestAnnouncements_HappyPathStill200(t *testing.T) {
 	w = doAnnouncement(t, r, http.MethodDelete, "/announcements/a-1/comments/c-1", "")
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "success") {
 		t.Fatalf("delete comment: status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+// API projection must never echo FileService storage paths — clients
+// download by index; path is an internal capability reference.
+func TestAnnouncements_GetOmitsAttachmentPath(t *testing.T) {
+	svc := &fakeAnnouncementService{get: &types.Announcement{
+		ID:    "a-1",
+		Title: "hw",
+		Attachments: []types.AnnouncementAttachment{
+			{Name: "hw.pdf", Path: "local://tenant/7/announcements/hw.pdf", Size: 12},
+		},
+	}}
+	r := announcementTestRouter(NewMeAnnouncementHandler(svc, nil))
+
+	w := doAnnouncement(t, r, http.MethodGet, "/announcements/a-1", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if strings.Contains(body, "local://") || strings.Contains(body, `"path"`) {
+		t.Fatalf("response must omit attachment path, got %s", body)
+	}
+	if !strings.Contains(body, "hw.pdf") {
+		t.Fatalf("response must still include attachment name, got %s", body)
+	}
+}
+
+func TestAnnouncements_ListOmitsAttachmentPath(t *testing.T) {
+	svc := &fakeAnnouncementService{list: []*types.Announcement{{
+		ID:    "a-1",
+		Title: "hw",
+		Attachments: []types.AnnouncementAttachment{
+			{Name: "a.zip", Path: "minio://bucket/secret-key", Size: 99},
+		},
+	}}}
+	r := announcementTestRouter(NewMeAnnouncementHandler(svc, nil))
+
+	w := doAnnouncement(t, r, http.MethodGet, "/announcements", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if strings.Contains(body, "minio://") || strings.Contains(body, `"path"`) {
+		t.Fatalf("list must omit attachment path, got %s", body)
+	}
+}
+
+type fakeAnnouncementFileSvc struct {
+	interfaces.FileService
+	data []byte
+}
+
+func (f *fakeAnnouncementFileSvc) GetFile(ctx context.Context, filePath string) (io.ReadCloser, error) {
+	return io.NopCloser(bytes.NewReader(f.data)), nil
+}
+
+func TestAnnouncements_DownloadAttachment_UsesMimeContentDisposition(t *testing.T) {
+	svc := &fakeAnnouncementService{get: &types.Announcement{
+		ID: "a-1",
+		Attachments: []types.AnnouncementAttachment{
+			{Name: `report "final".pdf`, Path: "local://x", Size: 4},
+		},
+	}}
+	files := &fakeAnnouncementFileSvc{data: []byte("data")}
+	h := NewMeAnnouncementHandler(svc, files)
+	r := announcementTestRouter(h)
+	r.GET("/announcements/:id/attachments/:index", h.DownloadAttachment)
+
+	w := doAnnouncement(t, r, http.MethodGet, "/announcements/a-1/attachments/0", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	cd := w.Header().Get("Content-Disposition")
+	if !strings.HasPrefix(cd, "attachment") {
+		t.Fatalf("Content-Disposition = %q, want attachment prefix", cd)
+	}
+	if !strings.Contains(cd, "filename") {
+		t.Fatalf("Content-Disposition = %q, want filename parameter", cd)
+	}
+	// Raw quote concatenation must not appear — mime.FormatMediaType encodes it.
+	if strings.Contains(cd, `filename="report "final".pdf"`) {
+		t.Fatalf("Content-Disposition must not raw-embed quotes: %q", cd)
 	}
 }

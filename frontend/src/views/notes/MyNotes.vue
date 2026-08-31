@@ -102,6 +102,7 @@ import { useI18n } from 'vue-i18n'
 import { createNote, deleteNote, getNote, listNotes, updateNote, type MyNoteListItem } from '@/api/me/notes'
 import { safeMarkdownToHTML, sanitizeHTML } from '@/utils/security'
 import { fetchNoteImageBlob, uploadNoteImage } from '@/api/me/notes'
+import { deriveLocalTitle } from './deriveLocalTitle'
 
 const { t } = useI18n()
 
@@ -147,16 +148,7 @@ function formatDate(value: string): string {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-// 与后端派生规则一致的本地镜像（仅用于列表即时反馈）
-function deriveLocalTitle(text: string): string {
-    for (const line of text.split('\n')) {
-        const trimmed = line.trim()
-        if (!trimmed) continue
-        const stripped = trimmed.replace(/^#+\s*/, '').trim()
-        return (stripped || trimmed).slice(0, 50)
-    }
-    return ''
-}
+// deriveLocalTitle imported from ./deriveLocalTitle (N-6 mirror of backend)
 
 async function loadList() {
     listLoading.value = true

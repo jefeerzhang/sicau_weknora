@@ -22,7 +22,7 @@
 | DELETE | `/announcements/:id` | 作者或 admin | 连带 FileService 删附件文件、级联删留言 |
 | GET | `/announcements/:id/attachments/:index` | viewer+ | 按下标流式下载附件 |
 | GET | `/announcements/:id/comments` | viewer+ | 平铺留言，时间正序，含作者名 |
-| POST | `/announcements/:id/comments` | viewer+ | `{"content": "text"}`，纯文本，非空 |
+| POST | `/announcements/:id/comments` | viewer+ | `{"content": "text"}`，纯文本，非空，≤4KiB |
 | DELETE | `/announcements/:id/comments/:cid` | 留言作者或 admin | 删除单条留言 |
 
 ## 响应形状
@@ -32,21 +32,23 @@
 ```json
 {
   "id": "b21c…",
+  "user_id": "u-…",
   "title": "第一次作业",
   "content": "请完成第一章习题…",
-  "attachments": [{ "name": "作业一.pdf", "path": "local://7/announcements/…", "size": 12345 }],
+  "attachments": [{ "name": "作业一.pdf", "size": 12345 }],
   "author_name": "张剑1234",
   "created_at": "…", "updated_at": "…"
 }
 ```
 
+附件对象只含 `name` / `size`（不含内部 FileService `path`；下载按下标）。
 留言对象：`{ "id", "user_id", "author_name", "content", "created_at" }`。
 
 ## 错误码
 
 | 状态码 | 场景 |
 |---|---|
-| 400 | 标题缺失、附件 >50MB / >5 个 / 白名单外扩展名、留言为空 |
+| 400 | 标题缺失、附件 >50MB / >5 个 / 白名单外扩展名、留言为空或 >4KiB |
 | 401 | 未登录 |
 | 403 | viewer 发公告；非作者且非 admin 删公告；非留言作者且非 admin 删留言 |
 | 404 | 公告/附件/留言不存在（他人可见资源不存在时不区分） |

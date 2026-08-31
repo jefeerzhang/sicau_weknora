@@ -80,6 +80,14 @@ type TenantNoteImage struct {
 // TableName pins the table so GORM's pluralizer cannot drift.
 func (TenantNoteImage) TableName() string { return "tenant_note_images" }
 
+// BeforeCreate mints the image id (capability token in the URL).
+func (img *TenantNoteImage) BeforeCreate(tx *gorm.DB) error {
+	if img.ID == "" {
+		img.ID = uuid.New().String()
+	}
+	return nil
+}
+
 // NoteImageURLPrefix is the markdown-facing URL stem for note images.
 // Handlers mount the full route under /api/v1/me/notes/images/<id>.
 const NoteImageURLPrefix = "/api/v1/me/notes/images/"

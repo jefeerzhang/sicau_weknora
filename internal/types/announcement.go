@@ -12,10 +12,11 @@ import (
 // sicau-v1 announcement limits (design §3). Constants, validated in the
 // handler/service boundary.
 const (
-	MaxAnnouncementAttachments   = 5
-	MaxAnnouncementFileBytes     = 50 << 20 // 50MB per file
-	MaxAnnouncementTitleRunes    = 200
-	MaxAnnouncementContentBytes  = 1 << 20 // 1MB of notice body text
+	MaxAnnouncementAttachments      = 5
+	MaxAnnouncementFileBytes        = 50 << 20 // 50MB per file
+	MaxAnnouncementTitleRunes       = 200
+	MaxAnnouncementContentBytes     = 1 << 20 // 1MB of notice body text
+	MaxAnnouncementCommentBytes     = 4 << 10 // 4KiB plain-text comment
 )
 
 // AnnouncementAttachment allowed extensions (design A-3: generic document
@@ -33,7 +34,7 @@ var AnnouncementAttachmentExtensions = map[string]bool{
 // workspace's storage backend, not in PG.
 type AnnouncementAttachment struct {
 	Name string `json:"name"`
-	Path string `json:"path"`
+	Path string `json:"path,omitempty"` // omitted from HTTP via publicAnnouncement (clears Path)
 	Size int64  `json:"size"`
 }
 

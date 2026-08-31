@@ -257,6 +257,9 @@ func (s *tenantAnnouncementService) CreateComment(ctx context.Context, announcem
 	if content == "" {
 		return types.AnnouncementCommentItem{}, apperrors.NewValidationError("comment cannot be empty")
 	}
+	if len(content) > types.MaxAnnouncementCommentBytes {
+		return types.AnnouncementCommentItem{}, apperrors.NewValidationError("comment too large (max 4KB)")
+	}
 	if _, err := s.repo.GetByID(ctx, tenantID, announcementID); err != nil {
 		return types.AnnouncementCommentItem{}, err
 	}
