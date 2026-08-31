@@ -85,18 +85,15 @@ func parseTenantIDFromPath(c *gin.Context) (uint64, bool) {
 	return v, true
 }
 
-// ListMembers godoc
-// @Summary      列出空间成员
-// @Description  分页返回当前空间内 active 成员（含每位成员的角色、邮箱、头像）；支持 q 按邮箱/用户名筛选
+// GetMemberUsageStats godoc
+// @Summary      成员使用统计
+// @Description  每位成员的提问数与最后活跃时间（sicau-v1 ticket 05）；Admin+ 可见，与成员名单同门槛（ticket 01）
 // @Tags         空间成员
 // @Produce      json
-// @Param        id         path   string  true   "空间 ID"
-// @Param        q          query  string  false  "按邮箱/用户名模糊筛选"
-// @Param        page       query  int     false  "页码（从 1 起）"  default(1)
-// @Param        page_size  query  int     false  "每页数量（最大 100）"  default(20)
+// @Param        id  path  string  true  "空间 ID"
 // @Success      200  {object}  map[string]interface{}
 // @Security     Bearer
-// @Router       /tenants/{id}/members [get]
+// @Router       /tenants/{id}/member-stats [get]
 // GetMemberUsageStats returns per-member question counts and last activity
 // (sicau-v1 ticket 05). Registered Admin+ — same gate as the roster itself
 // (ticket 01): students never see who is in the workspace, let alone how
@@ -122,6 +119,18 @@ func (h *TenantMemberHandler) GetMemberUsageStats(c *gin.Context) {
 	})
 }
 
+// ListMembers godoc
+// @Summary      列出空间成员
+// @Description  分页返回当前空间内 active 成员（含每位成员的角色、邮箱、头像）；支持 q 按邮箱/用户名筛选
+// @Tags         空间成员
+// @Produce      json
+// @Param        id         path   string  true   "空间 ID"
+// @Param        q          query  string  false  "按邮箱/用户名模糊筛选"
+// @Param        page       query  int     false  "页码（从 1 起）"  default(1)
+// @Param        page_size  query  int     false  "每页数量（最大 100）"  default(20)
+// @Success      200  {object}  map[string]interface{}
+// @Security     Bearer
+// @Router       /tenants/{id}/members [get]
 func (h *TenantMemberHandler) ListMembers(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID, ok := parseTenantIDFromPath(c)

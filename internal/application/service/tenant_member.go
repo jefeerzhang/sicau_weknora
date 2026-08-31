@@ -397,13 +397,6 @@ func (s *tenantMemberService) emitRoleChangeAudit(
 // space switcher (see issue #2586). Cleanup failures are logged but
 // never fail the removal itself: the membership row is already gone
 // and the login-path membership checks act as a second line of defence.
-// MemberUsageStats aggregates per-user question counts and last activity
-// (sicau-v1 ticket 05). Pass-through: the aggregation is a pure read and
-// carries no RBAC invariants beyond the Admin+ route guard upstream.
-func (s *tenantMemberService) MemberUsageStats(ctx context.Context, tenantID uint64) ([]types.TenantMemberUsageStat, error) {
-	return s.repo.MemberUsageStats(ctx, tenantID)
-}
-
 func (s *tenantMemberService) RemoveMember(ctx context.Context, userID string, tenantID uint64) error {
 	current, err := s.repo.Get(ctx, userID, tenantID)
 	if err != nil {
@@ -430,6 +423,13 @@ func (s *tenantMemberService) RemoveMember(ctx context.Context, userID string, t
 	s.emitRemovalAudit(ctx, tenantID, userID)
 	s.cleanupRemovedMemberState(ctx, userID, tenantID)
 	return nil
+}
+
+// MemberUsageStats aggregates per-user question counts and last activity
+// (sicau-v1 ticket 05). Pass-through: the aggregation is a pure read and
+// carries no RBAC invariants beyond the Admin+ route guard upstream.
+func (s *tenantMemberService) MemberUsageStats(ctx context.Context, tenantID uint64) ([]types.TenantMemberUsageStat, error) {
+	return s.repo.MemberUsageStats(ctx, tenantID)
 }
 
 // cleanupRemovedMemberState drops stale home/preference pointers that
