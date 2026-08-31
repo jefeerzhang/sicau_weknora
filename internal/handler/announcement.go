@@ -6,8 +6,10 @@ package handler
 // (IM synthetic accounts share a user_id — notes design §7 applies here too).
 
 import (
+	"errors"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
@@ -15,6 +17,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type MeAnnouncementHandler struct {
@@ -24,6 +27,16 @@ type MeAnnouncementHandler struct {
 
 func NewMeAnnouncementHandler(service interfaces.TenantAnnouncementService, fileSvc interfaces.FileService) *MeAnnouncementHandler {
 	return &MeAnnouncementHandler{service: service, fileSvc: fileSvc}
+}
+
+// mapAnnouncementError converts service-layer sentinels into
+// HTTP-appropriate app errors: missing announcements/comments → 404,
+// anything else passes through for the error middleware.
+func mapAnnouncementError(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return apperrors.NewNotFoundError("announcement not found")
+	}
+	return err
 }
 
 // List godoc
@@ -36,7 +49,7 @@ func NewMeAnnouncementHandler(service interfaces.TenantAnnouncementService, file
 func (h *MeAnnouncementHandler) List(c *gin.Context) {
 	items, err := h.service.List(c.Request.Context())
 	if err != nil {
-		c.Error(err)
+		c.Error(mapAnnouncementError(err))
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"announcements": items}})
@@ -74,20 +87,19 @@ func (h *MeAnnouncementHandler) Create(c *gin.Context) {
 			}
 			// 50MB cap re-checked here: MultipartForm already parsed the
 			// body, but the per-file read is bounded explicitly.
-			data := make([]byte, fh.Size)
-			if _, err := f.Read(data); err != nil && fh.Size > 0 {
-				f.Close()
-				c.Error(apperrors.NewValidationError("cannot read uploaded file: " + fh.Filename))
+			data, err := readUploadFull(f, fh.Size)
+			f.Close()
+			if err != nil {
+				c.Error(apperrors.NewValidationError("cannot read uploaded file: " + fh.Filename).WithDetails(err.Error()))
 				return
 			}
-			f.Close()
 			files = append(files, interfaces.AnnouncementUploadFile{Name: filepath.Base(fh.Filename), Data: data})
 		}
 	}
 
 	announcement, err := h.service.Create(c.Request.Context(), title, content, files)
 	if err != nil {
-		c.Error(err)
+		c.Error(mapAnnouncementError(err))
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": announcement})
@@ -104,7 +116,7 @@ func (h *MeAnnouncementHandler) Create(c *gin.Context) {
 func (h *MeAnnouncementHandler) Get(c *gin.Context) {
 	announcement, err := h.service.Get(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.Error(err)
+		c.Error(mapAnnouncementError(err))
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": announcement})
@@ -122,7 +134,7 @@ func (h *MeAnnouncementHandler) Get(c *gin.Context) {
 // @Router       /announcements/{id} [delete]
 func (h *MeAnnouncementHandler) Delete(c *gin.Context) {
 	if err := h.service.Delete(c.Request.Context(), c.Param("id")); err != nil {
-		c.Error(err)
+		c.Error(mapAnnouncementError(err))
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
@@ -141,16 +153,13 @@ func (h *MeAnnouncementHandler) Delete(c *gin.Context) {
 func (h *MeAnnouncementHandler) DownloadAttachment(c *gin.Context) {
 	announcement, err := h.service.Get(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.Error(err)
+		c.Error(mapAnnouncementError(err))
 		return
 	}
-	index := 0
-	for _, ch := range c.Param("index") {
-		if ch < '0' || ch > '9' {
-			c.Error(apperrors.NewValidationError("invalid attachment index"))
-			return
-		}
-		index = index*10 + int(ch-'0')
+	index, err := strconv.Atoi(c.Param("index"))
+	if err != nil {
+		c.Error(apperrors.NewValidationError("invalid attachment index"))
+		return
 	}
 	if index < 0 || index >= len(announcement.Attachments) {
 		c.Error(apperrors.NewNotFoundError("attachment not found"))
@@ -180,7 +189,7 @@ func (h *MeAnnouncementHandler) DownloadAttachment(c *gin.Context) {
 func (h *MeAnnouncementHandler) ListComments(c *gin.Context) {
 	items, err := h.service.ListComments(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.Error(err)
+		c.Error(mapAnnouncementError(err))
 		return
 	}
 	if items == nil {
@@ -209,7 +218,7 @@ func (h *MeAnnouncementHandler) CreateComment(c *gin.Context) {
 	}
 	item, err := h.service.CreateComment(c.Request.Context(), c.Param("id"), req.Content)
 	if err != nil {
-		c.Error(err)
+		c.Error(mapAnnouncementError(err))
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": item})
@@ -217,18 +226,17 @@ func (h *MeAnnouncementHandler) CreateComment(c *gin.Context) {
 
 // DeleteComment godoc
 // @Summary      删除留言
-// @Description  留言作者或 admin
+// @Description  留言作者或 admin；他人留言与不存在的留言同样 404（不泄露存在性）
 // @Tags         Announcements
 // @Param        id   path  string  true  "公告 ID"
 // @Param        cid  path  string  true  "留言 ID"
 // @Success      200  {object}  map[string]interface{}
-// @Failure      403  {object}  apperrors.AppError
 // @Failure      404  {object}  apperrors.AppError
 // @Security     Bearer
 // @Router       /announcements/{id}/comments/{cid} [delete]
 func (h *MeAnnouncementHandler) DeleteComment(c *gin.Context) {
 	if err := h.service.DeleteComment(c.Request.Context(), c.Param("id"), c.Param("cid")); err != nil {
-		c.Error(err)
+		c.Error(mapAnnouncementError(err))
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})

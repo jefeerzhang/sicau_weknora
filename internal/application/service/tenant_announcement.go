@@ -13,9 +13,9 @@ import (
 )
 
 type tenantAnnouncementService struct {
-	repo       interfaces.TenantAnnouncementRepository
-	fileSvc    interfaces.FileService
-	userRepo   interfaces.UserRepository
+	repo     interfaces.TenantAnnouncementRepository
+	fileSvc  interfaces.FileService
+	userRepo interfaces.UserRepository
 }
 
 func NewTenantAnnouncementService(
@@ -40,7 +40,7 @@ func (s *tenantAnnouncementService) caller(ctx context.Context) (uint64, string,
 
 // callerRole resolves the caller's tenant role for author-or-admin checks.
 // Missing membership is an error, not a default.
-func (s *tenantAnnouncementService) callerRole(ctx context.Context, tenantID uint64, userID string) (types.TenantRole, error) {
+func (s *tenantAnnouncementService) callerRole(ctx context.Context) (types.TenantRole, error) {
 	role := types.TenantRoleFromContext(ctx)
 	if role != "" {
 		return role, nil
@@ -107,7 +107,7 @@ func (s *tenantAnnouncementService) Create(ctx context.Context, title, content s
 	if err != nil {
 		return nil, err
 	}
-	role, err := s.callerRole(ctx, tenantID, userID)
+	role, err := s.callerRole(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -130,10 +130,10 @@ func (s *tenantAnnouncementService) Create(ctx context.Context, title, content s
 	}
 
 	announced := &types.Announcement{
-		TenantID:  tenantID,
-		UserID:    userID,
-		Title:     title,
-		Content:   content,
+		TenantID:    tenantID,
+		UserID:      userID,
+		Title:       title,
+		Content:     content,
 		Attachments: []types.AnnouncementAttachment{},
 	}
 
@@ -197,7 +197,7 @@ func (s *tenantAnnouncementService) Delete(ctx context.Context, announcementID s
 	if err != nil {
 		return err
 	}
-	role, err := s.callerRole(ctx, tenantID, callerID)
+	role, err := s.callerRole(ctx)
 	if err != nil {
 		return err
 	}
@@ -281,12 +281,14 @@ func (s *tenantAnnouncementService) CreateComment(ctx context.Context, announcem
 }
 
 // DeleteComment removes a comment: its author, or a workspace admin/owner.
+// Ticket 12: anyone else sees the same not-found as a missing comment —
+// existence of foreign comments is never leaked via a 403.
 func (s *tenantAnnouncementService) DeleteComment(ctx context.Context, announcementID, commentID string) error {
 	tenantID, callerID, err := s.caller(ctx)
 	if err != nil {
 		return err
 	}
-	role, err := s.callerRole(ctx, tenantID, callerID)
+	role, err := s.callerRole(ctx)
 	if err != nil {
 		return err
 	}
@@ -295,10 +297,7 @@ func (s *tenantAnnouncementService) DeleteComment(ctx context.Context, announcem
 		return err
 	}
 	if comment.UserID != callerID && role != types.TenantRoleAdmin && role != types.TenantRoleOwner {
-		return apperrors.NewForbiddenError("only the comment author or an admin can delete this comment")
+		return gorm.ErrRecordNotFound
 	}
 	return s.repo.DeleteComment(ctx, tenantID, announcementID, commentID)
 }
-
-// keep gorm imported for the gorm.ErrRecordNotFound mapping in handlers.
-var _ = gorm.ErrRecordNotFound

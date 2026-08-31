@@ -6,13 +6,14 @@ package service
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/application/service/file"
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"gorm.io/driver/sqlite"
@@ -187,5 +188,39 @@ func TestAnnouncements_Comments_Permissions(t *testing.T) {
 
 	if _, err := tc.svc.CreateComment(studentCtx, "missing-id", "hi"); err == nil {
 		t.Fatal("missing announcement must 404")
+	}
+}
+
+// Ticket 12: deleting someone else's comment must look exactly like
+// deleting a missing one (404), never a 403 — existence is not leaked.
+func TestAnnouncements_DeleteComment_ForeignLooksLikeMissing(t *testing.T) {
+	tc := newAnnouncementTestCtx(t)
+	ann, err := tc.svc.Create(tc.ctx(), "t", "c", nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	studentCtx := tc.withCaller(context.Background(), types.TenantRoleViewer, "u-student")
+	item, err := tc.svc.CreateComment(studentCtx, ann.ID, "只有我能删的留言")
+	if err != nil {
+		t.Fatalf("student comment: %v", err)
+	}
+
+	otherCtx := tc.withCaller(context.Background(), types.TenantRoleViewer, "u-other")
+	err = tc.svc.DeleteComment(otherCtx, ann.ID, item.ID)
+	if err == nil {
+		t.Fatal("other student must not delete the comment")
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("foreign comment delete must surface as not-found (404), got %v", err)
+	}
+	// Same shape as a genuinely missing comment.
+	if err := tc.svc.DeleteComment(otherCtx, ann.ID, "no-such-comment"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("missing comment must be not-found too, got %v", err)
+	}
+
+	comments, err := tc.svc.ListComments(tc.ctx(), ann.ID)
+	if err != nil || len(comments) != 1 {
+		t.Fatalf("comment must survive the foreign delete: n=%d err=%v", len(comments), err)
 	}
 }
