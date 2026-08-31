@@ -173,23 +173,34 @@ func validateNoteContent(content string) error {
 	return nil
 }
 
-// deriveNoteTitle implements notes design N-6: the first `#` heading wins,
-// else the first non-empty line; both truncated to 50 runes. Empty content
-// yields an empty title (the frontend renders "无标题"). The input is a
-// bounded content head from the repository, never the full content.
+// deriveNoteTitle implements notes design N-6: the first `#` heading wins
+// (scanning the whole head), else the first non-empty line; both truncated
+// to 50 runes. Empty content yields an empty title (the frontend renders
+// "无标题"). The input is a bounded content head from the repository,
+// never the full content.
 func deriveNoteTitle(contentHead string) string {
-	for _, line := range strings.Split(contentHead, "\n") {
+	lines := strings.Split(contentHead, "\n")
+	// Pass 1: ticket 06 — the first `#` heading wins even when plain
+	// lines come before it. Bare "###" separators carry no text and are
+	// skipped.
+	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
+		if !strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		// A heading line may carry leading hashes; strip them for display.
-		// Bare "###" separators keep scanning for a line with actual text.
 		stripped := strings.TrimSpace(strings.TrimLeft(trimmed, "#"))
 		if stripped == "" {
 			continue
 		}
 		return truncateNoteTitle(stripped, types.NoteTitleMaxRunes)
+	}
+	// Pass 2: no heading anywhere — fall back to the first non-empty line.
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.TrimSpace(strings.TrimLeft(trimmed, "#")) == "" {
+			continue
+		}
+		return truncateNoteTitle(trimmed, types.NoteTitleMaxRunes)
 	}
 	return ""
 }

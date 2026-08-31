@@ -7,6 +7,7 @@ package handler
 
 import (
 	"errors"
+	"io"
 	"net/http"
 
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
@@ -131,6 +132,25 @@ func (h *MeNoteHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+// readUploadFull reads exactly size bytes from r. A single Read is not
+// enough — the io.Reader contract allows short reads (slow networks,
+// streaming sources), which would silently truncate the upload. Empty
+// uploads and streams serving more than the declared size are rejected.
+func readUploadFull(r io.Reader, size int64) ([]byte, error) {
+	if size <= 0 {
+		return nil, apperrors.NewValidationError("empty upload")
+	}
+	data := make([]byte, size)
+	if _, err := io.ReadFull(r, data); err != nil {
+		return nil, apperrors.NewValidationError("cannot read uploaded file")
+	}
+	var probe [1]byte
+	if n, _ := r.Read(probe[:]); n > 0 {
+		return nil, apperrors.NewValidationError("uploaded file is larger than declared")
+	}
+	return data, nil
+}
+
 // mapNoteError converts service-layer sentinels into HTTP-appropriate
 // app errors: limits → 400, missing/foreign notes → 404 (existence is not
 // leaked), anything else passes through for the error middleware.
@@ -169,13 +189,11 @@ func (h *MeNoteHandler) UploadImage(c *gin.Context) {
 		return
 	}
 	defer f.Close()
-	data := make([]byte, file.Size+1)
-	n, err := f.Read(data)
-	if err != nil && n == 0 {
-		c.Error(apperrors.NewValidationError("empty upload"))
+	data, err := readUploadFull(f, file.Size)
+	if err != nil {
+		c.Error(err)
 		return
 	}
-	data = data[:n]
 
 	image, err := h.service.CreateImage(c.Request.Context(), data)
 	if err != nil {

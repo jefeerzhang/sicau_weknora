@@ -8,6 +8,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,17 +22,17 @@ import (
 
 type fakeNoteService struct {
 	interfaces.TenantNoteService
-	list        []types.TenantNoteListItem
-	created     string
-	updateID    string
-	updateBody  string
-	deleteID    string
-	getID       string
-	getResult   *types.TenantNote
-	getErr      error
-	createErr   error
-	updateErr   error
-	deleteErr   error
+	list       []types.TenantNoteListItem
+	created    string
+	updateID   string
+	updateBody string
+	deleteID   string
+	getID      string
+	getResult  *types.TenantNote
+	getErr     error
+	createErr  error
+	updateErr  error
+	deleteErr  error
 }
 
 func (s *fakeNoteService) List(ctx context.Context) ([]types.TenantNoteListItem, error) {
@@ -283,6 +284,45 @@ func TestNotes_DeleteImagePassesID(t *testing.T) {
 }
 
 // --- 100MB per-user image quota (user revision) ---
+
+// --- upload read robustness ---
+
+// dripReader hands out at most one byte per Read, like a slow network
+// source; a single f.Read call would truncate the upload.
+type dripReader struct {
+	data []byte
+	pos  int
+}
+
+func (d *dripReader) Read(p []byte) (int, error) {
+	if d.pos >= len(d.data) {
+		return 0, io.EOF
+	}
+	p[0] = d.data[d.pos]
+	d.pos++
+	return 1, nil
+}
+
+func TestReadUploadFull_SurvivesShortReads(t *testing.T) {
+	payload := bytes.Repeat([]byte("x0"), 512) // 1KB, one byte per Read
+	got, err := readUploadFull(&dripReader{data: payload}, int64(len(payload)))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("short reads truncated the upload: got %d bytes, want %d", len(got), len(payload))
+	}
+}
+
+func TestReadUploadFull_RejectsEmptyAndCorrupt(t *testing.T) {
+	if _, err := readUploadFull(&dripReader{}, 0); err == nil {
+		t.Fatal("zero-byte upload must be rejected")
+	}
+	// Declared smaller than what the reader actually serves.
+	if _, err := readUploadFull(&dripReader{data: []byte("abc")}, 2); err == nil {
+		t.Fatal("reader serving more than declared size must be rejected")
+	}
+}
 
 func TestDetectNoteImageMime_Whitelist(t *testing.T) {
 	png := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0}
