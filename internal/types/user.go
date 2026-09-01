@@ -117,6 +117,16 @@ type User struct {
 	Tenant *Tenant `json:"tenant,omitempty" gorm:"foreignKey:TenantID"`
 }
 
+// HasTeacherCapability reports whether the user has effective teacher
+// capability. SuperAdmin is a composite identity — platform governance
+// plus inherited teacher capability — so it satisfies this without being
+// separately appointed as a Teacher. This is a capability floor used to
+// gate teacher-only workspace actions; it is NOT a cross-tenant bypass
+// (that is governed by CanAccessAllTenants + EnableCrossTenantAccess).
+func (u *User) HasTeacherCapability() bool {
+	return u.IsTeacher || u.IsSystemAdmin
+}
+
 // AuthToken represents an authentication token
 type AuthToken struct {
 	// Unique identifier of the token

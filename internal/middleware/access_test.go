@@ -151,6 +151,31 @@ func TestIsTenantAccessible_NilMemberServiceRejectsNonHome(t *testing.T) {
 	}
 }
 
+// #13: a composite SuperAdmin (IsSystemAdmin) inherits teacher capability
+// but is NOT a cross-tenant superuser. Its platform identity must not grant
+// daily reach into another teacher's workspace; that requires either
+// CanAccessAllTenants AND the cluster flag, or an explicit membership.
+func TestIsCrossTenantSuperuser_CompositeSuperAdminNotCrossTenant(t *testing.T) {
+	// Flag on, but the SuperAdmin's CanAccessAllTenants is false (bootstrap
+	// does not set it), so no cross-tenant superuser power.
+	ctx := context.WithValue(context.Background(), types.UserContextKey,
+		&types.User{ID: "sa1", IsSystemAdmin: true, CanAccessAllTenants: false})
+	if IsCrossTenantSuperuser(ctx, cfgCrossTenant(true)) {
+		t.Fatalf("composite SuperAdmin must not be a cross-tenant superuser")
+	}
+}
+
+func TestIsTenantAccessible_CompositeSuperAdminBlockedWithoutMembership(t *testing.T) {
+	// SuperAdmin targeting a peer teacher's workspace (99) with no
+	// membership row and no CanAccessAllTenants: platform identity alone
+	// must not open another teacher's workspace.
+	user := &types.User{ID: "sa1", TenantID: 1, IsSystemAdmin: true, CanAccessAllTenants: false}
+	ms := newFakeMemberService() // empty membership store
+	if IsTenantAccessible(context.Background(), user, 99, ms, cfgCrossTenant(true)) {
+		t.Fatalf("composite SuperAdmin must not reach a peer workspace without membership")
+	}
+}
+
 // ---------- RequireCrossTenantAccess ----------
 
 func runCrossTenantHandler(cfg *config.Config, user *types.User) *httptest.ResponseRecorder {

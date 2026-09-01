@@ -235,3 +235,147 @@ func TestAuthMeTeacherCanCreateTenantWhenSelfServiceOn(t *testing.T) {
 		t.Fatalf("teacher should be able to create tenant: %s", w.Body.String())
 	}
 }
+
+// #13: the composite SuperAdmin must be able to create its own workspace
+// without a separate teacher appointment, even when public self-service
+// creation is disabled (the teaching default).
+func TestCreateTenantAllowsSuperAdminWhenSelfServiceDisabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tenants := &tenantPolicyTenantService{}
+	h := &TenantHandler{
+		service: tenants,
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:            "sa-1",
+			TenantID:      1, // composite SuperAdmin is tenantless at bootstrap; pre-set home to skip UpdateUser
+			IsSystemAdmin: true,
+		}},
+		config:           &config.Config{Tenant: &config.TenantConfig{}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: false},
+	}
+	r := gin.New()
+	r.Use(tenantPolicyErrorCapture())
+	r.POST("/tenants", h.CreateTenant)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tenants", bytes.NewBufferString(`{"name":"sa-space"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if tenants.createCalls != 1 {
+		t.Fatalf("CreateTenant called %d times, want 1", tenants.createCalls)
+	}
+}
+
+func TestCreateTenantAllowsSuperAdminWhenSelfServiceEnabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tenants := &tenantPolicyTenantService{}
+	on := true
+	h := &TenantHandler{
+		service: tenants,
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:            "sa-1",
+			TenantID:      1,
+			IsSystemAdmin: true,
+		}},
+		config: &config.Config{Tenant: &config.TenantConfig{
+			SelfServiceCreationEnabled: &on,
+		}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: true},
+	}
+	r := gin.New()
+	r.Use(tenantPolicyErrorCapture())
+	r.POST("/tenants", h.CreateTenant)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tenants", bytes.NewBufferString(`{"name":"sa-space"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if tenants.createCalls != 1 {
+		t.Fatalf("CreateTenant called %d times, want 1", tenants.createCalls)
+	}
+}
+
+// #13: /auth/me must advertise the SuperAdmin's inherited teacher
+// capability regardless of the self-service flag, so the workspace-creation
+// entry stays consistent with the backend gate.
+func TestAuthMeSuperAdminCanCreateTenant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &AuthHandler{
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:            "sa-1",
+			Username:      "sa",
+			Email:         "sa@example.com",
+			IsSystemAdmin: true,
+		}},
+		configInfo:       &config.Config{Tenant: &config.TenantConfig{}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: false},
+	}
+	r := gin.New()
+	r.GET("/auth/me", h.GetCurrentUser)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/auth/me", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"can_create_tenant":true`) {
+		t.Fatalf("superadmin should be able to create tenant: %s", w.Body.String())
+	}
+}
+
+// recordEnsureOwner is a minimal TenantMemberService stub that records the
+// EnsureOwner call so we can assert the composite SuperAdmin becomes the
+// Owner of the workspace it just created (#13 AC1/AC3).
+type recordEnsureOwner struct {
+	interfaces.TenantMemberService
+	userID   string
+	tenantID uint64
+	calls    int
+}
+
+func (m *recordEnsureOwner) EnsureOwner(_ context.Context, userID string, tenantID uint64) (*types.TenantMember, error) {
+	m.userID = userID
+	m.tenantID = tenantID
+	m.calls++
+	return nil, nil
+}
+
+func (m *recordEnsureOwner) ListByUser(_ context.Context, _ string) ([]*types.TenantMember, error) {
+	return nil, nil
+}
+
+func TestCreateTenantSuperAdminBecomesOwner(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tenants := &tenantPolicyTenantService{}
+	ms := &recordEnsureOwner{}
+	h := &TenantHandler{
+		service:        tenants,
+		memberService:  ms,
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:            "sa-1",
+			TenantID:      1,
+			IsSystemAdmin: true,
+		}},
+		config:           &config.Config{Tenant: &config.TenantConfig{}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: false},
+	}
+	r := gin.New()
+	r.Use(tenantPolicyErrorCapture())
+	r.POST("/tenants", h.CreateTenant)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tenants", bytes.NewBufferString(`{"name":"sa-space"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if ms.calls != 1 || ms.userID != "sa-1" || ms.tenantID != 99 {
+		t.Fatalf("EnsureOwner not called once for SuperAdmin on tenant 99: userID=%q tenant=%d calls=%d", ms.userID, ms.tenantID, ms.calls)
+	}
+}

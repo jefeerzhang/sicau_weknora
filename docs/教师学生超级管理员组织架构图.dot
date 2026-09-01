@@ -22,17 +22,19 @@ digraph Organization {
 
   subgraph cluster_workspaces {
     label="工作空间层"; fontname="Microsoft YaHei"; fontsize=20; color="#16a34a"; style="rounded";
+    wsa [label="超级管理员教师工作空间\nOwner：超级管理员", fillcolor="#dcfce7", color="#16a34a", fontcolor="#14532d"];
     wa [label="教师 A 工作空间\nOwner：教师 A", fillcolor="#dcfce7", color="#16a34a", fontcolor="#14532d"];
     wb [label="教师 B 工作空间\nOwner：教师 B", fillcolor="#dcfce7", color="#16a34a", fontcolor="#14532d"];
     wn [label="教师 N 工作空间\nOwner：教师 N", fillcolor="#dcfce7", color="#16a34a", fontcolor="#14532d"];
+    sa -> wsa [label="创建 / 管理（自动继承教师能力）"];
     ta -> wa [label="创建 / 管理"];
     tb -> wb [label="创建 / 管理"];
     tn -> wn [label="创建 / 管理"];
-    oversight [label="超级管理员可跨空间管理 / 恢复", fillcolor="#fef3c7", color="#d97706", fontcolor="#78350f"];
+    oversight [label="超级管理员对其他教师空间：平台审计 / 故障恢复", fillcolor="#fef3c7", color="#d97706", fontcolor="#78350f"];
     sa -> oversight [label="平台监管", color="#d97706"];
-    oversight -> wa [color="#d97706"];
-    oversight -> wb [color="#d97706"];
-    oversight -> wn [color="#d97706"];
+    oversight -> wa [color="#d97706", label="非日常管理"];
+    oversight -> wb [color="#d97706", label="非日常管理"];
+    oversight -> wn [color="#d97706", label="非日常管理"];
   }
 
   subgraph cluster_students {

@@ -126,8 +126,11 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.must_change_password === true
   })
 
+  // Effective teacher capability (mirrors backend HasTeacherCapability):
+  // the composite SuperAdmin satisfies it without a separate appointment,
+  // so it is `is_teacher OR is_system_admin` (issue #13 / #10).
   const isTeacher = computed(() => {
-    return user.value?.is_teacher === true
+    return user.value?.is_teacher === true || user.value?.is_system_admin === true
   })
 
   // currentTenantRole returns the user's role in the active tenant

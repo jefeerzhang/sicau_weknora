@@ -15,15 +15,14 @@ flowchart TB
     end
 
     subgraph WORKSPACES[工作空间层]
+        WSA[超级管理员教师工作空间\nOwner: 超级管理员]
         W1[教师 A 工作空间\nOwner: 教师 A]
         W2[教师 B 工作空间\nOwner: 教师 B]
         WN[教师 N 工作空间\nOwner: 教师 N]
+        SA -->|创建 / 管理（自动继承教师能力）| WSA
         T1 -->|创建 / 管理| W1
         T2 -->|创建 / 管理| W2
         TN -->|创建 / 管理| WN
-        SA -->|平台级管理 / 故障恢复| W1
-        SA -->|平台级管理 / 故障恢复| W2
-        SA -->|平台级管理 / 故障恢复| WN
     end
 
     subgraph STUDENTS[学生使用层]
@@ -49,6 +48,6 @@ flowchart TB
 
     class SA,TEACHER_REGISTRY super;
     class T1,T2,TN teacher;
-    class W1,W2,WN workspace;
+    class WSA,W1,W2,WN workspace;
     class S1,S2,SN student;
     class BLOCK1,BLOCK2,BLOCK3 block;

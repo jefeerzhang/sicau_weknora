@@ -241,19 +241,25 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 	platformCaller := hasAPIKeyScope && apiKeyScope.IsPlatform()
 	catalogManager := caller.CanAccessAllTenants || platformCaller
 
-	// Deployment-level policy: ordinary users may be restricted to joining
-	// existing workspaces by invitation. This check is authoritative; the
-	// frontend capability only improves UX and cannot bypass it. Cross-tenant
-	// superusers retain the catalog-management create path.
-	if !catalogManager &&
+	// Deployment-level policy: ordinary (non-teacher) users may be
+	// restricted to joining existing workspaces by invitation. This check
+	// is authoritative; the frontend capability only improves UX and cannot
+	// bypass it. Effective-teacher identities (appointed Teachers and the
+	// composite SuperAdmin) and cross-tenant superusers always pass — the
+	// flag only selects the refusal a non-teacher-capability caller gets
+	// (2005 "creation disabled" vs 403 "not a teacher"), never whether a
+	// teacher may create (#10/#13).
+	if !catalogManager && !caller.HasTeacherCapability() &&
 		!resolveTenantSelfServiceCreationEnabled(ctx, h.config, h.systemSettingSvc) {
 		logger.Warnf(ctx, "Self-service tenant creation denied by policy for user %s", caller.ID)
 		c.Error(errors.NewTenantCreationDisabledError())
 		return
 	}
-	// #10: only appointed Teachers may create teaching workspaces. SuperAdmin
-	// must also be appointed Teacher (or use catalogManager bypass).
-	if !catalogManager && !caller.IsTeacher {
+	// #10/#13: only effective Teachers may create teaching workspaces. The
+	// composite SuperAdmin satisfies this via inherited teacher capability
+	// without a separate appointment; students, unappointed accounts and
+	// non-platform API keys do not (catalogManager bypass remains).
+	if !catalogManager && !caller.HasTeacherCapability() {
 		logger.Warnf(ctx, "Tenant creation denied: user %s is not an appointed teacher", caller.ID)
 		c.Error(errors.NewForbiddenError("Only appointed teachers can create workspaces"))
 		return
