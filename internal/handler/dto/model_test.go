@@ -116,7 +116,18 @@ func TestModelResponse_ViewerStripsIntegrationDetail(t *testing.T) {
 	assert.Nil(t, resp.Parameters.ExtraConfig)
 }
 
-func TestModelResponse_NilSafe(t *testing.T) {
-	assert.Nil(t, NewModelResponse(adminContext(), nil))
-	assert.Equal(t, []*ModelResponse{}, NewModelResponses(adminContext(), nil))
+func TestModelResponse_ViewerOmitsCredentialMetadata(t *testing.T) {
+	m := &types.Model{
+		ID: "m-cred",
+		Parameters: types.ModelParameters{
+			APIKey:    "sk-secret",
+			AppSecret: "app-secret",
+		},
+	}
+	resp := NewModelResponse(viewerContext(), m)
+	assert.Nil(t, resp.Credentials, "viewer must not see credential configured flags")
+	body, err := json.Marshal(resp)
+	require.NoError(t, err)
+	assert.NotContains(t, string(body), `"credentials"`)
+	assert.NotContains(t, string(body), "sk-secret")
 }

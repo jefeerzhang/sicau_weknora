@@ -75,6 +75,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresInit: false, requiresTenant: false }
     },
     {
+      path: "/change-password",
+      name: "forceChangePassword",
+      component: () => import("../views/auth/ForceChangePassword.vue"),
+      meta: { requiresAuth: true, requiresInit: false, requiresTenant: false }
+    },
+    {
       path: "/join",
       name: "joinOrganization",
       // 重定向到组织列表页，并将 code 参数转换为 invite_code
@@ -344,7 +350,7 @@ router.beforeEach(async (to, from, next) => {
 
   // Tenantless onboarding still requires a valid user token even though it
   // deliberately skips the normal tenant/system-initialization gates.
-  if (to.path === '/onboarding/workspace') {
+  if (to.path === '/onboarding/workspace' || to.path === '/change-password') {
     if (!authStore.isLoggedIn) {
       const restored = await hydrateSessionFromToken(authStore)
       if (!restored) {
@@ -352,8 +358,10 @@ router.beforeEach(async (to, from, next) => {
         return
       }
     }
-    if (authStore.hasValidTenant) {
+    if (to.path === '/onboarding/workspace' && authStore.hasValidTenant) {
       next('/platform/knowledge-bases')
+    } else if (to.path === '/change-password' && !authStore.mustChangePassword) {
+      next(authStore.hasValidTenant ? '/platform/knowledge-bases' : '/onboarding/workspace')
     } else {
       next()
     }
@@ -364,7 +372,11 @@ router.beforeEach(async (to, from, next) => {
   if (to.meta.requiresAuth === false || to.meta.requiresInit === false) {
     // 如果已登录用户访问登录页面，重定向到知识库列表页面
     if (to.path === '/login' && authStore.isLoggedIn) {
-      next(authStore.hasValidTenant ? '/platform/knowledge-bases' : '/onboarding/workspace')
+      if (authStore.mustChangePassword) {
+        next('/change-password')
+      } else {
+        next(authStore.hasValidTenant ? '/platform/knowledge-bases' : '/onboarding/workspace')
+      }
       return
     }
     next()
@@ -376,6 +388,10 @@ router.beforeEach(async (to, from, next) => {
     if (!authStore.isLoggedIn) {
       const restored = await hydrateSessionFromToken(authStore)
       if (restored) {
+        if (authStore.mustChangePassword) {
+          next('/change-password')
+          return
+        }
         next(
           !authStore.hasValidTenant && to.meta.requiresTenant !== false
             ? '/onboarding/workspace'
@@ -403,6 +419,11 @@ router.beforeEach(async (to, from, next) => {
       next('/login')
       return
     }
+  }
+
+  if (authStore.isLoggedIn && authStore.mustChangePassword && to.path !== '/change-password') {
+    next('/change-password')
+    return
   }
 
   if (to.meta.requiresTenant !== false && !authStore.hasValidTenant) {

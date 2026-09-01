@@ -185,6 +185,29 @@ func (r *userRepository) ListSystemAdmins(ctx context.Context, offset, limit int
 	return users, total, nil
 }
 
+// ListTeachers lists users where is_teacher = true (platform Teacher identity).
+func (r *userRepository) ListTeachers(ctx context.Context, offset, limit int) ([]*types.User, int64, error) {
+	var users []*types.User
+	var total int64
+
+	base := r.db.WithContext(ctx).Model(&types.User{}).Where("is_teacher = ?", true)
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	query := base.Order("created_at DESC, id ASC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if err := query.Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
 // RevokeSystemAdmin revokes system-admin privileges inside a transaction.
 // It locks the current admin rows before counting so concurrent revokes
 // cannot both observe "two admins" and leave the platform with zero.

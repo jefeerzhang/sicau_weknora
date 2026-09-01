@@ -334,6 +334,10 @@ func RegisterSystemAdminRoutes(
 		adminRoutes.POST("/promote", handler.PromoteUserToSystemAdmin)
 		adminRoutes.POST("/revoke", handler.RevokeSystemAdmin)
 		adminRoutes.GET("/list", handler.ListSystemAdmins)
+		// #9: platform Teacher appointment
+		adminRoutes.POST("/teachers/appoint", handler.AppointTeacher)
+		adminRoutes.POST("/teachers/revoke", handler.RevokeTeacher)
+		adminRoutes.GET("/teachers", handler.ListTeachers)
 		adminRoutes.POST("/users/reset-password", handler.ResetUserPassword)
 		adminRoutes.POST("/users/create", handler.CreateSystemUser)
 		adminRoutes.GET("/api-keys", handler.ListPlatformAPIKeys)

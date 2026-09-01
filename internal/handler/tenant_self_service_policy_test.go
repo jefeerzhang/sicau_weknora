@@ -121,6 +121,69 @@ func TestCreateTenantAllowsCrossTenantSuperuserWhenSelfServiceDisabled(t *testin
 	}
 }
 
+func TestCreateTenantAllowsTeacherWhenSelfServiceEnabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tenants := &tenantPolicyTenantService{}
+	on := true
+	h := &TenantHandler{
+		service: tenants,
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:        "teacher-1",
+			TenantID:  1, // already has a home tenant; skip default-tenant UpdateUser
+			IsTeacher: true,
+		}},
+		config: &config.Config{Tenant: &config.TenantConfig{
+			SelfServiceCreationEnabled: &on,
+		}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: true},
+	}
+	r := gin.New()
+	r.Use(tenantPolicyErrorCapture())
+	r.POST("/tenants", h.CreateTenant)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tenants", bytes.NewBufferString(`{"name":"course-a"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if tenants.createCalls != 1 {
+		t.Fatalf("CreateTenant called %d times, want 1", tenants.createCalls)
+	}
+}
+
+func TestCreateTenantRejectsNonTeacherWhenSelfServiceEnabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tenants := &tenantPolicyTenantService{}
+	on := true
+	h := &TenantHandler{
+		service: tenants,
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:        "student-1",
+			IsTeacher: false,
+		}},
+		config: &config.Config{Tenant: &config.TenantConfig{
+			SelfServiceCreationEnabled: &on,
+		}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: true},
+	}
+	r := gin.New()
+	r.Use(tenantPolicyErrorCapture())
+	r.POST("/tenants", h.CreateTenant)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tenants", bytes.NewBufferString(`{"name":"blocked"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if tenants.createCalls != 0 {
+		t.Fatalf("CreateTenant called %d times, want 0", tenants.createCalls)
+	}
+}
+
 func TestAuthMeProjectsTenantCreationCapability(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := &AuthHandler{
@@ -142,5 +205,33 @@ func TestAuthMeProjectsTenantCreationCapability(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), `"can_create_tenant":false`) {
 		t.Fatalf("response missing capability: %s", w.Body.String())
+	}
+}
+
+func TestAuthMeTeacherCanCreateTenantWhenSelfServiceOn(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	on := true
+	h := &AuthHandler{
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:        "teacher-me",
+			Username:  "teacher",
+			Email:     "teacher@example.com",
+			IsTeacher: true,
+		}},
+		configInfo: &config.Config{Tenant: &config.TenantConfig{
+			SelfServiceCreationEnabled: &on,
+		}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: true},
+	}
+	r := gin.New()
+	r.GET("/auth/me", h.GetCurrentUser)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/auth/me", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"can_create_tenant":true`) {
+		t.Fatalf("teacher should be able to create tenant: %s", w.Body.String())
 	}
 }

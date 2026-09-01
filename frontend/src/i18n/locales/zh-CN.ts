@@ -2822,6 +2822,24 @@ export default {
           }
         }
       },
+      teachers: {
+        label: '教师',
+        description: '被任命的教师可创建教学工作空间。在右侧输入邮箱并回车即可任命；点击 × 即为撤销教师身份。',
+        placeholder: '输入用户邮箱并回车',
+        loadFailed: '加载教师列表失败',
+        saveSuccess: '已更新教师名单',
+        saveFailed: '更新教师名单失败',
+        confirm: {
+          appoint: {
+            body: '确认任命 {email} 为教师？该用户将可以创建教学工作空间。',
+            confirmBtn: '确认任命'
+          },
+          revoke: {
+            body: '确认撤销 {email} 的教师身份？撤销后该用户将无法再创建教学工作空间。',
+            confirmBtn: '确认撤销'
+          }
+        }
+      },
       reset: {
         label: '重置',
         tooltip: '清除当前 UI 覆盖，恢复使用环境变量或内置默认值',
@@ -4622,6 +4640,12 @@ export default {
       inviteOnlyNotice: '此账户只能通过邀请加入已有空间',
       help: '你现在可以创建空间，也可以稍后回来接受邀请。',
       inviteOnlyHelp: '还没有邀请？请把你的注册邮箱提供给空间管理员，由管理员向你发送邀请。'
+    },
+    forceChangePassword: {
+      title: '请修改初始密码',
+      description: '出于安全考虑，首次登录需要设置新密码后才能继续使用。',
+      submit: '确认修改',
+      success: '密码已更新，请使用新密码重新登录。'
     }
   },
   inviteRegister: {

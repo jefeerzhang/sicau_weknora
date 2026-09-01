@@ -96,6 +96,12 @@ type User struct {
 	CanAccessAllTenants bool `json:"can_access_all_tenants" gorm:"default:false"`
 	// Whether the user is a system administrator (independent of workspace roles)
 	IsSystemAdmin bool `json:"is_system_admin" gorm:"default:false;index"`
+	// MustChangePassword forces the user through password rotation before
+	// other authenticated APIs (used for bootstrap SuperAdmin credentials).
+	MustChangePassword bool `json:"must_change_password" gorm:"default:false"`
+	// IsTeacher marks a SuperAdmin-appointed teaching identity. Teachers may
+	// create workspaces; students and unappointed accounts may not.
+	IsTeacher bool `json:"is_teacher" gorm:"default:false;index"`
 	// Per-user UI/feature preferences.
 	// Stored as JSON (jsonb on Postgres, TEXT on SQLite) via the
 	// driver.Valuer / sql.Scanner methods on UserPreferences.
@@ -260,6 +266,8 @@ type UserInfo struct {
 	IsActive            bool            `json:"is_active"`
 	CanAccessAllTenants bool            `json:"can_access_all_tenants"`
 	IsSystemAdmin       bool            `json:"is_system_admin"`
+	MustChangePassword  bool            `json:"must_change_password"`
+	IsTeacher           bool            `json:"is_teacher"`
 	Preferences         UserPreferences `json:"preferences"`
 	CreatedAt           time.Time       `json:"created_at"`
 	UpdatedAt           time.Time       `json:"updated_at"`
@@ -276,6 +284,8 @@ func (u *User) ToUserInfo() *UserInfo {
 		IsActive:            u.IsActive,
 		CanAccessAllTenants: u.CanAccessAllTenants,
 		IsSystemAdmin:       u.IsSystemAdmin,
+		MustChangePassword:  u.MustChangePassword,
+		IsTeacher:           u.IsTeacher,
 		Preferences:         u.Preferences,
 		CreatedAt:           u.CreatedAt,
 		UpdatedAt:           u.UpdatedAt,

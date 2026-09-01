@@ -21,13 +21,15 @@ func TestApplyAuthAndTenantDefaults_DisableRegistrationDrivesRegistrationMode(t 
 		{"true overrides explicit self_serve YAML", "true", AuthRegistrationModeSelfServe, AuthRegistrationModeInviteOnly},
 		{"true is a no-op when YAML already invite_only", "true", AuthRegistrationModeInviteOnly, AuthRegistrationModeInviteOnly},
 		{"false leaves YAML untouched", "false", AuthRegistrationModeSelfServe, AuthRegistrationModeSelfServe},
-		{"unset falls back to default self_serve", "", "", AuthRegistrationModeSelfServe},
+		// Teaching default (#11): empty YAML → invite_only (not self_serve).
+		{"unset falls back to default invite_only", "", "", AuthRegistrationModeInviteOnly},
 		{"unset keeps explicit invite_only YAML", "", AuthRegistrationModeInviteOnly, AuthRegistrationModeInviteOnly},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("DISABLE_REGISTRATION", tc.disable)
+			t.Setenv("WEKNORA_AUTH_REGISTRATION_MODE", "")
 			// Other tenant env vars must not leak between cases.
 			t.Setenv("WEKNORA_TENANT_ENABLE_RBAC", "")
 			t.Setenv("WEKNORA_TENANT_MAX_OWNED_PER_USER", "")
@@ -44,14 +46,14 @@ func TestApplyAuthAndTenantDefaults_DisableRegistrationDrivesRegistrationMode(t 
 }
 
 func TestApplyAuthAndTenantDefaults_SelfServiceTenantCreation(t *testing.T) {
-	t.Run("defaults enabled", func(t *testing.T) {
+	t.Run("defaults disabled for teaching", func(t *testing.T) {
 		t.Setenv("WEKNORA_TENANT_SELF_SERVICE_CREATION_ENABLED", "")
 		cfg := &Config{Tenant: &TenantConfig{}}
 
 		applyAuthAndTenantDefaults(cfg)
 
-		if !cfg.Tenant.IsSelfServiceCreationEnabled() {
-			t.Fatal("self-service tenant creation should default to enabled")
+		if cfg.Tenant.IsSelfServiceCreationEnabled() {
+			t.Fatal("self-service tenant creation should default to disabled (#10)")
 		}
 	})
 
@@ -66,17 +68,28 @@ func TestApplyAuthAndTenantDefaults_SelfServiceTenantCreation(t *testing.T) {
 			t.Fatal("environment override should disable self-service tenant creation")
 		}
 	})
+
+	t.Run("environment enables teaching default", func(t *testing.T) {
+		t.Setenv("WEKNORA_TENANT_SELF_SERVICE_CREATION_ENABLED", "true")
+		cfg := &Config{Tenant: &TenantConfig{}}
+
+		applyAuthAndTenantDefaults(cfg)
+
+		if !cfg.Tenant.IsSelfServiceCreationEnabled() {
+			t.Fatal("environment override should enable self-service tenant creation")
+		}
+	})
 }
 
 func TestApplyAuthAndTenantDefaults_DefaultTenantMode(t *testing.T) {
-	t.Run("historical default creates a personal tenant", func(t *testing.T) {
+	t.Run("teaching default is tenantless", func(t *testing.T) {
 		t.Setenv("WEKNORA_AUTH_DEFAULT_TENANT_MODE", "")
 		cfg := &Config{Auth: &AuthConfig{}}
 
 		applyAuthAndTenantDefaults(cfg)
 
-		if cfg.Auth.DefaultTenantMode != AuthDefaultTenantModeCreatePersonal {
-			t.Fatalf("default_tenant_mode = %q, want %q", cfg.Auth.DefaultTenantMode, AuthDefaultTenantModeCreatePersonal)
+		if cfg.Auth.DefaultTenantMode != AuthDefaultTenantModeTenantless {
+			t.Fatalf("default_tenant_mode = %q, want %q", cfg.Auth.DefaultTenantMode, AuthDefaultTenantModeTenantless)
 		}
 	})
 

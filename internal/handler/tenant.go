@@ -251,6 +251,13 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 		c.Error(errors.NewTenantCreationDisabledError())
 		return
 	}
+	// #10: only appointed Teachers may create teaching workspaces. SuperAdmin
+	// must also be appointed Teacher (or use catalogManager bypass).
+	if !catalogManager && !caller.IsTeacher {
+		logger.Warnf(ctx, "Tenant creation denied: user %s is not an appointed teacher", caller.ID)
+		c.Error(errors.NewForbiddenError("Only appointed teachers can create workspaces"))
+		return
+	}
 
 	var tenantData types.Tenant
 

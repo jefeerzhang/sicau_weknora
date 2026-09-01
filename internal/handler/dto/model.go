@@ -87,11 +87,15 @@ func NewModelResponse(ctx context.Context, m *types.Model) *ModelResponse {
 		params.CustomHeaders = nil
 		params.AppID = ""
 	}
+	// #12: credential presence is Admin+ (or SystemAdmin for builtins).
+	// Students/viewers must not learn whether API keys are configured.
 	var creds map[string]CredentialFieldMetadata
-	if !m.IsBuiltin || canManageBuiltin {
-		creds = map[string]CredentialFieldMetadata{
-			"api_key":    {Configured: m.Parameters.APIKey != ""},
-			"app_secret": {Configured: m.Parameters.AppSecret != ""},
+	if CanViewIntegrationSecrets(ctx) || canManageBuiltin {
+		if !m.IsBuiltin || canManageBuiltin {
+			creds = map[string]CredentialFieldMetadata{
+				"api_key":    {Configured: m.Parameters.APIKey != ""},
+				"app_secret": {Configured: m.Parameters.AppSecret != ""},
+			}
 		}
 	}
 	return &ModelResponse{

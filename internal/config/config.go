@@ -227,8 +227,10 @@ type TenantConfig struct {
 	// applyAuthAndTenantDefaults for the semantics of <0 / 0 / >0.
 	MaxOwnedPerUser int `yaml:"max_owned_per_user" json:"max_owned_per_user" mapstructure:"max_owned_per_user"`
 	// SelfServiceCreationEnabled controls whether ordinary authenticated
-	// users may create a workspace for themselves. Nil preserves the
-	// historical default (enabled); cross-tenant superusers are exempt.
+	// users may create a workspace for themselves. Nil falls back to
+	// disabled after applyAuthAndTenantDefaults (teaching default #10);
+	// cross-tenant superusers / appointed Teachers (when enabled) are
+	// the create path. Explicit true restores open self-service.
 	SelfServiceCreationEnabled *bool `yaml:"self_service_creation_enabled" json:"self_service_creation_enabled" mapstructure:"self_service_creation_enabled"`
 }
 
@@ -246,9 +248,13 @@ func (t *TenantConfig) IsRBACEnforced() bool {
 }
 
 // IsSelfServiceCreationEnabled reports whether ordinary users may create
-// tenants. Nil keeps the historical behaviour enabled.
+// tenants. Nil defaults to false (teaching #10); applyAuthAndTenantDefaults
+// materializes an explicit pointer on startup.
 func (t *TenantConfig) IsSelfServiceCreationEnabled() bool {
-	return t == nil || t.SelfServiceCreationEnabled == nil || *t.SelfServiceCreationEnabled
+	if t == nil || t.SelfServiceCreationEnabled == nil {
+		return false
+	}
+	return *t.SelfServiceCreationEnabled
 }
 
 // AuditConfig governs durable audit log behaviour. Writes happen on
@@ -268,12 +274,10 @@ type AuditConfig struct {
 // AuthConfig governs the user authentication entry points.
 type AuthConfig struct {
 	// RegistrationMode controls who may call POST /auth/register.
-	//   "self_serve" (default) — anyone may register; a new tenant is
-	//                            auto-created and the registrant becomes
-	//                            its Owner. Preserves existing behaviour.
-	//   "invite_only"          — public registration is rejected; new
-	//                            users only enter through the invitation
-	//                            flow added in PR 3.
+	//   "invite_only" (teaching default) — public registration is rejected;
+	//                            new accounts join via invitation.
+	//   "self_serve"           — anyone may register; a new tenant may be
+	//                            auto-created depending on DefaultTenantMode.
 	RegistrationMode string `yaml:"registration_mode" json:"registration_mode"`
 	// DefaultTenantMode controls public password-registration provisioning.
 	// create_personal preserves the historical one-user-one-workspace default;
@@ -841,14 +845,19 @@ func applyAuthAndTenantDefaults(cfg *Config) {
 		}
 	}
 
+	// Teaching deployments (#11): invite_only + tenantless when unset.
+	// Explicit YAML/env self_serve / create_personal still win.
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_AUTH_REGISTRATION_MODE")); value != "" {
+		cfg.Auth.RegistrationMode = value
+	}
 	if strings.TrimSpace(cfg.Auth.RegistrationMode) == "" {
-		cfg.Auth.RegistrationMode = AuthRegistrationModeSelfServe
+		cfg.Auth.RegistrationMode = AuthRegistrationModeInviteOnly
 	}
 	if value := strings.TrimSpace(os.Getenv("WEKNORA_AUTH_DEFAULT_TENANT_MODE")); value != "" {
 		cfg.Auth.DefaultTenantMode = value
 	}
 	if strings.TrimSpace(cfg.Auth.DefaultTenantMode) == "" {
-		cfg.Auth.DefaultTenantMode = AuthDefaultTenantModeCreatePersonal
+		cfg.Auth.DefaultTenantMode = AuthDefaultTenantModeTenantless
 	}
 
 	if value := strings.TrimSpace(os.Getenv("WEKNORA_TENANT_ENABLE_RBAC")); value != "" {
@@ -882,9 +891,12 @@ func applyAuthAndTenantDefaults(cfg *Config) {
 			)
 		}
 	}
+	// Teaching deployments default to false (#10): only appointed Teachers
+	// may create workspaces. Explicit env/YAML true restores upstream
+	// self-service behavior for non-teaching installs.
 	if cfg.Tenant.SelfServiceCreationEnabled == nil {
-		on := true
-		cfg.Tenant.SelfServiceCreationEnabled = &on
+		off := false
+		cfg.Tenant.SelfServiceCreationEnabled = &off
 	}
 
 	if value := strings.TrimSpace(os.Getenv("WEKNORA_TENANT_MAX_OWNED_PER_USER")); value != "" {

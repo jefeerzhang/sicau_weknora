@@ -1358,6 +1358,25 @@ func (h *SystemHandler) PromoteUserToSystemAdmin(c *gin.Context) {
 		c.JSON(http.StatusOK, user.ToUserInfo())
 		return
 	}
+	// #8: exactly one SuperAdmin — further promotes are rejected; use Teacher appoint (#9).
+	_, total, listErr := h.userSvc.ListSystemAdmins(ctx, 0, 1)
+	if listErr != nil {
+		logger.Errorf(ctx, "Error listing system admins before promote: %v", listErr)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to promote user"})
+		return
+	}
+	if total >= 1 {
+		h.emitAdminAudit(ctx, types.AuditActionSystemAdminPromoted, user, map[string]any{
+			"target_email":    user.Email,
+			"target_username": user.Username,
+			"denied":          "second_superadmin",
+		})
+		c.JSON(http.StatusConflict, gin.H{
+			"error": "Cannot promote a second SuperAdmin; appoint a Teacher instead",
+			"code":  "second_superadmin",
+		})
+		return
+	}
 	user.IsSystemAdmin = true
 	if err := h.userSvc.UpdateUser(ctx, user); err != nil {
 		logger.Errorf(ctx, "Error promoting user %s to system admin: %v", req.UserID, err)

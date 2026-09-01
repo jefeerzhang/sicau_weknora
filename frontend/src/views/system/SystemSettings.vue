@@ -154,6 +154,47 @@
         </div>
       </div>
 
+          <div v-if="activeSettingsSection === 'access'" class="setting-row setting-row--teacher">
+        <div class="setting-info">
+              <div class="setting-label">
+            <span>{{ t('system.globalSettings.teachers.label') }}</span>
+              </div>
+          <p class="desc">{{ t('system.globalSettings.teachers.description') }}</p>
+        </div>
+        <div class="setting-control">
+          <div class="setting-control-row">
+            <t-popconfirm
+              v-model:visible="teacherPopconfirm.visible"
+              :content="teacherPopconfirm.content"
+              :theme="teacherPopconfirm.theme"
+              :confirm-btn="teacherPopconfirm.confirmBtn"
+              :cancel-btn="t('system.globalSettings.confirm.cancelBtn')"
+              :popup-props="PROGRAMMATIC_POPCONFIRM_PROPS"
+              placement="left"
+              @confirm="teacherPopconfirm.finish(true)"
+              @cancel="teacherPopconfirm.finish(false)"
+              @visible-change="teacherPopconfirm.onVisibleChange"
+            >
+              <div class="setting-control-anchor">
+                <t-tag-input
+                  v-model="teacherEmails"
+                  :placeholder="t('system.globalSettings.teachers.placeholder')"
+                  :aria-label="t('system.globalSettings.teachers.label')"
+                  :disabled="teacherBusy"
+                  class="setting-input setting-input--wide"
+                  clearable
+                  @change="onTeachersChange"
+                />
+              </div>
+            </t-popconfirm>
+                <div v-if="teacherBusy" class="setting-save-state" role="status">
+                  <t-loading size="small" />
+                  <span>{{ t('system.globalSettings.saving') }}</span>
+                </div>
+          </div>
+        </div>
+      </div>
+
           <div v-if="activeSettingsSection === 'access'" class="setting-row setting-row--password-reset">
             <div class="setting-info">
               <div class="setting-label">
@@ -492,6 +533,9 @@ import {
   listSystemAdmins,
   promoteUserToSystemAdmin,
   revokeSystemAdmin,
+  listTeachers,
+  appointTeacher,
+  revokeTeacher,
   resetUserPassword,
   type SystemSettingItem,
 } from '@/api/system'
@@ -592,6 +636,7 @@ function createInlinePopconfirm() {
 
 const ssrfPopconfirm = createInlinePopconfirm()
 const adminPopconfirm = createInlinePopconfirm()
+const teacherPopconfirm = createInlinePopconfirm()
 const highRiskPopconfirm = createInlinePopconfirm()
 
 // Friendly labels for enum options live in i18n
@@ -670,7 +715,7 @@ const activeSectionDescription = computed(() =>
 function sectionTabLabel(section: SettingsSection): string {
   const count = section === 'other'
     ? unknownSettings.value.length
-    : SETTINGS_SECTION_KEYS[section].filter((key) => settingsByKey.value.has(key)).length + (section === 'access' ? 2 : 0)
+    : SETTINGS_SECTION_KEYS[section].filter((key) => settingsByKey.value.has(key)).length + (section === 'access' ? 3 : 0)
   return t(`system.globalSettings.sections.${section}.tab`, { count })
 }
 
@@ -698,6 +743,10 @@ function markSettingSaved(item: SystemSettingItem) {
 const adminEmails = ref<string[]>([])
 const adminEmailToId = ref<Record<string, string>>({})
 const adminBusy = ref(false)
+
+const teacherEmails = ref<string[]>([])
+const teacherEmailToId = ref<Record<string, string>>({})
+const teacherBusy = ref(false)
 
 const passwordResetVisible = ref(false)
 const passwordResetSubmitting = ref(false)
@@ -1279,9 +1328,100 @@ async function onAdminsChange(next: string[]) {
   }
 }
 
+async function loadTeachers() {
+  try {
+    const resp = await listTeachers({ limit: 200 })
+    const map: Record<string, string> = {}
+    const emails: string[] = []
+    for (const u of resp.users ?? []) {
+      if (!u.email) continue
+      map[u.email] = u.id
+      emails.push(u.email)
+    }
+    teacherEmailToId.value = map
+    teacherEmails.value = emails
+  } catch (err: any) {
+    const msg = err?.message || t('system.globalSettings.teachers.loadFailed')
+    MessagePlugin.error(msg)
+  }
+}
+
+function confirmTeacherChange(action: 'appoint' | 'revoke', email: string): Promise<boolean> {
+  const base = `system.globalSettings.teachers.confirm.${action}`
+  return teacherPopconfirm.ask({
+    content: globalSettingsText(`${base}.body`, { email }),
+    theme: action === 'revoke' ? 'danger' : 'warning',
+    confirmBtn: {
+      content: globalSettingsText(`${base}.confirmBtn`),
+      theme: action === 'revoke' ? 'danger' : 'primary',
+    },
+  })
+}
+
+async function onTeachersChange(next: string[]) {
+  if (teacherBusy.value) return
+
+  const authoritative = new Set(Object.keys(teacherEmailToId.value))
+  const nextSet = new Set(next.map((e) => e.trim()).filter(Boolean))
+
+  const added: string[] = []
+  for (const email of nextSet) {
+    if (!authoritative.has(email)) added.push(email)
+  }
+  const removed: string[] = []
+  for (const email of authoritative) {
+    if (!nextSet.has(email)) removed.push(email)
+  }
+
+  if (added.length === 0 && removed.length === 0) return
+
+  for (const email of added) {
+    const ok = await confirmTeacherChange('appoint', email)
+    if (!ok) {
+      await loadTeachers()
+      return
+    }
+  }
+  for (const email of removed) {
+    const ok = await confirmTeacherChange('revoke', email)
+    if (!ok) {
+      await loadTeachers()
+      return
+    }
+  }
+
+  teacherBusy.value = true
+  let applied = 0
+  try {
+    for (const email of added) {
+      await appointTeacher({ email })
+      applied++
+    }
+    for (const email of removed) {
+      const userId = teacherEmailToId.value[email]
+      if (!userId) continue
+      await revokeTeacher({ user_id: userId })
+      applied++
+    }
+    await loadTeachers()
+    if (applied > 0) {
+      saveAnnouncement.value = t('system.globalSettings.teachers.saveSuccess')
+      MessagePlugin.success(t('system.globalSettings.teachers.saveSuccess'))
+    }
+  } catch (err: any) {
+    const msg = err?.message || t('system.globalSettings.teachers.saveFailed')
+    saveAnnouncement.value = msg
+    MessagePlugin.error(msg)
+    await loadTeachers()
+  } finally {
+    teacherBusy.value = false
+  }
+}
+
 onMounted(() => {
   loadSettings()
   loadAdmins()
+  loadTeachers()
 })
 
 onUnmounted(() => {

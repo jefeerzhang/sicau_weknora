@@ -361,6 +361,52 @@ export async function listSystemAdmins(
   return response as unknown as ListSystemAdminsResponse
 }
 
+// ---- Teacher Management (#9) ----
+
+export interface TeacherUser {
+  id: string
+  username: string
+  email: string
+  avatar?: string
+  is_active?: boolean
+  is_teacher?: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ListTeachersResponse {
+  users: TeacherUser[]
+  total: number
+  offset: number
+  limit: number
+}
+
+export interface TeacherIdentityRequest {
+  user_id?: string
+  email?: string
+}
+
+export async function appointTeacher(req: TeacherIdentityRequest): Promise<TeacherUser> {
+  const response = await post('/api/v1/system/admin/teachers/appoint', req)
+  return response as unknown as TeacherUser
+}
+
+export async function revokeTeacher(req: TeacherIdentityRequest): Promise<TeacherUser> {
+  const response = await post('/api/v1/system/admin/teachers/revoke', req)
+  return response as unknown as TeacherUser
+}
+
+export async function listTeachers(
+  params?: { offset?: number; limit?: number },
+): Promise<ListTeachersResponse> {
+  const qs = new URLSearchParams()
+  if (params?.offset != null) qs.set('offset', String(params.offset))
+  if (params?.limit != null) qs.set('limit', String(params.limit))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  const response = await get(`/api/v1/system/admin/teachers${suffix}`)
+  return response as unknown as ListTeachersResponse
+}
+
 export interface ResetUserPasswordRequest {
   email: string
   new_password: string

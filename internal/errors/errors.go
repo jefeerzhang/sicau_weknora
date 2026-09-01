@@ -30,6 +30,9 @@ const (
 	ErrTenantNameRequired     ErrorCode = 2003
 	ErrTenantInvalidStatus    ErrorCode = 2004
 	ErrTenantCreationDisabled ErrorCode = 2005
+	// ErrModelSetupRequired is returned when a workspace has no usable
+	// tenant-owned chat model and QA refuses platform/builtin fallback (#12).
+	ErrModelSetupRequired ErrorCode = 2006
 
 	// Agent related error codes (2100-2199)
 	ErrAgentMissingThinkingModel ErrorCode = 2100
@@ -192,6 +195,17 @@ func NewTenantCreationDisabledError() *AppError {
 		Code:     ErrTenantCreationDisabled,
 		Message:  "self-service workspace creation is disabled; join a workspace by invitation",
 		HTTPCode: http.StatusForbidden,
+	}
+}
+
+// NewModelSetupRequiredError reports that the active workspace has no
+// usable tenant-owned chat model. Callers must configure models in the
+// workspace; platform/builtin models are not used as an implicit fallback.
+func NewModelSetupRequiredError() *AppError {
+	return &AppError{
+		Code:     ErrModelSetupRequired,
+		Message:  "workspace chat model is not configured; ask a teacher to add a model in settings",
+		HTTPCode: http.StatusBadRequest,
 	}
 }
 

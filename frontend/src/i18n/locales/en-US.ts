@@ -2159,6 +2159,12 @@ export default {
       inviteOnlyNotice: 'This account can only join an existing workspace by invitation',
       help: 'You can create a workspace now or return later to accept an invitation.',
       inviteOnlyHelp: 'No invitation yet? Send your registered email address to a workspace administrator and ask them to invite you.'
+    },
+    forceChangePassword: {
+      title: 'Change your initial password',
+      description: 'For security, you must set a new password before continuing.',
+      submit: 'Update password',
+      success: 'Password updated. Please sign in again with your new password.'
     }
   },
   authStore: {
@@ -3967,6 +3973,24 @@ export default {
           revoke: {
             header: 'Revoke system administrator',
             body: 'Revoke system-administrator privileges from {email}? They will lose access to all system-level features.',
+            confirmBtn: 'Revoke'
+          }
+        }
+      },
+      teachers: {
+        label: 'Teachers',
+        description: 'Appointed teachers may create teaching workspaces. Type an email and press Enter to appoint; click × on a tag to revoke.',
+        placeholder: 'Type a user email and press Enter',
+        loadFailed: 'Failed to load teachers',
+        saveSuccess: 'Teachers updated',
+        saveFailed: 'Failed to update teachers',
+        confirm: {
+          appoint: {
+            body: 'Appoint {email} as a teacher? This user will be able to create teaching workspaces.',
+            confirmBtn: 'Appoint'
+          },
+          revoke: {
+            body: 'Revoke teacher status from {email}? They will no longer be able to create teaching workspaces.',
             confirmBtn: 'Revoke'
           }
         }
