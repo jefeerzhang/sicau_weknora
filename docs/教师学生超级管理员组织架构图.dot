@@ -1,0 +1,57 @@
+digraph Organization {
+  graph [rankdir=TB, bgcolor="white", fontname="Microsoft YaHei", nodesep=0.55, ranksep=0.85, pad=0.25, newrank=true];
+  node [shape=box, style="rounded,filled", fontname="Microsoft YaHei", fontsize=18, margin="0.18,0.12", color="#6b7280", penwidth=1.5];
+  edge [fontname="Microsoft YaHei", fontsize=13, color="#4b5563", arrowsize=0.8];
+
+  subgraph cluster_platform {
+    label="平台治理层"; fontname="Microsoft YaHei"; fontsize=20; color="#d97706"; style="rounded";
+    sa [label="超级管理员\n唯一 / 初始化账号", fillcolor="#fef3c7", color="#d97706", fontcolor="#78350f", penwidth=2];
+    registry [label="教师名册\n由超级管理员维护", fillcolor="#fef3c7", color="#d97706", fontcolor="#78350f", penwidth=2];
+    sa -> registry [label="指定 / 撤销教师"];
+  }
+
+  subgraph cluster_teachers {
+    label="教师身份层"; fontname="Microsoft YaHei"; fontsize=20; color="#2563eb"; style="rounded";
+    ta [label="教师 A", fillcolor="#dbeafe", color="#2563eb", fontcolor="#1e3a8a"];
+    tb [label="教师 B", fillcolor="#dbeafe", color="#2563eb", fontcolor="#1e3a8a"];
+    tn [label="教师 N", fillcolor="#dbeafe", color="#2563eb", fontcolor="#1e3a8a"];
+    registry -> ta [label="授权"];
+    registry -> tb [label="授权"];
+    registry -> tn [label="授权"];
+  }
+
+  subgraph cluster_workspaces {
+    label="工作空间层"; fontname="Microsoft YaHei"; fontsize=20; color="#16a34a"; style="rounded";
+    wa [label="教师 A 工作空间\nOwner：教师 A", fillcolor="#dcfce7", color="#16a34a", fontcolor="#14532d"];
+    wb [label="教师 B 工作空间\nOwner：教师 B", fillcolor="#dcfce7", color="#16a34a", fontcolor="#14532d"];
+    wn [label="教师 N 工作空间\nOwner：教师 N", fillcolor="#dcfce7", color="#16a34a", fontcolor="#14532d"];
+    ta -> wa [label="创建 / 管理"];
+    tb -> wb [label="创建 / 管理"];
+    tn -> wn [label="创建 / 管理"];
+    oversight [label="超级管理员可跨空间管理 / 恢复", fillcolor="#fef3c7", color="#d97706", fontcolor="#78350f"];
+    sa -> oversight [label="平台监管", color="#d97706"];
+    oversight -> wa [color="#d97706"];
+    oversight -> wb [color="#d97706"];
+    oversight -> wn [color="#d97706"];
+  }
+
+  subgraph cluster_students {
+    label="学生使用层"; fontname="Microsoft YaHei"; fontsize=20; color="#6b7280"; style="rounded";
+    s1 [label="学生 1", fillcolor="#f3f4f6", color="#6b7280", fontcolor="#1f2937"];
+    s2 [label="学生 2", fillcolor="#f3f4f6", color="#6b7280", fontcolor="#1f2937"];
+    sn [label="学生 N", fillcolor="#f3f4f6", color="#6b7280", fontcolor="#1f2937"];
+    s1 -> wa [label="教师邀请 / 授权后使用"];
+    s1 -> wb [label="可被授权进入"];
+    s2 -> wa [label="教师邀请 / 授权后使用"];
+    sn -> wn [label="教师邀请 / 授权后使用"];
+  }
+
+  subgraph cluster_boundaries {
+    label="权限边界（默认拒绝）"; fontname="Microsoft YaHei"; fontsize=20; color="#dc2626"; style="rounded,dashed";
+    b1 [label="学生：不能创建工作空间", fillcolor="#fee2e2", color="#dc2626", fontcolor="#7f1d1d"];
+    b2 [label="学生：不能成为教师", fillcolor="#fee2e2", color="#dc2626", fontcolor="#7f1d1d"];
+    b3 [label="教师：不能指定其他教师", fillcolor="#fee2e2", color="#dc2626", fontcolor="#7f1d1d"];
+    b4 [label="教师：不能管理其他教师的空间", fillcolor="#fee2e2", color="#dc2626", fontcolor="#7f1d1d"];
+    b1 -> b2 -> b3 -> b4 [style=invis];
+  }
+}

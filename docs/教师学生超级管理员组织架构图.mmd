@@ -1,0 +1,54 @@
+flowchart TB
+    subgraph PLATFORM[平台治理层]
+        SA[超级管理员\n唯一 / 初始化账号]
+        TEACHER_REGISTRY[教师名册\n由超级管理员维护]
+        SA -->|指定 / 撤销教师| TEACHER_REGISTRY
+    end
+
+    subgraph TEACHERS[教师身份层]
+        T1[教师 A]
+        T2[教师 B]
+        TN[教师 N]
+        TEACHER_REGISTRY -->|授权| T1
+        TEACHER_REGISTRY -->|授权| T2
+        TEACHER_REGISTRY -->|授权| TN
+    end
+
+    subgraph WORKSPACES[工作空间层]
+        W1[教师 A 工作空间\nOwner: 教师 A]
+        W2[教师 B 工作空间\nOwner: 教师 B]
+        WN[教师 N 工作空间\nOwner: 教师 N]
+        T1 -->|创建 / 管理| W1
+        T2 -->|创建 / 管理| W2
+        TN -->|创建 / 管理| WN
+        SA -->|平台级管理 / 故障恢复| W1
+        SA -->|平台级管理 / 故障恢复| W2
+        SA -->|平台级管理 / 故障恢复| WN
+    end
+
+    subgraph STUDENTS[学生使用层]
+        S1[学生 1]
+        S2[学生 2]
+        SN[学生 N]
+        S1 -->|教师邀请 / 授权后使用| W1
+        S1 -->|可被授权进入| W2
+        S2 -->|教师邀请 / 授权后使用| W1
+        SN -->|教师邀请 / 授权后使用| WN
+    end
+
+    S1 -.->|禁止：创建工作空间| BLOCK1[拒绝]
+    S2 -.->|禁止：成为教师| BLOCK2[拒绝]
+    T1 -.->|禁止：指定其他教师| BLOCK3[拒绝]
+    T1 -.->|禁止：管理教师 B 的空间| W2
+
+    classDef super fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px;
+    classDef teacher fill:#dbeafe,stroke:#2563eb,color:#1e3a8a,stroke-width:1.5px;
+    classDef workspace fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:1.5px;
+    classDef student fill:#f3f4f6,stroke:#6b7280,color:#1f2937,stroke-width:1.5px;
+    classDef block fill:#fee2e2,stroke:#dc2626,color:#7f1d1d,stroke-width:1.5px;
+
+    class SA,TEACHER_REGISTRY super;
+    class T1,T2,TN teacher;
+    class W1,W2,WN workspace;
+    class S1,S2,SN student;
+    class BLOCK1,BLOCK2,BLOCK3 block;
