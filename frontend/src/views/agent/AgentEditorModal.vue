@@ -71,8 +71,8 @@
                       </div>
                     </div>
 
-                    <!-- 集成渠道状态（编辑模式，配置在集成中心） -->
-                    <div v-if="editorMode === 'edit' && editorAgent?.id" class="setting-row">
+                    <!-- 集成渠道状态（编辑模式，配置在集成中心；sicau-v1 学生不可见） -->
+                    <div v-if="editorMode === 'edit' && editorAgent?.id && canManageIntegrations" class="setting-row">
                       <div class="setting-info">
                         <label>{{ $t('integrations.agentEditor.label') }}</label>
                         <p class="desc">{{ isPostCreateSession ? $t('agent.editor.postCreateHint.integrationDesc') : $t('integrations.agentEditor.desc') }}</p>
@@ -1800,6 +1800,7 @@ import { SKILL_ICON } from '@/types/mention';
 import { listEmbedChannels } from '@/api/embed';
 import { getRootZoom, rectToCssPx } from '@/utils/zoom';
 import { integrationSectionKey } from '@/config/settingsRoute';
+import { INTEGRATION_TAB_MIN_ROLE } from '@/config/integrations';
 import {
   evaluateToolRequirement,
   deriveKbFilterFromTools,
@@ -2005,6 +2006,10 @@ const canEnableSkills = computed(() =>
   hasSandboxSelected.value || namedSandboxConfigs().length === 1,
 );
 const canInstallSkills = computed(() => authStore.hasRole('admin'));
+// sicau-v1 ADR-009-7 / issue #6: same bar as settings publish tabs (im/embed).
+const canManageIntegrations = computed(() =>
+  authStore.hasRole(INTEGRATION_TAB_MIN_ROLE.im ?? 'contributor'),
+);
 
 type CatalogSkillRow = SkillCatalogItem & {
   installed: boolean
@@ -2819,6 +2824,11 @@ const agentIMChannelCount = ref(0);
 const agentEmbedChannelCount = ref(0);
 
 async function loadAgentIntegrationCounts(agentId: string) {
+  if (!canManageIntegrations.value) {
+    agentIMChannelCount.value = 0;
+    agentEmbedChannelCount.value = 0;
+    return;
+  }
   try {
     const [imResp, embedResp] = await Promise.all([
       listIMChannels(agentId),
@@ -2833,6 +2843,7 @@ async function loadAgentIntegrationCounts(agentId: string) {
 }
 
 function gotoIntegrations(tab: 'im' | 'embed') {
+  if (!canManageIntegrations.value) return;
   const agentId = editorAgent.value?.id;
   if (!agentId) return;
   handleClose();

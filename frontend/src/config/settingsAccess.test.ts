@@ -22,8 +22,10 @@ test('the skill catalog is admin-only like the sandbox it installs into', () => 
   assert.equal(SETTINGS_SECTION_MIN_ROLE.skills, SETTINGS_SECTION_MIN_ROLE.sandbox)
 })
 
-test('personal skill environment variables are visible to every member', () => {
-  assert.equal(SETTINGS_SECTION_MIN_ROLE.envvars, 'viewer')
+test('sicau-v1: personal sandbox secrets stay contributor+ (students sealed)', () => {
+  // ADR-009-7 / issue #4: viewers (students) must not see or manage
+  // settings.envvars; teachers/TAs remain contributor+.
+  assert.equal(SETTINGS_SECTION_MIN_ROLE.envvars, 'contributor')
   // Workspace-wide skill env values live on the Admin+ skills page; a
   // management shortcut on the avatar menu would only duplicate that entrance.
   assert.equal(
