@@ -185,12 +185,18 @@ func (r *userRepository) ListSystemAdmins(ctx context.Context, offset, limit int
 	return users, total, nil
 }
 
-// ListTeachers lists users where is_teacher = true (platform Teacher identity).
+// ListTeachers lists users with effective Teacher capability (#10/#13/#14):
+// either the explicitly appointed platform Teacher identity (is_teacher=true)
+// or the composite SuperAdmin that inherits the teacher capability without a
+// separate appointment (is_system_admin=true). This mirrors
+// types.User.HasTeacherCapability() so the SuperAdmin console's teacher list
+// reflects the full 教师端 membership defined in CONTEXT.md.
 func (r *userRepository) ListTeachers(ctx context.Context, offset, limit int) ([]*types.User, int64, error) {
 	var users []*types.User
 	var total int64
 
-	base := r.db.WithContext(ctx).Model(&types.User{}).Where("is_teacher = ?", true)
+	base := r.db.WithContext(ctx).Model(&types.User{}).
+		Where("is_teacher = ? OR is_system_admin = ?", true, true)
 	if err := base.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}

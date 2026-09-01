@@ -185,6 +185,26 @@
                   clearable
                   @change="onTeachersChange"
                 />
+                <div v-if="teacherSystemAdminEmails.length > 0" class="locked-teachers">
+                  <t-tag theme="primary" variant="light" size="small" class="locked-teachers-badge">
+                    <t-icon name="lock-on" />
+                    {{ t('system.globalSettings.teachers.systemAdmin') }}
+                  </t-tag>
+                  <t-tag
+                    v-for="email in teacherSystemAdminEmails"
+                    :key="email"
+                    theme="warning"
+                    variant="outline"
+                    size="small"
+                    class="locked-teachers-item"
+                  >
+                    <t-icon name="lock-on" />
+                    {{ email }}
+                  </t-tag>
+                  <div class="locked-teachers-hint">
+                    {{ t('system.globalSettings.teachers.systemAdminHint') }}
+                  </div>
+                </div>
               </div>
             </t-popconfirm>
                 <div v-if="teacherBusy" class="setting-save-state" role="status">
@@ -746,7 +766,15 @@ const adminBusy = ref(false)
 
 const teacherEmails = ref<string[]>([])
 const teacherEmailToId = ref<Record<string, string>>({})
+// Composite SuperAdmins (is_system_admin=true) inherit teacher capability
+// without a separate appointment (CONTEXT.md). They are locked: shown as a
+// non-revocable tag and never dispatched to revokeTeacher (#14).
+const teacherSystemAdminEmails = ref<string[]>([])
 const teacherBusy = ref(false)
+
+function isSystemAdminEmail(email: string): boolean {
+  return teacherSystemAdminEmails.value.includes(email)
+}
 
 const passwordResetVisible = ref(false)
 const passwordResetSubmitting = ref(false)
@@ -1333,13 +1361,19 @@ async function loadTeachers() {
     const resp = await listTeachers({ limit: 200 })
     const map: Record<string, string> = {}
     const emails: string[] = []
+    const systemAdmins: string[] = []
     for (const u of resp.users ?? []) {
       if (!u.email) continue
       map[u.email] = u.id
-      emails.push(u.email)
+      // Composite SuperAdmins (is_system_admin) inherit teacher capability and
+      // cannot be revoked (#14): keep them out of the editable picker and list
+      // them in a locked read-only row instead.
+      if (u.is_system_admin === true) systemAdmins.push(u.email)
+      else emails.push(u.email)
     }
     teacherEmailToId.value = map
     teacherEmails.value = emails
+    teacherSystemAdminEmails.value = systemAdmins
   } catch (err: any) {
     const msg = err?.message || t('system.globalSettings.teachers.loadFailed')
     MessagePlugin.error(msg)
@@ -1370,7 +1404,13 @@ async function onTeachersChange(next: string[]) {
   }
   const removed: string[] = []
   for (const email of authoritative) {
-    if (!nextSet.has(email)) removed.push(email)
+    if (!nextSet.has(email)) {
+      // Composite SuperAdmins inherit teacher capability and cannot be
+      // revoked (#14); they are rendered in a locked read-only row and never
+      // dispatched to revokeTeacher.
+      if (isSystemAdminEmail(email)) continue
+      removed.push(email)
+    }
   }
 
   if (added.length === 0 && removed.length === 0) return
@@ -1733,6 +1773,32 @@ onUnmounted(() => {
 
 .setting-input--wide {
   width: 320px;
+}
+
+// Read-only locked row for composite SuperAdmins that inherit teacher
+// capability but cannot be revoked (#14).
+.locked-teachers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  max-width: 320px;
+}
+
+.locked-teachers-badge,
+.locked-teachers-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.locked-teachers-hint {
+  flex-basis: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--td-text-color-secondary);
 }
 
 .password-reset-trigger {

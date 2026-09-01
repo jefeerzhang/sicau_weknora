@@ -629,12 +629,16 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	// 同步返回当前用户的 memberships，让前端在页面刷新（仅命中 /auth/me）
 	// 后也能恢复 currentTenantRole，避免角色信息只在 login 那一刻可用。
 	memberships := h.userService.BuildLoginMemberships(ctx, user, tenant)
-	// #10/#13: workspace creation requires effective Teacher capability
+	// #10/#13/#14: workspace creation requires effective Teacher capability
 	// (appointed Teacher or the composite SuperAdmin). The composite
 	// SuperAdmin inherits the teacher capability floor, so it can create its
 	// own workspace without being separately appointed. Cross-tenant
 	// catalog managers and API-key platform principals retain their path.
-	canCreateTenant := user.CanAccessAllTenants || user.HasTeacherCapability()
+	// Mirror tenant.go CreateTenant's authoritative gate so the capability
+	// reported to the frontend never disagrees with the backend check.
+	apiKeyScope, hasAPIKeyScope := types.TenantAPIKeyScopeFromContext(ctx)
+	platformCaller := hasAPIKeyScope && apiKeyScope.IsPlatform()
+	canCreateTenant := user.CanAccessAllTenants || platformCaller || user.HasTeacherCapability()
 	autoAcceptInvitation := h.systemSettingSvc != nil &&
 		h.systemSettingSvc.GetBool(ctx, "tenant.auto_accept_invitation", "WEKNORA_TENANT_AUTO_ACCEPT_INVITATION", false)
 	c.JSON(http.StatusOK, gin.H{

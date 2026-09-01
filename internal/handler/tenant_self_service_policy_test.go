@@ -328,6 +328,45 @@ func TestAuthMeSuperAdminCanCreateTenant(t *testing.T) {
 	}
 }
 
+// #14: an API-key platform principal must be able to create a tenant even if
+// the underlying user row carries no teacher/admin flags, and /auth/me must
+// advertise that so the frontend capability never disagrees with the backend
+// gate in CreateTenant (catalogManager || HasTeacherCapability).
+func TestAuthMePlatformCallerCanCreateTenant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &AuthHandler{
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:       "platform-caller",
+			Username: "platform",
+			Email:    "platform@example.com",
+			// deliberately no CanAccessAllTenants / IsTeacher / IsSystemAdmin
+		}},
+		configInfo:       &config.Config{Tenant: &config.TenantConfig{}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: false},
+	}
+	r := gin.New()
+	r.GET("/auth/me", h.GetCurrentUser)
+
+	// Inject a platform API-key scope into the request context, the same way
+	// the API-key middleware populates it for platform-scoped calls.
+	ctx := types.WithTenantAPIKeyScope(context.Background(), types.TenantAPIKeyScope{
+		ScopeType: types.APIKeyScopePlatform,
+	})
+	w := httptest.NewRecorder()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/auth/me", nil)
+	if err != nil {
+		t.Fatalf("failed to build request: %v", err)
+	}
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"can_create_tenant":true`) {
+		t.Fatalf("platform caller should be able to create tenant: %s", w.Body.String())
+	}
+}
+
 // recordEnsureOwner is a minimal TenantMemberService stub that records the
 // EnsureOwner call so we can assert the composite SuperAdmin becomes the
 // Owner of the workspace it just created (#13 AC1/AC3).

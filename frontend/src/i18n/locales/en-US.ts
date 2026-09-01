@@ -3984,6 +3984,8 @@ export default {
         loadFailed: 'Failed to load teachers',
         saveSuccess: 'Teachers updated',
         saveFailed: 'Failed to update teachers',
+        systemAdmin: 'System admin (inherits teacher ability, cannot be revoked)',
+        systemAdminHint: 'These accounts are platform SuperAdmins. They inherit teacher capability automatically, need no appointment, and cannot be revoked here.',
         confirm: {
           appoint: {
             body: 'Appoint {email} as a teacher? This user will be able to create teaching workspaces.',

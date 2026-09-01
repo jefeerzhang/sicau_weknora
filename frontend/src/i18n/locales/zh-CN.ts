@@ -2829,6 +2829,8 @@ export default {
         loadFailed: '加载教师列表失败',
         saveSuccess: '已更新教师名单',
         saveFailed: '更新教师名单失败',
+        systemAdmin: '系统管理员（继承教师能力，不可撤销）',
+        systemAdminHint: '这些账号为平台超级管理员，自动继承教师能力，无需任命，也无法在此撤销。',
         confirm: {
           appoint: {
             body: '确认任命 {email} 为教师？该用户将可以创建教学工作空间。',

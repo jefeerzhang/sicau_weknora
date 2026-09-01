@@ -370,6 +370,10 @@ export interface TeacherUser {
   avatar?: string
   is_active?: boolean
   is_teacher?: boolean
+  // is_system_admin marks the composite SuperAdmin (inherits teacher capability
+  // without a separate appointment, see CONTEXT.md). Such entries are shown as
+  // non-revocable // #14.
+  is_system_admin?: boolean
   created_at: string
   updated_at: string
 }
