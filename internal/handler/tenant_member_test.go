@@ -259,6 +259,15 @@ func TestTenantMember_ListMembers_HappyPath(t *testing.T) {
 	if resp.Data.Members[0].Email == "" {
 		t.Fatalf("expected hydrated email, got empty")
 	}
+	// CONTEXT.md "平台身份可见性": the workspace member roster must not
+	// leak members' platform identity. The member response carries only
+	// workspace roles (owner/admin/contributor/viewer), never platform
+	// identity, SuperAdmin, or teacher flags.
+	if strings.Contains(w.Body.String(), "platform_identity") ||
+		strings.Contains(w.Body.String(), "is_system_admin") ||
+		strings.Contains(w.Body.String(), "is_teacher") {
+		t.Fatalf("member roster leaked platform identity: %s", w.Body.String())
+	}
 }
 
 func TestTenantMember_ListMembers_TolerantToDeletedUsers(t *testing.T) {

@@ -55,6 +55,17 @@
         </div>
       </div>
 
+      <!-- 平台身份（用户身份标签）：平台层身份分类，不随工作空间切换变化 -->
+      <div class="setting-row" data-testid="platform-identity-row">
+        <div class="setting-info">
+          <label>{{ $t('userProfile.platformIdentity.label') }}</label>
+          <p class="desc">{{ $t('userProfile.platformIdentity.description') }}</p>
+        </div>
+        <div class="setting-control">
+          <span class="platform-identity-tag">{{ platformIdentityLabel }}</span>
+        </div>
+      </div>
+
       <!-- 注册时间 -->
       <div class="setting-row">
         <div class="setting-info">
@@ -182,6 +193,7 @@ import {
 } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
+import { platformIdentityKey } from '@/utils/platformIdentity'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -202,6 +214,12 @@ const passwordForm = reactive({
 
 const oidcOnlyLogin = computed(
   () => userInfo.value?.preferences?.oidc_only_login === true,
+)
+
+// 用户身份标签：平台层身份分类的本地化文案。已知值映射到对应文案，缺失/未知
+// 一律回退到「身份未设置」，绝不推断为教师或超级管理员（见 CONTEXT.md）。
+const platformIdentityLabel = computed(() =>
+  t(platformIdentityKey(userInfo.value?.platform_identity)),
 )
 
 watch(passwordPopupVisible, (open) => {
@@ -426,6 +444,18 @@ onMounted(loadInfo)
 .password-mask {
   letter-spacing: 0.12em;
   color: var(--td-text-color-secondary);
+}
+
+.platform-identity-tag {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: right;
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+  border-radius: 4px;
+  padding: 2px 10px;
+  white-space: nowrap;
 }
 
 .password-popup-inner {

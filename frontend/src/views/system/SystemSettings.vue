@@ -212,6 +212,16 @@
                   <span>{{ t('system.globalSettings.saving') }}</span>
                 </div>
           </div>
+          <!-- 教师管理范围内可见被管理账号的平台身份（用户身份标签）。只读，不参与编辑。 -->
+          <div v-if="managedTeachers.length > 0" class="managed-identities" data-testid="managed-teacher-identities">
+            <span class="managed-identities-label">{{ t('system.globalSettings.teachers.identityLabel') }}</span>
+            <div class="managed-identities-list">
+              <span v-for="item in managedTeachers" :key="item.email" class="managed-identity-item">
+                <span class="managed-identity-email">{{ item.email }}</span>
+                <span class="managed-identity-tag">{{ identityLabel(item.identity) }}</span>
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -560,6 +570,8 @@ import {
   type SystemSettingItem,
 } from '@/api/system'
 import { useAuthStore } from '@/stores/auth'
+import type { PlatformIdentity } from '@/api/auth'
+import { platformIdentityKey } from '@/utils/platformIdentity'
 
 const authStore = useAuthStore()
 const currentUserId = computed(() => authStore.currentUserId)
@@ -770,10 +782,26 @@ const teacherEmailToId = ref<Record<string, string>>({})
 // without a separate appointment (CONTEXT.md). They are locked: shown as a
 // non-revocable tag and never dispatched to revokeTeacher (#14).
 const teacherSystemAdminEmails = ref<string[]>([])
+// 平台身份分类（用户身份标签）per managed email, surfaced in the SuperAdmin
+// teacher-management scope so each managed account's identity is visible.
+const teacherIdentityMap = ref<Record<string, PlatformIdentity>>({})
 const teacherBusy = ref(false)
 
 function isSystemAdminEmail(email: string): boolean {
   return teacherSystemAdminEmails.value.includes(email)
+}
+
+// 教师管理范围内的被管理账号及其平台身份分类（用户身份标签），供超级管理员查看。
+const managedTeachers = computed(() =>
+  Object.entries(teacherIdentityMap.value).map(([email, identity]) => ({
+    email,
+    identity,
+  })),
+)
+
+// 平台身份分类的本地化标签；缺失/未知一律回退到「身份未设置」，绝不推断为教师/超管。
+function identityLabel(identity: string): string {
+  return t(platformIdentityKey(identity))
 }
 
 const passwordResetVisible = ref(false)
@@ -1374,6 +1402,15 @@ async function loadTeachers() {
     teacherEmailToId.value = map
     teacherEmails.value = emails
     teacherSystemAdminEmails.value = systemAdmins
+    // 平台身份分类（用户身份标签），供超级管理员在教师管理范围内查看。
+    // 后端已统一定义该分类，前端直接使用；缺失/未知一律回退到「身份未设置」，
+    // 从不在此推断教师或超级管理员（见 CONTEXT.md「身份未设置」）。
+    const identityMap: Record<string, PlatformIdentity> = {}
+    for (const u of resp.users ?? []) {
+      if (!u.email) continue
+      identityMap[u.email] = (u.platform_identity as PlatformIdentity) || 'unset'
+    }
+    teacherIdentityMap.value = identityMap
   } catch (err: any) {
     const msg = err?.message || t('system.globalSettings.teachers.loadFailed')
     MessagePlugin.error(msg)
@@ -1799,6 +1836,49 @@ onUnmounted(() => {
   font-size: 12px;
   line-height: 1.5;
   color: var(--td-text-color-secondary);
+}
+
+.managed-identities {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  max-width: 320px;
+}
+
+.managed-identities-label {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+}
+
+.managed-identities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.managed-identity-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.managed-identity-email {
+  color: var(--td-text-color-primary);
+  word-break: break-all;
+}
+
+.managed-identity-tag {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+  border-radius: 4px;
+  padding: 0 6px;
+  white-space: nowrap;
 }
 
 .password-reset-trigger {

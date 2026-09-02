@@ -3986,6 +3986,7 @@ export default {
         saveFailed: 'Failed to update teachers',
         systemAdmin: 'System admin (inherits teacher ability, cannot be revoked)',
         systemAdminHint: 'These accounts are platform SuperAdmins. They inherit teacher capability automatically, need no appointment, and cannot be revoked here.',
+        identityLabel: 'Platform identity of managed accounts',
         confirm: {
           appoint: {
             body: 'Appoint {email} as a teacher? This user will be able to create teaching workspaces.',
@@ -6502,6 +6503,16 @@ export default {
   userProfile: {
     title: 'User Profile',
     description: 'View your account info (user ID, username, email, registration time) and change your password.',
+    platformIdentity: {
+      label: 'Platform identity',
+      description: 'The platform-level identity classification (user identity label). It does not change with the active workspace and is separate from the Owner/Admin/Contributor/Viewer roles.',
+      values: {
+        superadmin: 'Super Admin (with teacher capability)',
+        teacher: 'Teacher',
+        student: 'Student',
+        unset: 'Identity unset',
+      },
+    },
     changePassword: {
       label: 'Change password',
       description: 'Verify your current password, then set a new one. All signed-in sessions will be revoked and you will need to sign in again.',

@@ -104,6 +104,8 @@ export interface UserPreferences {
 }
 
 // 用户信息接口
+export type PlatformIdentity = 'superadmin' | 'teacher' | 'student' | 'unset'
+
 export interface UserInfo {
   id: string
   username: string
@@ -115,6 +117,9 @@ export interface UserInfo {
   is_system_admin?: boolean
   must_change_password?: boolean
   is_teacher?: boolean
+  // 平台层身份分类（用户身份标签），与空间内 Owner/Admin/Contributor/Viewer 角色分开表达。
+  // 取值：superadmin（超级管理员，含教师能力）/ teacher（教师）/ student（学生）/ unset（身份未设置）。
+  platform_identity?: PlatformIdentity
   created_at: string
   updated_at: string
 }
@@ -156,6 +161,7 @@ export function userInfoFromApi(
     is_system_admin: u?.is_system_admin === true,
     must_change_password: u?.must_change_password === true,
     is_teacher: u?.is_teacher === true,
+    platform_identity: (u?.platform_identity as PlatformIdentity) || 'unset',
     preferences: u?.preferences,
     created_at: u?.created_at || new Date().toISOString(),
     updated_at: u?.updated_at || new Date().toISOString(),

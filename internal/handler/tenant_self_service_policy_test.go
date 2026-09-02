@@ -323,8 +323,50 @@ func TestAuthMeSuperAdminCanCreateTenant(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
+	// CONTEXT.md "用户身份标签": /auth/me must project the unified platform
+	// identity so the user info page can render it. A composite SuperAdmin is
+	// classified as superadmin even without a teacher appointment.
+	if !strings.Contains(w.Body.String(), `"platform_identity":"superadmin"`) {
+		t.Fatalf("superadmin platform_identity missing: %s", w.Body.String())
+	}
 	if !strings.Contains(w.Body.String(), `"can_create_tenant":true`) {
 		t.Fatalf("superadmin should be able to create tenant: %s", w.Body.String())
+	}
+}
+
+// Platform identity projection is deterministic for the other two identities:
+// an appointed teacher is classified as teacher; a plain account is student.
+// This locks the "用户身份标签" self-visible on the user info page.
+func TestAuthMePlatformIdentityProjection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cases := []struct {
+		name string
+		user *types.User
+		want string
+	}{
+		{"appointed teacher", &types.User{ID: "u", Username: "t", Email: "t@example.com", IsTeacher: true}, "teacher"},
+		{"default student", &types.User{ID: "u", Username: "s", Email: "s@example.com"}, "student"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := &AuthHandler{
+				userService:      &tenantPolicyUserService{user: tc.user},
+				configInfo:       &config.Config{Tenant: &config.TenantConfig{}},
+				systemSettingSvc: &tenantPolicySettingService{enabled: false},
+			}
+			r := gin.New()
+			r.GET("/auth/me", h.GetCurrentUser)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/auth/me", nil))
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+			needle := `"platform_identity":"` + tc.want + `"`
+			if !strings.Contains(w.Body.String(), needle) {
+				t.Fatalf("platform_identity=%s missing: %s", tc.want, w.Body.String())
+			}
+		})
 	}
 }
 
@@ -393,8 +435,8 @@ func TestCreateTenantSuperAdminBecomesOwner(t *testing.T) {
 	tenants := &tenantPolicyTenantService{}
 	ms := &recordEnsureOwner{}
 	h := &TenantHandler{
-		service:        tenants,
-		memberService:  ms,
+		service:       tenants,
+		memberService: ms,
 		userService: &tenantPolicyUserService{user: &types.User{
 			ID:            "sa-1",
 			TenantID:      1,

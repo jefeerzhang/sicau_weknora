@@ -230,6 +230,16 @@ export default {
   userProfile: {
     title: '用户信息',
     description: '查看您的账户基础信息（用户 ID、用户名、邮箱、注册时间），并可修改登录密码',
+    platformIdentity: {
+      label: '平台身份',
+      description: '平台层身份分类（用户身份标签），不随工作空间切换变化；与空间内 Owner/Admin/Contributor/Viewer 角色分开表达。',
+      values: {
+        superadmin: '超级管理员（教师能力）',
+        teacher: '教师',
+        student: '学生',
+        unset: '身份未设置',
+      },
+    },
     changePassword: {
       label: '修改密码',
       description: '使用当前密码验证后设置新密码。修改成功后所有设备上的登录状态将失效，需要重新登录。',
@@ -2831,6 +2841,7 @@ export default {
         saveFailed: '更新教师名单失败',
         systemAdmin: '系统管理员（继承教师能力，不可撤销）',
         systemAdminHint: '这些账号为平台超级管理员，自动继承教师能力，无需任命，也无法在此撤销。',
+        identityLabel: '被管理账号的平台身份',
         confirm: {
           appoint: {
             body: '确认任命 {email} 为教师？该用户将可以创建教学工作空间。',

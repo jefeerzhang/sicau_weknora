@@ -230,6 +230,16 @@ export default {
   userProfile: {
     title: '사용자 정보',
     description: '계정 기본 정보(사용자 ID, 사용자 이름, 이메일, 가입 시각)를 확인하고 비밀번호를 변경할 수 있습니다.',
+    platformIdentity: {
+      label: '플랫폼 신원',
+      description: '플랫폼 수준 신원 분류(사용자 신원 라벨)로, 활성 워크스페이스에 따라 바뀌지 않으며 공간 내 Owner/Admin/Contributor/Viewer 역할과 분리됩니다.',
+      values: {
+        superadmin: '슈퍼 관리자 (교사 능력 포함)',
+        teacher: '교사',
+        student: '학생',
+        unset: '신원 미설정',
+      },
+    },
     changePassword: {
       label: '비밀번호 변경',
       description: '현재 비밀번호를 확인한 뒤 새 비밀번호를 설정합니다. 성공 시 모든 세션이 만료되어 다시 로그인해야 합니다.',
@@ -2820,6 +2830,27 @@ export default {
           }
         }
       },
+      teachers: {
+        label: '교사',
+        description: '임명된 교사는 교수용 워크스페이스를 만들 수 있습니다. 오른쪽에 이메일을 입력하고 Enter를 누르면 임명하고, 태그의 ×를 누르면 교사 자격을 회수합니다.',
+        placeholder: '사용자 이메일을 입력하고 Enter를 누르세요',
+        loadFailed: '교사 목록을 불러오지 못했습니다',
+        saveSuccess: '교사 명단이 업데이트되었습니다',
+        saveFailed: '교사 명단 업데이트 실패',
+        systemAdmin: '시스템 관리자 (교사 능력 상속, 회수 불가)',
+        systemAdminHint: '이 계정은 플랫폼 슈퍼 관리자로, 교사 능력을 자동 상속하므로 별도 임명이 필요하지 않으며 여기서 회수할 수도 없습니다.',
+        identityLabel: '관리 대상 계정의 플랫폼 신원',
+        confirm: {
+          appoint: {
+            body: '{email} 사용자를 교사로 임명하시겠습니까? 이 사용자는 교수용 워크스페이스를 만들 수 있습니다.',
+            confirmBtn: '임명 확인'
+          },
+          revoke: {
+            body: '{email} 사용자의 교사 자격을 회수하시겠습니까? 회수 후에는 더 이상 교수용 워크스페이스를 만들 수 없습니다.',
+            confirmBtn: '회수 확인'
+          }
+        }
+      },
       reset: {
         label: '초기화',
         tooltip: 'UI 재정의 값을 제거하고 환경 변수 또는 내장 기본값으로 되돌립니다',
@@ -4620,6 +4651,12 @@ export default {
       inviteOnlyNotice: '이 계정은 초대를 통해서만 기존 공간에 참여할 수 있습니다',
       help: '지금 작업 공간을 만들거나 나중에 돌아와 초대를 수락할 수 있습니다.',
       inviteOnlyHelp: '초대가 없다면 등록 이메일을 공간 관리자에게 전달하고 초대를 요청하세요.'
+    },
+    forceChangePassword: {
+      title: '초기 비밀번호 변경',
+      description: '보안을 위해 계속하기 전에 새 비밀번호를 설정해야 합니다.',
+      submit: '비밀번호 업데이트',
+      success: '비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해 주세요.'
     }
   },
   inviteRegister: {

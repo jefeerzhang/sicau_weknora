@@ -1,5 +1,6 @@
 import { get, post, put, del, patch, postUpload } from '@/utils/request'
 import type { CreatedTenantAPIKey, TenantAPIKey, TenantAPIKeyCapability } from '@/api/tenant'
+import type { PlatformIdentity } from '@/api/auth'
 
 export interface CreatePlatformAPIKeyPayload {
   name: string
@@ -374,6 +375,9 @@ export interface TeacherUser {
   // without a separate appointment, see CONTEXT.md). Such entries are shown as
   // non-revocable // #14.
   is_system_admin?: boolean
+  // 平台层身份分类（用户身份标签）：superadmin / teacher / student / unset。
+  // 在教师管理范围内供超级管理员查看被管理账号的身份。
+  platform_identity?: PlatformIdentity
   created_at: string
   updated_at: string
 }

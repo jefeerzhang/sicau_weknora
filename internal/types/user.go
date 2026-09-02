@@ -267,20 +267,63 @@ type RegisterResponse struct {
 }
 
 // UserInfo represents user information for API responses
+// PlatformIdentity is the unified platform identity classification shown as
+// the user identity label (see CONTEXT.md "用户身份标签"). It is independent
+// of any workspace membership role (Owner/Admin/Contributor/Viewer).
+type PlatformIdentity string
+
+const (
+	// PlatformIdentitySuperAdmin marks the composite platform authority that
+	// automatically satisfies the Teacher capability floor (CONTEXT.md
+	// "复合身份"). It wins over the teacher flag.
+	PlatformIdentitySuperAdmin PlatformIdentity = "superadmin"
+	// PlatformIdentityTeacher marks an appointed teaching identity.
+	PlatformIdentityTeacher PlatformIdentity = "teacher"
+	// PlatformIdentityStudent is the default non-teaching identity.
+	PlatformIdentityStudent PlatformIdentity = "student"
+	// PlatformIdentityUnset marks an abnormal state where identity data is
+	// missing or unrecognizable (CONTEXT.md "身份未设置"). It is never a
+	// grantable business identity and must not be inferred as Teacher or
+	// SuperAdmin.
+	PlatformIdentityUnset PlatformIdentity = "unset"
+)
+
+// PlatformIdentity returns the unified platform identity classification.
+//
+// SuperAdmin is a composite identity that wins over the teacher flag: an
+// account with IsSystemAdmin=true is a SuperAdmin even if IsTeacher=false.
+// An appointed teacher (IsTeacher=true, IsSystemAdmin=false) is a Teacher.
+// Any other account defaults to Student. A nil receiver (identity data
+// missing) yields PlatformIdentityUnset, which callers must render
+// defensively rather than inferring a teaching privilege.
+func (u *User) PlatformIdentity() PlatformIdentity {
+	if u == nil {
+		return PlatformIdentityUnset
+	}
+	if u.IsSystemAdmin {
+		return PlatformIdentitySuperAdmin
+	}
+	if u.IsTeacher {
+		return PlatformIdentityTeacher
+	}
+	return PlatformIdentityStudent
+}
+
 type UserInfo struct {
-	ID                  string          `json:"id"`
-	Username            string          `json:"username"`
-	Email               string          `json:"email"`
-	Avatar              string          `json:"avatar"`
-	TenantID            uint64          `json:"tenant_id"`
-	IsActive            bool            `json:"is_active"`
-	CanAccessAllTenants bool            `json:"can_access_all_tenants"`
-	IsSystemAdmin       bool            `json:"is_system_admin"`
-	MustChangePassword  bool            `json:"must_change_password"`
-	IsTeacher           bool            `json:"is_teacher"`
-	Preferences         UserPreferences `json:"preferences"`
-	CreatedAt           time.Time       `json:"created_at"`
-	UpdatedAt           time.Time       `json:"updated_at"`
+	ID                  string           `json:"id"`
+	Username            string           `json:"username"`
+	Email               string           `json:"email"`
+	Avatar              string           `json:"avatar"`
+	TenantID            uint64           `json:"tenant_id"`
+	IsActive            bool             `json:"is_active"`
+	CanAccessAllTenants bool             `json:"can_access_all_tenants"`
+	IsSystemAdmin       bool             `json:"is_system_admin"`
+	MustChangePassword  bool             `json:"must_change_password"`
+	IsTeacher           bool             `json:"is_teacher"`
+	PlatformIdentity    PlatformIdentity `json:"platform_identity"`
+	Preferences         UserPreferences  `json:"preferences"`
+	CreatedAt           time.Time        `json:"created_at"`
+	UpdatedAt           time.Time        `json:"updated_at"`
 }
 
 // ToUserInfo converts User to UserInfo (without sensitive data)
@@ -296,6 +339,7 @@ func (u *User) ToUserInfo() *UserInfo {
 		IsSystemAdmin:       u.IsSystemAdmin,
 		MustChangePassword:  u.MustChangePassword,
 		IsTeacher:           u.IsTeacher,
+		PlatformIdentity:    u.PlatformIdentity(),
 		Preferences:         u.Preferences,
 		CreatedAt:           u.CreatedAt,
 		UpdatedAt:           u.UpdatedAt,

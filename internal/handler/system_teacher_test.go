@@ -90,6 +90,7 @@ func TestListTeachers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := &teacherUserSvc{listed: []*types.User{
 		{ID: "u1", Email: "a@example.com", IsTeacher: true},
+		{ID: "u2", Email: "sa@example.com", IsTeacher: false, IsSystemAdmin: true},
 	}}
 	h := &SystemHandler{userSvc: svc}
 	r := gin.New()
@@ -98,4 +99,9 @@ func TestListTeachers(t *testing.T) {
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/teachers", nil))
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "a@example.com")
+	// CONTEXT.md "平台身份可见性": in the teacher-management scope the
+	// SuperAdmin sees each managed account's platform identity, so the list
+	// must carry it (appointed teacher = teacher; composite = superadmin).
+	assert.Contains(t, w.Body.String(), `"platform_identity":"teacher"`)
+	assert.Contains(t, w.Body.String(), `"platform_identity":"superadmin"`)
 }
