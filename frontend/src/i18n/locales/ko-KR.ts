@@ -2858,6 +2858,26 @@ export default {
           }
         }
       },
+      ownershipAnomalies: {
+        label: '공간 책임자 이상',
+        description: 'Owner가 없거나 여러 명인 워크스페이스는 슈퍼 관리자가 명시적으로 책임자를 지정해야 하며, 시스템이 자동 선택하지 않습니다.',
+        refresh: '목록 새로고침',
+        runMigration: '멤버 역할 마이그레이션 실행',
+        empty: '처리할 이상이 없습니다',
+        tenant: '워크스페이스 #{id}',
+        ownerCount: 'Owner 수: {count}',
+        pickLead: '교사 능력이 있는 멤버 선택',
+        resolve: '공간 책임자로 지정',
+        loadFailed: '이상 목록을 불러오지 못했습니다',
+        migrationDone: '마이그레이션 완료: 강등 {downgraded}명, 이상 공간 {anomalies}개',
+        migrationFailed: '마이그레이션 실패',
+        resolveSuccess: '공간 책임자를 지정했습니다',
+        resolveFailed: '공간 책임자 지정 실패',
+        kind: {
+          zero_owner: 'Owner 없음',
+          multi_owner: 'Owner 다수',
+        },
+      },
       reset: {
         label: '초기화',
         tooltip: 'UI 재정의 값을 제거하고 환경 변수 또는 내장 기본값으로 되돌립니다',

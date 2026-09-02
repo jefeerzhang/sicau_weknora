@@ -338,6 +338,10 @@ func RegisterSystemAdminRoutes(
 		adminRoutes.POST("/teachers/appoint", handler.AppointTeacher)
 		adminRoutes.POST("/teachers/revoke", handler.RevokeTeacher)
 		adminRoutes.GET("/teachers", handler.ListTeachers)
+		// #18/#19: teaching membership migration + ownership anomaly recovery
+		adminRoutes.POST("/migrations/teaching-roles", handler.RunTeachingRoleMigration)
+		adminRoutes.GET("/workspace-anomalies", handler.ListWorkspaceOwnershipAnomalies)
+		adminRoutes.POST("/workspace-anomalies/:tenant_id/resolve", handler.ResolveWorkspaceOwnershipAnomaly)
 		adminRoutes.POST("/users/reset-password", handler.ResetUserPassword)
 		adminRoutes.POST("/users/create", handler.CreateSystemUser)
 		adminRoutes.GET("/api-keys", handler.ListPlatformAPIKeys)

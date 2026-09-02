@@ -415,6 +415,56 @@ export async function listTeachers(
   return response as unknown as ListTeachersResponse
 }
 
+export type WorkspaceOwnershipAnomalyKind = 'zero_owner' | 'multi_owner'
+
+export interface WorkspaceOwnershipAnomaly {
+  id: number
+  tenant_id: number
+  kind: WorkspaceOwnershipAnomalyKind
+  owner_count: number
+  owner_user_ids?: string[] | string
+  status: string
+  created_at?: string
+  updated_at?: string
+  candidates?: Array<{ user_id: string; email?: string; username?: string }>
+}
+
+export interface TeachingRoleMigrationReport {
+  downgraded: number
+  skipped: number
+  failed: number
+  anomaly_tenant_ids: number[]
+}
+
+export async function runTeachingRoleMigration(): Promise<TeachingRoleMigrationReport> {
+  const response = await post('/api/v1/system/admin/migrations/teaching-roles', {})
+  const body = response as unknown as { data?: TeachingRoleMigrationReport } & TeachingRoleMigrationReport
+  return (body.data ?? body) as TeachingRoleMigrationReport
+}
+
+export async function listWorkspaceOwnershipAnomalies(): Promise<{
+  anomalies: WorkspaceOwnershipAnomaly[]
+  total: number
+}> {
+  const response = await get('/api/v1/system/admin/workspace-anomalies')
+  const body = response as unknown as {
+    data?: { anomalies: WorkspaceOwnershipAnomaly[]; total: number }
+    anomalies?: WorkspaceOwnershipAnomaly[]
+    total?: number
+  }
+  if (body.data) return body.data
+  return { anomalies: body.anomalies ?? [], total: body.total ?? 0 }
+}
+
+export async function resolveWorkspaceOwnershipAnomaly(
+  tenantId: number,
+  newOwnerUserId: string,
+): Promise<void> {
+  await post(`/api/v1/system/admin/workspace-anomalies/${tenantId}/resolve`, {
+    new_owner_user_id: newOwnerUserId,
+  })
+}
+
 export interface ResetUserPasswordRequest {
   email: string
   new_password: string

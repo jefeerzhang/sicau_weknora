@@ -3998,6 +3998,26 @@ export default {
           }
         }
       },
+      ownershipAnomalies: {
+        label: 'Workspace ownership anomalies',
+        description: 'Workspaces with zero or multiple Owners need an explicit SuperAdmin assignment of a single workspace lead; the system never auto-picks.',
+        refresh: 'Refresh list',
+        runMigration: 'Run membership migration',
+        empty: 'No open ownership anomalies',
+        tenant: 'Workspace #{id}',
+        ownerCount: 'Owner count: {count}',
+        pickLead: 'Select a teacher-capable member',
+        resolve: 'Assign workspace lead',
+        loadFailed: 'Failed to load anomalies',
+        migrationDone: 'Migration done: downgraded {downgraded}, anomalies {anomalies}',
+        migrationFailed: 'Migration failed',
+        resolveSuccess: 'Workspace lead assigned',
+        resolveFailed: 'Failed to assign workspace lead',
+        kind: {
+          zero_owner: 'Zero owners',
+          multi_owner: 'Multiple owners',
+        },
+      },
       passwordReset: {
         label: 'Reset user password',
         description: 'Set a new password for another user who cannot sign in. A successful reset invalidates all of that user\'s current sessions, so they must sign in again with the new password.',

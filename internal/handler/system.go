@@ -64,6 +64,9 @@ type SystemHandler struct {
 	// unit tests, in which case only the legacy config is consulted.
 	storageBackendRepo interfaces.StorageBackendRepository
 	sandboxConfigSvc   sandboxConfigService
+	// teachingMigrator runs #18/#19 membership demotion and ownership recovery.
+	// Optional — nil when dig wiring is incomplete in unit tests.
+	teachingMigrator *service.TeachingRoleMigrator
 	// startup snapshot for GET /system/capabilities; bound in router.NewRouter.
 	deploymentCapabilities DeploymentCapabilitiesData
 }
@@ -81,6 +84,7 @@ func NewSystemHandler(cfg *config.Config,
 	knowledgeSvc interfaces.KnowledgeService,
 	storageBackendRepo interfaces.StorageBackendRepository,
 	sandboxConfigSvc *service.TenantSandboxConfigService,
+	teachingMigrator *service.TeachingRoleMigrator,
 ) *SystemHandler {
 	return &SystemHandler{
 		cfg:                cfg,
@@ -95,6 +99,7 @@ func NewSystemHandler(cfg *config.Config,
 		knowledgeSvc:       knowledgeSvc,
 		storageBackendRepo: storageBackendRepo,
 		sandboxConfigSvc:   sandboxConfigSvc,
+		teachingMigrator:   teachingMigrator,
 	}
 }
 

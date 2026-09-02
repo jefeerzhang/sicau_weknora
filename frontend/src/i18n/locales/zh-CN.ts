@@ -2860,6 +2860,26 @@ export default {
           }
         }
       },
+      ownershipAnomalies: {
+        label: '异常空间负责人',
+        description: '零 Owner 或多 Owner 的工作空间需由超级管理员显式指定唯一空间负责人；不会自动猜测。',
+        refresh: '刷新异常清单',
+        runMigration: '运行成员角色迁移',
+        empty: '当前没有待处理的异常空间',
+        tenant: '工作空间 #{id}',
+        ownerCount: '当前 Owner 数：{count}',
+        pickLead: '选择具备教师能力的成员',
+        resolve: '指定为空间负责人',
+        loadFailed: '加载异常清单失败',
+        migrationDone: '迁移完成：降级 {downgraded} 人，异常空间 {anomalies} 个',
+        migrationFailed: '运行迁移失败',
+        resolveSuccess: '已指定空间负责人',
+        resolveFailed: '指定空间负责人失败',
+        kind: {
+          zero_owner: '零 Owner',
+          multi_owner: '多 Owner',
+        },
+      },
       reset: {
         label: '重置',
         tooltip: '清除当前 UI 覆盖，恢复使用环境变量或内置默认值',

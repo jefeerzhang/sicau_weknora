@@ -225,6 +225,63 @@
         </div>
       </div>
 
+          <div v-if="activeSettingsSection === 'access'" class="setting-row setting-row--ownership">
+            <div class="setting-info">
+              <div class="setting-label">
+                <span>{{ t('system.globalSettings.ownershipAnomalies.label') }}</span>
+              </div>
+              <p class="desc">{{ t('system.globalSettings.ownershipAnomalies.description') }}</p>
+            </div>
+            <div class="setting-control">
+              <div class="setting-control-row ownership-actions">
+                <t-button size="small" variant="outline" :loading="ownershipBusy" @click="loadOwnershipAnomalies">
+                  {{ t('system.globalSettings.ownershipAnomalies.refresh') }}
+                </t-button>
+                <t-button size="small" theme="primary" :loading="ownershipBusy" @click="runOwnershipMigration">
+                  {{ t('system.globalSettings.ownershipAnomalies.runMigration') }}
+                </t-button>
+              </div>
+              <div v-if="ownershipAnomalies.length === 0" class="ownership-empty">
+                {{ t('system.globalSettings.ownershipAnomalies.empty') }}
+              </div>
+              <div v-else class="ownership-list">
+                <div
+                  v-for="row in ownershipAnomalies"
+                  :key="row.tenant_id"
+                  class="ownership-item"
+                >
+                  <div class="ownership-item-meta">
+                    <strong>{{ t('system.globalSettings.ownershipAnomalies.tenant', { id: row.tenant_id }) }}</strong>
+                    <t-tag size="small" theme="warning" variant="light">
+                      {{ t(`system.globalSettings.ownershipAnomalies.kind.${row.kind}`) }}
+                    </t-tag>
+                    <span class="ownership-count">
+                      {{ t('system.globalSettings.ownershipAnomalies.ownerCount', { count: row.owner_count }) }}
+                    </span>
+                  </div>
+                  <div class="ownership-item-resolve">
+                    <t-select
+                      v-model="ownershipSelections[row.tenant_id]"
+                      :placeholder="t('system.globalSettings.ownershipAnomalies.pickLead')"
+                      :options="candidateOptions(row)"
+                      clearable
+                      class="setting-input"
+                    />
+                    <t-button
+                      size="small"
+                      theme="primary"
+                      :disabled="!ownershipSelections[row.tenant_id]"
+                      :loading="ownershipBusy"
+                      @click="resolveOwnership(row)"
+                    >
+                      {{ t('system.globalSettings.ownershipAnomalies.resolve') }}
+                    </t-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div v-if="activeSettingsSection === 'access'" class="setting-row setting-row--password-reset">
             <div class="setting-info">
               <div class="setting-label">
@@ -567,6 +624,10 @@ import {
   appointTeacher,
   revokeTeacher,
   resetUserPassword,
+  listWorkspaceOwnershipAnomalies,
+  runTeachingRoleMigration,
+  resolveWorkspaceOwnershipAnomaly,
+  type WorkspaceOwnershipAnomaly,
   type SystemSettingItem,
 } from '@/api/system'
 import { useAuthStore } from '@/stores/auth'
@@ -786,6 +847,64 @@ const teacherSystemAdminEmails = ref<string[]>([])
 // teacher-management scope so each managed account's identity is visible.
 const teacherIdentityMap = ref<Record<string, PlatformIdentity>>({})
 const teacherBusy = ref(false)
+
+const ownershipAnomalies = ref<Array<WorkspaceOwnershipAnomaly & {
+  candidates?: Array<{ user_id: string; email?: string; username?: string }>
+}>>([])
+const ownershipSelections = ref<Record<number, string>>({})
+const ownershipBusy = ref(false)
+
+function candidateOptions(row: {
+  candidates?: Array<{ user_id: string; email?: string; username?: string }>
+}) {
+  return (row.candidates ?? []).map((c) => ({
+    value: c.user_id,
+    label: c.email || c.username || c.user_id,
+  }))
+}
+
+async function loadOwnershipAnomalies() {
+  try {
+    const resp = await listWorkspaceOwnershipAnomalies()
+    ownershipAnomalies.value = resp.anomalies ?? []
+  } catch (err: any) {
+    MessagePlugin.error(err?.message || t('system.globalSettings.ownershipAnomalies.loadFailed'))
+  }
+}
+
+async function runOwnershipMigration() {
+  ownershipBusy.value = true
+  try {
+    const report = await runTeachingRoleMigration()
+    MessagePlugin.success(
+      t('system.globalSettings.ownershipAnomalies.migrationDone', {
+        downgraded: report.downgraded ?? 0,
+        anomalies: (report.anomaly_tenant_ids ?? []).length,
+      }),
+    )
+    await loadOwnershipAnomalies()
+  } catch (err: any) {
+    MessagePlugin.error(err?.message || t('system.globalSettings.ownershipAnomalies.migrationFailed'))
+  } finally {
+    ownershipBusy.value = false
+  }
+}
+
+async function resolveOwnership(row: WorkspaceOwnershipAnomaly) {
+  const userId = ownershipSelections.value[row.tenant_id]
+  if (!userId) return
+  ownershipBusy.value = true
+  try {
+    await resolveWorkspaceOwnershipAnomaly(row.tenant_id, userId)
+    MessagePlugin.success(t('system.globalSettings.ownershipAnomalies.resolveSuccess'))
+    delete ownershipSelections.value[row.tenant_id]
+    await loadOwnershipAnomalies()
+  } catch (err: any) {
+    MessagePlugin.error(err?.message || t('system.globalSettings.ownershipAnomalies.resolveFailed'))
+  } finally {
+    ownershipBusy.value = false
+  }
+}
 
 function isSystemAdminEmail(email: string): boolean {
   return teacherSystemAdminEmails.value.includes(email)
@@ -1499,6 +1618,7 @@ onMounted(() => {
   loadSettings()
   loadAdmins()
   loadTeachers()
+  loadOwnershipAnomalies()
 })
 
 onUnmounted(() => {
