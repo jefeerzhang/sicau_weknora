@@ -4389,7 +4389,7 @@ export default {
     }
   },
   createChat: {
-    title: 'Привет, я WeKnora — ваши знания всегда под рукой',
+    title: 'ваши знания всегда под рукой',
     newSessionTitle: 'Новая сессия',
     messages: {
       createFailed: 'Не удалось создать сессию',

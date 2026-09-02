@@ -4389,7 +4389,7 @@ export default {
     }
   },
   createChat: {
-    title: '안녕하세요, WeKnora입니다 — 당신의 지식을 손끝에',
+    title: '당신의 지식을 손끝에',
     newSessionTitle: '새 세션',
     messages: {
       createFailed: '세션 생성 실패',
