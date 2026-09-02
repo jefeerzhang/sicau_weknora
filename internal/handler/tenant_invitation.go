@@ -278,12 +278,12 @@ func (h *TenantInvitationHandler) CreateInvitation(c *gin.Context) {
 		c.Error(apperrors.NewValidationError("role must be one of owner/admin/contributor/viewer"))
 		return
 	}
-	// sicau-v1 ticket 02 (ADR-009-4): invitations minted through this
-	// endpoint are viewer-only. Higher roles go through the Owner+
-	// member-management flow so a leaked invite can never mint staff.
+	// sicau-v1 ticket 02 (ADR-009-4) + teaching #17: invitations are
+	// viewer-only (Student). Elevated workspace roles are not mintable
+	// through invite or member-management teaching routes.
 	if req.Role != types.TenantRoleViewer {
 		c.Error(apperrors.NewValidationError(
-			"invitation role is fixed to viewer; add collaborators via member management"))
+			"invitation role is fixed to viewer (student)"))
 		return
 	}
 

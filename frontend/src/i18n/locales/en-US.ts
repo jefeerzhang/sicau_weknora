@@ -6543,9 +6543,9 @@ export default {
     emptySearch: 'No members match "{q}".',
     searchPlaceholder: 'Search by name or email',
     permissions: {
-      title: 'Role permissions',
-      desc: 'What each role can do inside this workspace. Server-enforced; UI controls reflect the rules but are not the source of truth.',
-      iconHint: 'Hover to view role permission details',
+      title: 'Workspace relationships',
+      desc: 'Teaching workspaces only have Workspace lead and Student. Server-enforced; the UI only displays the rules.',
+      iconHint: 'Hover to view workspace relationship details',
       manageMembers: 'Manage members',
       manageTenantConfig: 'Edit workspace settings',
       manageInfra: 'Configure models / vector stores / IM channels',
@@ -6555,7 +6555,7 @@ export default {
         stats: { neverActive: 'Never active' },
     columns: {
       member: 'Name & email',
-      role: 'Role',
+      role: 'Relationship',
       joinedAt: 'Joined',
       questionCount: 'Questions',
       lastActive: 'Last active',
@@ -6566,6 +6566,13 @@ export default {
       admin: 'Admin',
       contributor: 'Contributor',
       viewer: 'Viewer'
+    },
+    teaching: {
+      lead: 'Workspace lead',
+      student: 'Student',
+      legacyOwner: 'Legacy lead (needs resolution)',
+      unknown: 'Unknown relationship',
+      legacyWarning: 'Legacy role — not editable here; wait for platform migration or contact the SuperAdmin',
     },
     add: {
       button: 'Add Member',

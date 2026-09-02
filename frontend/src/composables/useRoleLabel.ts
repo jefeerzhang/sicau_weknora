@@ -19,6 +19,18 @@ export function useRoleLabel() {
   const { t } = useI18n()
   const formatRole = (role: string | null | undefined): string => {
     if (!role) return ''
+    // Teaching deployment (#17): prefer education labels for the two
+    // active relationships; keep generic keys for legacy admin/contributor.
+    const teachingKey =
+      role === 'owner'
+        ? 'tenantMember.teaching.lead'
+        : role === 'viewer'
+          ? 'tenantMember.teaching.student'
+          : ''
+    if (teachingKey) {
+      const teachingLabel = t(teachingKey)
+      if (teachingLabel !== teachingKey) return teachingLabel
+    }
     const key = `tenantMember.role.${role}`
     const label = t(key)
     return label === key ? role : label

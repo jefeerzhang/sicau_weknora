@@ -208,18 +208,25 @@ export default {
       contributor: '编辑',
       viewer: '访客'
     },
+    teaching: {
+      lead: '空间负责人',
+      student: '学生',
+      legacyOwner: '历史负责人（待处理）',
+      unknown: '未知关系',
+      legacyWarning: '历史角色，不可在此修改；请等待平台迁移或联系超级管理员处理',
+    },
     columns: {
       member: '姓名与邮箱',
-      role: '角色',
+      role: '空间关系',
       joinedAt: '加入时间',
       questionCount: '提问数',
       lastActive: '最后活跃',
       operations: '操作'
     },
     permissions: {
-      title: '角色权限说明',
-      desc: '每个角色在当前空间内能做的事情。服务端强制执行，UI 控件仅作展示。',
-      iconHint: '悬停查看角色权限说明',
+      title: '空间关系说明',
+      desc: '教学空间仅有「空间负责人」与「学生」两种关系。服务端强制执行，界面仅作展示。',
+      iconHint: '悬停查看空间关系说明',
       manageMembers: '管理成员',
       manageTenantConfig: '修改空间配置',
       manageInfra: '配置模型 / 向量库 / IM 通道',

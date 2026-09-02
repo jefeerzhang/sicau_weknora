@@ -208,18 +208,25 @@ export default {
       contributor: '기여자',
       viewer: '뷰어'
     },
+    teaching: {
+      lead: '공간 책임자',
+      student: '학생',
+      legacyOwner: '이전 책임자 (처리 대기)',
+      unknown: '알 수 없는 관계',
+      legacyWarning: '이전 역할 — 여기서 수정할 수 없습니다. 플랫폼 마이그레이션을 기다리거나 슈퍼관리자에게 문의하세요',
+    },
     columns: {
       member: '이름 · 이메일',
-      role: '역할',
+      role: '공간 관계',
       joinedAt: '가입일',
       questionCount: '질문 수',
       lastActive: '마지막 활동',
       operations: '작업'
     },
     permissions: {
-      title: '역할 권한',
-      desc: '각 역할이 이 워크스페이스에서 할 수 있는 작업입니다. 서버에서 적용되며 UI 컨트롤은 표시만 합니다.',
-      iconHint: '역할 권한 안내를 보려면 마우스를 올리세요',
+      title: '공간 관계 안내',
+      desc: '교육용 공간에는 「공간 책임자」와 「학생」만 있습니다. 서버에서 적용되며 UI는 표시만 합니다.',
+      iconHint: '공간 관계 안내를 보려면 마우스를 올리세요',
       manageMembers: '멤버 관리',
       manageTenantConfig: '워크스페이스 설정 변경',
       manageInfra: '모델 / 벡터 저장소 / IM 채널 구성',
