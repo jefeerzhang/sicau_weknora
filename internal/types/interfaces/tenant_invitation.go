@@ -26,6 +26,10 @@ type TenantInvitationRepository interface {
 	// they hit the unique index.
 	GetPendingByPair(ctx context.Context, tenantID uint64, inviteeUserID string) (*types.TenantInvitation, error)
 
+	// GetActiveShareLinkByTenant returns the tenant's single pending
+	// share-link row, or (nil, nil) when no reusable link exists.
+	GetActiveShareLinkByTenant(ctx context.Context, tenantID uint64) (*types.TenantInvitation, error)
+
 	// GetActiveByToken looks up the share-link row matching the
 	// supplied plaintext token. Returns (nil, nil) if no row matches
 	// or the row is no longer pending. "Active" rather than "pending

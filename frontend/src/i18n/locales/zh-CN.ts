@@ -106,15 +106,15 @@ export default {
       success: '邀请已撤销。'
     },
     shareLink: {
-      button: '生成共享链接',
+      button: '共享邀请链接',
       cellTitle: '通过链接邀请',
       cellAccepted: '已加入 {count} 人',
       cellEmpty: '尚无成员加入',
       dialogTitle: '生成共享邀请链接',
       description: '生成一条多人可用的注册链接，发到群里就行；谁打开都能用自己的邮箱注册并加入当前空间。链接 {days} 天后过期，或随时可在列表中撤销。',
       generate: '生成链接',
-      resultTitle: '邀请链接已生成',
-      resultBody: '复制下方链接，通过任意私密渠道发给被邀请人。链接也会保存在下方列表中，随时可以重新复制或撤销。',
+      resultTitle: '当前邀请链接',
+      resultBody: '复制下方链接，通过任意私密渠道发给被邀请人。该链接会一直保留到过期或撤销，可随时回来重新复制。',
       revokeConfirm: '撤销后，所有还未注册的人都无法再使用此链接；如需重发请生成新链接。'
     }
   },

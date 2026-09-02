@@ -25,16 +25,16 @@ var versionedSQLiteTables = []string{
 // versionedSQLiteColumns maps each existing table to the columns that the
 // versioned migrations add and the SQLite baseline was missing.
 var versionedSQLiteColumns = map[string][]string{
-	"tenants":            {"api_principal_config"},           // 000064
+	"tenants":            {"api_principal_config"},                                  // 000064
 	"users":              {"is_system_admin", "must_change_password", "is_teacher"}, // 000053, 000094
-	"knowledges":         {"pending_subtasks_count"},         // 000056
-	"messages":           {"attachments", "usage"},           // 000034, 000085
-	"tenant_invitations": {"token", "accepted_count"},        // 000054
-	"embed_channels":     {"allow_memory"},                   // 000060
-	"mcp_oauth_tokens":   {"principal_type", "principal_id"}, // 000064
+	"knowledges":         {"pending_subtasks_count"},                                // 000056
+	"messages":           {"attachments", "usage"},                                  // 000034, 000085
+	"tenant_invitations": {"token", "accepted_count"},                               // 000054
+	"embed_channels":     {"allow_memory"},                                          // 000060
+	"mcp_oauth_tokens":   {"principal_type", "principal_id"},                        // 000064
 }
 
-const expectedSQLiteMigrationVersion = 14
+const expectedSQLiteMigrationVersion = 15
 
 func TestSQLiteMigrationsCreateVersionedSchema(t *testing.T) {
 	repoRoot := sqliteRepoRoot(t)
@@ -193,13 +193,13 @@ func assertSQLiteShareLinkInvitationsWork(t *testing.T, db *sql.DB) {
 	_, err = db.Exec(shareLinkInsert, "token-a", expiresAt)
 	require.NoError(t, err)
 	_, err = db.Exec(shareLinkInsert, "token-b", expiresAt)
-	require.NoError(t, err)
+	require.Error(t, err, "only one pending share link may exist per tenant")
 
 	var count int
 	require.NoError(t, db.QueryRow(
 		"SELECT COUNT(*) FROM tenant_invitations WHERE tenant_id = 1 AND invitee_user_id = '' AND status = 'pending'",
 	).Scan(&count))
-	require.Equal(t, 2, count)
+	require.Equal(t, 1, count)
 }
 
 func assertSQLiteMCPOAuthPrincipalUpsertWorks(t *testing.T, db *sql.DB) {

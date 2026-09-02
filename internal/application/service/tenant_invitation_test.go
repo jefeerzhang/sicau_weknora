@@ -66,6 +66,20 @@ func (r *fakeInvitationRepo) GetPendingByPair(
 	return nil, nil
 }
 
+func (r *fakeInvitationRepo) GetActiveShareLinkByTenant(
+	ctx context.Context, tenantID uint64,
+) (*types.TenantInvitation, error) {
+	for i := len(r.rows) - 1; i >= 0; i-- {
+		e := r.rows[i]
+		if e.TenantID == tenantID && e.InviteeUserID == "" && e.Token != "" &&
+			e.Status == types.TenantInvitationStatusPending {
+			cp := *e
+			return &cp, nil
+		}
+	}
+	return nil, nil
+}
+
 func (r *fakeInvitationRepo) GetActiveByToken(
 	ctx context.Context, token string,
 ) (*types.TenantInvitation, error) {
@@ -465,6 +479,69 @@ func TestInvitationService_CreateShareLink_PersistsToken(t *testing.T) {
 	}
 	if row.Status != types.TenantInvitationStatusPending {
 		t.Fatalf("status must be pending, got %s", row.Status)
+	}
+}
+
+func TestInvitationService_CreateShareLink_ReusesPendingLink(t *testing.T) {
+	svc, repo, _ := newInvitationSvc()
+	ctx := context.Background()
+	first, firstToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	second, secondToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("second create: %v", err)
+	}
+	if second.ID != first.ID || secondToken != firstToken {
+		t.Fatalf("pending link must be reused: first=(%d,%q) second=(%d,%q)",
+			first.ID, firstToken, second.ID, secondToken)
+	}
+	if len(repo.rows) != 1 {
+		t.Fatalf("reuse must not insert another row, got %d", len(repo.rows))
+	}
+}
+
+func TestInvitationService_CreateShareLink_CreatesAfterRevoke(t *testing.T) {
+	svc, repo, _ := newInvitationSvc()
+	ctx := context.Background()
+	first, firstToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	if err := svc.Revoke(ctx, first.ID); err != nil {
+		t.Fatalf("revoke: %v", err)
+	}
+	second, secondToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("create after revoke: %v", err)
+	}
+	if second.ID == first.ID || secondToken == firstToken {
+		t.Fatalf("revoked link must be replaced")
+	}
+	if len(repo.rows) != 2 {
+		t.Fatalf("expected historical plus new row, got %d", len(repo.rows))
+	}
+}
+
+func TestInvitationService_CreateShareLink_CreatesAfterExpiry(t *testing.T) {
+	svc, repo, _ := newInvitationSvc()
+	ctx := context.Background()
+	first, firstToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	repo.rows[0].ExpiresAt = time.Now().Add(-time.Hour)
+
+	second, secondToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("create after expiry: %v", err)
+	}
+	if second.ID == first.ID || secondToken == firstToken {
+		t.Fatalf("expired link must be replaced")
+	}
+	if repo.rows[0].Status != types.TenantInvitationStatusExpired {
+		t.Fatalf("old link must be swept to expired, got %s", repo.rows[0].Status)
 	}
 }
 

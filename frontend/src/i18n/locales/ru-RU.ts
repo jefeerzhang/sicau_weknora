@@ -106,15 +106,15 @@ export default {
       success: 'Invitation revoked.'
     },
     shareLink: {
-      button: 'Generate share link',
+      button: 'Share invitation link',
       cellTitle: 'Invite via link',
       cellAccepted: '{count} joined',
       cellEmpty: 'No one has joined yet',
       dialogTitle: 'Generate share invitation link',
       description: 'Generate a multi-use registration link you can drop in a group chat. Anyone who opens it registers with their own email and joins this workspace. Expires in {days} days, or revoke it any time from the list.',
       generate: 'Generate link',
-      resultTitle: 'Invitation link ready',
-      resultBody: 'Copy the link below and share it via any private channel. It\'s also saved in the list — you can re-copy or revoke it later.',
+      resultTitle: 'Current invitation link',
+      resultBody: 'Copy the link below and share it privately. It remains available here until it expires or is revoked.',
       revokeConfirm: 'Revoking will block anyone who hasn\'t registered yet from using this link. Generate a new one to re-share.'
     }
   },

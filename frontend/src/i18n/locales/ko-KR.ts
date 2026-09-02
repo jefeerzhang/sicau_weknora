@@ -106,15 +106,15 @@ export default {
       success: '초대가 취소되었습니다.'
     },
     shareLink: {
-      button: '공유 링크 생성',
+      button: '공유 초대 링크',
       cellTitle: '링크로 초대',
       cellAccepted: '{count}명 가입함',
       cellEmpty: '아직 가입한 사람이 없습니다',
       dialogTitle: '공유 초대 링크 생성',
       description: '여러 명이 사용할 수 있는 가입 링크를 생성합니다. 받은 사람이 자신의 이메일로 가입하고 이 워크스페이스에 합류합니다. {days}일 후 만료되며, 목록에서 언제든지 취소할 수 있습니다.',
       generate: '링크 생성',
-      resultTitle: '초대 링크가 생성되었습니다',
-      resultBody: '아래 링크를 복사해 비공개 채널로 전달하세요. 목록에도 저장되어 다시 복사하거나 취소할 수 있습니다.',
+      resultTitle: '현재 초대 링크',
+      resultBody: '아래 링크를 복사해 비공개 채널로 전달하세요. 만료되거나 취소될 때까지 여기에서 다시 복사할 수 있습니다.',
       revokeConfirm: '취소 후에는 미가입자가 이 링크를 사용할 수 없습니다. 다시 발급하려면 새 링크를 생성하세요.'
     }
   },

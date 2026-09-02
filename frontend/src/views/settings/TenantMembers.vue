@@ -126,7 +126,7 @@
                 </div>
               </template>
               <template #role="{ row }">
-                <t-tag :theme="roleTagTheme(row.role)" size="small">
+                <t-tag :theme="teachingRoleTagTheme(row.role)" size="small">
                   {{ $t('tenantMember.role.' + row.role) }}
                 </t-tag>
               </template>
@@ -244,7 +244,7 @@
                 </div>
               </template>
             </t-popup>
-            <!-- Share-link generator. Sits next to the invite-by-email
+            <!-- Share-link access. Sits next to the invite-by-email
                  popup so the two flows live side-by-side: "I know who"
                  (email input) vs "I don't" (one link, group chat). -->
             <t-popup v-if="canManage" v-model="shareLinkPopupVisible" trigger="click" placement="bottom-end"
@@ -567,9 +567,9 @@ const error = ref('')
 const adding = ref(false)
 /** 邀请流程：锚在列表头「+」按钮旁的弹出层（非居中模态）。 */
 const invitePopupVisible = ref(false)
-// share-link generator state (separate popup next to the email
-// invite). shareLinkResult is non-null after a successful create —
-// the popup then switches into "here's your link, copy it" mode.
+// Share-link state (separate popup next to the email invite). Existing
+// pending links are restored from the invitation list so reopening the
+// popup goes straight to copy mode instead of asking for another link.
 const shareLinkPopupVisible = ref(false)
 // sicau-v1 ticket 02: invitations are viewer-only (ADR-009-4); the server
 // rejects anything above viewer, so both forms pin the role client-side too.
@@ -605,6 +605,7 @@ const memberDisplayByUserId = reactive<Record<string, { username?: string; email
 const invitations = ref<TenantInvitation[]>([])
 const invitationsLoading = ref(false)
 const invitationsError = ref('')
+const activeShareLink = ref<TenantInvitation | null>(null)
 // Invitation TTL is mirrored from the backend constant
 // (defaultInvitationTTL in tenant_invitation.go). Kept as a UI string
 // for the section description; the authoritative number comes from
@@ -914,6 +915,13 @@ async function loadInvitations() {
         return
       }
       invitations.value = resp.data.invitations ?? []
+      activeShareLink.value = resp.data.active_share_link
+        ?? invitations.value.find(
+          (invitation) => invitation.is_share_link
+            && invitation.status === 'pending'
+            && Boolean(invitation.invite_url),
+        )
+        ?? null
       invitationsTotal.value = total
       if (typeof resp.data.page === 'number' && resp.data.page > 0) {
         invitationsPage.value = resp.data.page
@@ -943,6 +951,12 @@ async function doRevokeInvitation(row: TenantInvitation) {
   try {
     const resp = await revokeInvitation(activeTenantId.value, row.id)
     if (resp.success) {
+      if (shareLinkResult.value?.id === row.id) {
+        shareLinkResult.value = null
+      }
+      if (activeShareLink.value?.id === row.id) {
+        activeShareLink.value = null
+      }
       await loadInvitations()
       MessagePlugin.success(t('tenantInvitation.revoke.success'))
     } else {
@@ -1237,13 +1251,13 @@ watch(invitePopupVisible, (open) => {
   addDialogStep.value = 'form'
 })
 
-// Share-link popup: re-init on every open so the operator never sees
-// the previous result on a fresh click.
+// Reopening the popup restores the tenant's pending link. Only a tenant
+// without an active link sees the generation form.
 watch(shareLinkPopupVisible, (open) => {
   if (!open) return
   // sicau-v1 ticket 02: 分享链接固定 viewer（服务端同样拒绝更高角色）
   shareLinkForm.role = 'viewer'
-  shareLinkResult.value = null
+  shareLinkResult.value = activeShareLink.value
 })
 
 // absoluteInviteURL turns the backend's potentially-host-relative
@@ -1270,6 +1284,7 @@ async function submitShareLink() {
       return
     }
     shareLinkResult.value = resp.data
+    activeShareLink.value = resp.data
     invitationsPage.value = 1
     await loadInvitations()
   } catch (err: any) {
@@ -1403,6 +1418,8 @@ watch(
       invitationsPageSize.value = 20
       membersTotal.value = 0
       invitationsTotal.value = 0
+      shareLinkResult.value = null
+      activeShareLink.value = null
       loadMembers()
       loadInvitations()
     }

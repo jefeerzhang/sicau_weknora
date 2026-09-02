@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/types"
@@ -39,10 +40,9 @@ func NewTenantInvitationRepository(db *gorm.DB) interfaces.TenantInvitationRepos
 // (idx_tenant_invitations_unique_pending) as the conflict sentinel —
 // see invitationService.Create.
 //
-// Share-link rows (invitee_user_id == "") skip the pre-check: the
-// partial unique index on (tenant_id, invitee_user_id) deliberately
-// excludes empty values so multiple share links can coexist on a
-// tenant; pre-checking would falsely reject every additional one.
+// Share-link rows use the empty invitee id and are subject to the same
+// one-pending-row rule. A dedicated partial index additionally guards
+// that invariant under concurrent requests.
 func (r *tenantInvitationRepository) Create(
 	ctx context.Context,
 	inv *types.TenantInvitation,
@@ -50,24 +50,32 @@ func (r *tenantInvitationRepository) Create(
 	if inv.Status == "" {
 		inv.Status = types.TenantInvitationStatusPending
 	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if inv.InviteeUserID != "" {
-			var probe types.TenantInvitation
-			err := tx.
-				Where("tenant_id = ? AND invitee_user_id = ? AND status = ?",
-					inv.TenantID, inv.InviteeUserID, types.TenantInvitationStatusPending).
-				First(&probe).Error
-			switch {
-			case errors.Is(err, gorm.ErrRecordNotFound):
-				// fallthrough — clean to insert.
-			case err != nil:
-				return err
-			default:
-				return ErrPendingInvitationExists
-			}
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var probe types.TenantInvitation
+		probeErr := tx.
+			Where("tenant_id = ? AND invitee_user_id = ? AND status = ?",
+				inv.TenantID, inv.InviteeUserID, types.TenantInvitationStatusPending).
+			First(&probe).Error
+		switch {
+		case errors.Is(probeErr, gorm.ErrRecordNotFound):
+			// fallthrough — clean to insert.
+		case probeErr != nil:
+			return probeErr
+		default:
+			return ErrPendingInvitationExists
 		}
 		return tx.Create(inv).Error
 	})
+	lowerErr := ""
+	if err != nil {
+		lowerErr = strings.ToLower(err.Error())
+	}
+	if err != nil && (errors.Is(err, gorm.ErrDuplicatedKey) ||
+		strings.Contains(lowerErr, "idx_tenant_invitations_unique_pending") ||
+		(inv.InviteeUserID == "" && strings.Contains(lowerErr, "unique constraint"))) {
+		return ErrPendingInvitationExists
+	}
+	return err
 }
 
 // GetByID returns the invitation row (regardless of status) or
@@ -98,6 +106,28 @@ func (r *tenantInvitationRepository) GetPendingByPair(
 	err := r.db.WithContext(ctx).
 		Where("tenant_id = ? AND invitee_user_id = ? AND status = ?",
 			tenantID, inviteeUserID, types.TenantInvitationStatusPending).
+		First(&inv).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &inv, nil
+}
+
+// GetActiveShareLinkByTenant returns the newest pending share-link row.
+// The database uniqueness constraint means there is normally at most one;
+// newest-first is defensive for databases that have not migrated yet.
+func (r *tenantInvitationRepository) GetActiveShareLinkByTenant(
+	ctx context.Context,
+	tenantID uint64,
+) (*types.TenantInvitation, error) {
+	var inv types.TenantInvitation
+	err := r.db.WithContext(ctx).
+		Where("tenant_id = ? AND invitee_user_id = ? AND token <> ? AND status = ?",
+			tenantID, "", "", types.TenantInvitationStatusPending).
+		Order("id DESC").
 		First(&inv).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

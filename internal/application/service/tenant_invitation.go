@@ -440,6 +440,16 @@ func (s *tenantInvitationService) ListTenantInvitationsPage(
 	return rows, total, nil
 }
 
+// GetActiveShareLink returns the tenant's reusable link independently of
+// invitation-list pagination.
+func (s *tenantInvitationService) GetActiveShareLink(
+	ctx context.Context,
+	tenantID uint64,
+) (*types.TenantInvitation, error) {
+	s.sweep(ctx)
+	return s.repo.GetActiveShareLinkByTenant(ctx, tenantID)
+}
+
 // ListByInvitee sweeps then returns. Same reasoning as ListByTenant.
 func (s *tenantInvitationService) ListByInvitee(
 	ctx context.Context,
@@ -479,10 +489,9 @@ func generateShareLinkToken() (string, error) {
 
 // CreateShareLink issues a multi-use share-link invitation. The token
 // is generated server-side and persisted plaintext on the row so the
-// management UI can re-display it on demand. Per-user invitation
-// constraints (already-member, duplicate-pending) do NOT apply here:
-// share-link rows have no specific invitee, multiple can coexist on
-// the same tenant, and consumption is non-destructive (see
+// management UI can re-display it on demand. A tenant has at most one
+// pending share link: repeated calls return that row and token until it
+// is revoked or expires. Consumption remains non-destructive (see
 // AcceptByToken).
 func (s *tenantInvitationService) CreateShareLink(
 	ctx context.Context,
@@ -496,6 +505,14 @@ func (s *tenantInvitationService) CreateShareLink(
 	}
 	if err := rejectAPIKeyOwnerAssignment(ctx, role); err != nil {
 		return nil, "", err
+	}
+	s.sweep(ctx)
+	existing, err := s.repo.GetActiveShareLinkByTenant(ctx, tenantID)
+	if err != nil {
+		return nil, "", err
+	}
+	if existing != nil && !existing.IsExpired(s.now()) {
+		return existing, existing.Token, nil
 	}
 	token, err := generateShareLinkToken()
 	if err != nil {
@@ -513,6 +530,14 @@ func (s *tenantInvitationService) CreateShareLink(
 		ExpiresAt:     now.Add(invitationTTL()),
 	}
 	if err := s.repo.Create(ctx, inv); err != nil {
+		// A concurrent request may have created the tenant's link after
+		// our read. Return the winner instead of surfacing a conflict.
+		if errors.Is(err, apprepo.ErrPendingInvitationExists) {
+			existing, readErr := s.repo.GetActiveShareLinkByTenant(ctx, tenantID)
+			if readErr == nil && existing != nil {
+				return existing, existing.Token, nil
+			}
+		}
 		return nil, "", err
 	}
 	s.emitAudit(ctx, &types.AuditLog{
