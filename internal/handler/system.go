@@ -298,6 +298,13 @@ type GetSystemInfoResponse struct {
 	// succeeded; non-empty values let the frontend surface a troubleshooting
 	// banner instead of silently hiding the DB version row (see issue #1319).
 	DBMigrationError string `json:"db_migration_error,omitempty"`
+	// TeachingMigrationError carries the failure reason recorded when the
+	// most recent teaching data migration attempt failed (startup phase or
+	// SuperAdmin retry). Empty means the deployment is normalized and
+	// upgraded; a non-empty value is a blocked state — legacy elevated
+	// memberships or pending invitations may remain until a retry
+	// succeeds (#22). Values never embed invitation tokens or credentials.
+	TeachingMigrationError string `json:"teaching_migration_error,omitempty"`
 	// StartedAt is the server process boot time (RFC3339, UTC).
 	StartedAt string `json:"started_at,omitempty"`
 	// UptimeSeconds is seconds elapsed since process start.
@@ -361,19 +368,20 @@ func (h *SystemHandler) GetSystemInfo(c *gin.Context) {
 	}
 
 	response := GetSystemInfoResponse{
-		Version:             Version,
-		Edition:             Edition,
-		CommitID:            CommitID,
-		BuildTime:           BuildTime,
-		GoVersion:           GoVersion,
-		KeywordIndexEngine:  keywordIndexEngine,
-		VectorStoreEngine:   vectorStoreEngine,
-		GraphDatabaseEngine: graphDatabaseEngine,
-		MinioEnabled:        minioEnabled,
-		DBVersion:           dbVersion,
-		DBMigrationError:    dbMigrationErr,
-		StartedAt:           startedAt,
-		UptimeSeconds:       uptimeSec,
+		Version:                Version,
+		Edition:                Edition,
+		CommitID:               CommitID,
+		BuildTime:              BuildTime,
+		GoVersion:              GoVersion,
+		KeywordIndexEngine:     keywordIndexEngine,
+		VectorStoreEngine:      vectorStoreEngine,
+		GraphDatabaseEngine:    graphDatabaseEngine,
+		MinioEnabled:           minioEnabled,
+		DBVersion:              dbVersion,
+		DBMigrationError:       dbMigrationErr,
+		TeachingMigrationError: database.CachedTeachingMigrationError(),
+		StartedAt:              startedAt,
+		UptimeSeconds:          uptimeSec,
 	}
 
 	logger.Info(ctx, "System info retrieved successfully")

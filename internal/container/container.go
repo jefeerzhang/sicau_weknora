@@ -766,7 +766,6 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 		// we replace that with the actual STORAGE_TYPE from the environment.
 		resolveStorageProviderPending(db)
 		migrateLegacyStorageBackends(db)
-		runTeachingRoleMigration(db)
 
 		// Post-migration: declarative built-in models from config/builtin_models.yaml (optional).
 		if err := types.LoadBuiltinModelsConfig(context.Background(), db, config.ConfigDir()); err != nil {
@@ -775,6 +774,14 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 	} else {
 		logger.Infof(context.Background(), "Auto-migration is disabled (AUTO_MIGRATE=false)")
 	}
+
+	// Teaching data normalization runs unconditionally AFTER schema
+	// handling (#22): whether the schema was applied above or by an
+	// external migration tool, legacy elevated memberships and pending
+	// elevated invitations must be downgraded before the deployment is
+	// treated as upgraded. Failures surface as a blocked state via
+	// /system/info and retry on the next startup.
+	ensureTeachingMigrationState(context.Background(), db)
 
 	// Get underlying SQL DB object
 	sqlDB, err := db.DB()
@@ -823,23 +830,6 @@ func resolveStorageProviderPending(db *gorm.DB) {
 
 	// Reset any pending tasks left over from previous aborted runs (Lite App mode)
 	resetPendingTasks(db)
-}
-
-// runTeachingRoleMigration demotes legacy admin/contributor memberships to
-// viewer and records zero/multi-owner anomalies (#18). Idempotent; failures
-// are logged and do not block startup.
-func runTeachingRoleMigration(db *gorm.DB) {
-	ctx := context.Background()
-	report, err := service.NewTeachingRoleMigrator(db, nil).Run(ctx)
-	if err != nil {
-		logger.Warnf(ctx, "Teaching role migration failed: %v", err)
-		return
-	}
-	if report.Downgraded > 0 || len(report.AnomalyTenantIDs) > 0 || report.Failed > 0 {
-		logger.Infof(ctx,
-			"Teaching role migration: downgraded=%d skipped=%d failed=%d anomalies=%d",
-			report.Downgraded, report.Skipped, report.Failed, len(report.AnomalyTenantIDs))
-	}
 }
 
 // migrateLegacyStorageBackends backfills the storage_backends table from each

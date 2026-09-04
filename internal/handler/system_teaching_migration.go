@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"errors"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/Tencent/WeKnora/internal/application/service"
+	"github.com/Tencent/WeKnora/internal/database"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 )
@@ -26,16 +28,25 @@ func (h *SystemHandler) RunTeachingRoleMigration(c *gin.Context) {
 	report, err := h.teachingMigrator.Run(ctx)
 	if err != nil {
 		logger.Errorf(ctx, "RunTeachingRoleMigration: %v", err)
+		database.CacheTeachingMigrationError(err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "migration failed"})
 		return
 	}
+	// A successful manual retry clears the blocked state recorded at
+	// startup; a partially failed run re-arms it (#22).
+	if report.Failed > 0 {
+		database.CacheTeachingMigrationError(fmt.Sprintf(
+			"teaching data migration left %d item(s) unresolved", report.Failed))
+	} else {
+		database.CacheTeachingMigrationError("")
+	}
 	h.emitAdminAudit(ctx, types.AuditActionMemberRoleChanged, nil, map[string]any{
-		"reason":             "teaching_legacy_role_migration",
-		"source":             "superadmin_trigger",
-		"downgraded":         report.Downgraded,
-		"skipped":            report.Skipped,
-		"failed":             report.Failed,
-		"anomaly_tenant_ids": report.AnomalyTenantIDs,
+		"reason":               "teaching_legacy_role_migration",
+		"source":               "superadmin_trigger",
+		"downgraded":           report.Downgraded,
+		"skipped":              report.Skipped,
+		"failed":               report.Failed,
+		"anomaly_tenant_ids":   report.AnomalyTenantIDs,
 	})
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": report})
 }
