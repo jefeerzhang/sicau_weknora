@@ -119,10 +119,7 @@ func (h *SystemHandler) ResolveWorkspaceOwnershipAnomaly(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resolve ownership anomaly"})
 		return
 	}
-	h.emitAdminAudit(ctx, types.AuditActionMemberRoleChanged, nil, map[string]any{
-		"reason":            "teaching_ownership_resolve",
-		"tenant_id":         tenantID,
-		"new_owner_user_id": req.NewOwnerUserID,
-	})
+	// Audit trail: individual membership changes (downgrades and owner assignment)
+	// are already emitted per tenant by teachingMigrator.ResolveAnomaly.
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }

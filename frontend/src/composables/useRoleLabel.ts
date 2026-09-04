@@ -1,14 +1,18 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { teachingMembershipView } from '@/utils/teachingMembership'
 
 /**
  * Format a tenant role enum value ('viewer' | 'contributor' | 'admin' | 'owner')
- * into the user-facing label declared under tenantMember.role.* in the i18n
- * bundle. Falls back to the raw role string when the locale does not carry
- * the key — same behaviour as the inline helper this used to live in
- * (UserMenu.vue), now extracted so role-aware UI gates across views can
- * share one implementation.
+ * into the user-facing label declared under tenantMember.* in the i18n
+ * bundle. Teaching deployment (#17) maps the two active relationships —
+ * owner → "空间负责人", viewer → "学生" — through the shared
+ * teachingMembershipView helper; legacy admin/contributor and unknown
+ * values fall back to their generic key. When the locale does not carry
+ * the key, the raw role string is returned — same behaviour as the inline
+ * helper this used to live in (UserMenu.vue), now extracted so role-aware
+ * UI gates across views can share one implementation.
  *
  * `roleIcon(role)` returns a TDesign icon name suitable for prefixing the
  * role label (e.g. in tenant switcher rows). The mapping is intentionally
@@ -19,19 +23,7 @@ export function useRoleLabel() {
   const { t } = useI18n()
   const formatRole = (role: string | null | undefined): string => {
     if (!role) return ''
-    // Teaching deployment (#17): prefer education labels for the two
-    // active relationships; keep generic keys for legacy admin/contributor.
-    const teachingKey =
-      role === 'owner'
-        ? 'tenantMember.teaching.lead'
-        : role === 'viewer'
-          ? 'tenantMember.teaching.student'
-          : ''
-    if (teachingKey) {
-      const teachingLabel = t(teachingKey)
-      if (teachingLabel !== teachingKey) return teachingLabel
-    }
-    const key = `tenantMember.role.${role}`
+    const key = teachingMembershipView(role).labelKey
     const label = t(key)
     return label === key ? role : label
   }

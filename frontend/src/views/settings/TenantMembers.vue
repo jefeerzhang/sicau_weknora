@@ -127,7 +127,7 @@
               </template>
               <template #role="{ row }">
                 <t-tag :theme="teachingRoleTagTheme(row.role)" size="small">
-                  {{ $t('tenantMember.role.' + row.role) }}
+                  {{ $t(teachingMembershipView(row.role).labelKey) }}
                 </t-tag>
               </template>
               <template #inviter="{ row }">
@@ -220,7 +220,7 @@
                     </t-form-item>
                     <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
                       <!-- sicau-v1 ticket 02: invitations are viewer-only; the role is fixed server-side -->
-                      <t-tag theme="default" size="large">{{ $t('tenantMember.role.viewer') }}</t-tag>
+                      <t-tag theme="default" size="large">{{ $t(teachingMembershipView('viewer').labelKey) }}</t-tag>
                     </t-form-item>
                   </t-form>
                   <div v-else class="invite-confirm-body">
@@ -270,7 +270,7 @@
                     <t-form :data="shareLinkForm" :label-width="80">
                       <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
                         <!-- sicau-v1 ticket 02: share links are viewer-only; the role is fixed server-side -->
-                        <t-tag theme="default" size="large">{{ $t('tenantMember.role.viewer') }}</t-tag>
+                        <t-tag theme="default" size="large">{{ $t(teachingMembershipView('viewer').labelKey) }}</t-tag>
                       </t-form-item>
                     </t-form>
                   </div>
@@ -1298,7 +1298,7 @@ async function submitShareLink() {
 // every time the user goes Back, tweaks the form, and re-advances —
 // the summary always mirrors the current form state.
 const addConfirmEmail = computed(() => addForm.email.trim())
-const addConfirmRoleLabel = computed(() => t('tenantMember.role.' + addForm.role))
+const addConfirmRoleLabel = computed(() => t(teachingMembershipView(addForm.role).labelKey))
 
 // submitAdd is wired to the popup footer primary CTA. On step='form' it
 // validates and swaps to summary; on step='confirm' it fires the API.

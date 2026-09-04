@@ -70,9 +70,16 @@ func (r *tenantInvitationRepository) Create(
 	if err != nil {
 		lowerErr = strings.ToLower(err.Error())
 	}
+	// Translate any duplicate-key race into ErrPendingInvitationExists (409)
+	// rather than a raw 500. Use the canonical detection: gorm.ErrDuplicatedKey
+	// when TranslateError is enabled, otherwise the driver message — matching
+	// isUniqueViolation (service/resource.go) and isDuplicateMembership
+	// (service/tenant_member.go). Matching a specific index name is fragile:
+	// it breaks if the constraint is renamed or a different backend token wins,
+	// and every duplicate here is a unique-constraint failure anyway.
 	if err != nil && (errors.Is(err, gorm.ErrDuplicatedKey) ||
-		strings.Contains(lowerErr, "idx_tenant_invitations_unique_pending") ||
-		(inv.InviteeUserID == "" && strings.Contains(lowerErr, "unique constraint"))) {
+		strings.Contains(lowerErr, "duplicate") ||
+		strings.Contains(lowerErr, "unique constraint")) {
 		return ErrPendingInvitationExists
 	}
 	return err
