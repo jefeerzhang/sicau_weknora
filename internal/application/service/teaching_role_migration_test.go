@@ -291,6 +291,99 @@ func TestTeachingRoleResolve_SuccessMakesSoleOwner(t *testing.T) {
 	}
 }
 
+// --- #23: ownership recovery audited atomically with the member changes ---
+
+func TestTeachingRoleResolve_AuditFailureRollsBackEverything(t *testing.T) {
+	db := newTeachingMigrationDB(t)
+	audit := &recordingAudit{failLogTx: 1}
+	m := NewTeachingRoleMigrator(db, audit)
+	seedTenant(t, db, 10)
+	seedUser(t, db, "u-teacher", true, false)
+	seedUser(t, db, "u-other", false, false)
+	seedMember(t, db, "u-teacher", 10, types.TenantRoleOwner)
+	seedMember(t, db, "u-other", 10, types.TenantRoleOwner)
+	_, _ = m.Run(context.Background())
+
+	if err := m.ResolveAnomaly(context.Background(), 10, "u-teacher", "actor-sa"); err == nil {
+		t.Fatalf("resolve must fail when the success audit write fails")
+	}
+	// Everything rolled back: memberships unchanged, anomaly stays open,
+	// no success audit persisted for a recovery that did not happen.
+	if roleOf(t, db, "u-other", 10) != types.TenantRoleOwner {
+		t.Fatalf("failed audit must roll back the demotion, got %s", roleOf(t, db, "u-other", 10))
+	}
+	if roleOf(t, db, "u-teacher", 10) != types.TenantRoleOwner {
+		t.Fatalf("promotion must roll back with the audit, got %s", roleOf(t, db, "u-teacher", 10))
+	}
+	open, err := m.ListOpenAnomalies(context.Background())
+	if err != nil {
+		t.Fatalf("ListOpenAnomalies: %v", err)
+	}
+	if len(open) != 1 {
+		t.Fatalf("anomaly must stay open after failure, got %d", len(open))
+	}
+	if len(audit.entries) != 0 {
+		t.Fatalf("no success audit may survive a rolled-back recovery, got %d", len(audit.entries))
+	}
+
+	// Retry after the outage heals completes the recovery exactly once.
+	audit.failLogTx = 0
+	if err := m.ResolveAnomaly(context.Background(), 10, "u-teacher", "actor-sa"); err != nil {
+		t.Fatalf("retry resolve: %v", err)
+	}
+	if roleOf(t, db, "u-other", 10) != types.TenantRoleViewer {
+		t.Fatalf("retry must demote the other owner, got %s", roleOf(t, db, "u-other", 10))
+	}
+	if roleOf(t, db, "u-teacher", 10) != types.TenantRoleOwner {
+		t.Fatalf("retry must promote the teacher, got %s", roleOf(t, db, "u-teacher", 10))
+	}
+	if len(audit.entries) != 1 {
+		t.Fatalf("retry must leave exactly 1 recovery audit, got %d", len(audit.entries))
+	}
+	e := audit.entries[0]
+	if e.ActorUserID != "actor-sa" || e.TenantID != 10 || e.TargetUserID != "u-other" {
+		t.Fatalf("audit must carry actor, workspace and target: %+v", e)
+	}
+	var details map[string]string
+	if err := json.Unmarshal(e.Details, &details); err != nil {
+		t.Fatalf("unmarshal details: %v", err)
+	}
+	if details["old_role"] != string(types.TenantRoleOwner) ||
+		details["new_role"] != string(types.TenantRoleViewer) ||
+		details["source"] != "superadmin" {
+		t.Fatalf("audit must carry old/new roles and source, got %v", details)
+	}
+}
+
+func TestTeachingRoleResolve_RerunDoesNotDuplicateAudits(t *testing.T) {
+	db := newTeachingMigrationDB(t)
+	audit := &recordingAudit{}
+	m := NewTeachingRoleMigrator(db, audit)
+	seedTenant(t, db, 11)
+	seedUser(t, db, "u-teacher", true, false)
+	seedUser(t, db, "u-other", false, false)
+	seedMember(t, db, "u-teacher", 11, types.TenantRoleOwner)
+	seedMember(t, db, "u-other", 11, types.TenantRoleOwner)
+	_, _ = m.Run(context.Background())
+
+	if err := m.ResolveAnomaly(context.Background(), 11, "u-teacher", "actor-sa"); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	first := len(audit.entries)
+
+	// Repeat execution of an already-recovered workspace must be rejected
+	// without new member changes and without new audits.
+	if err := m.ResolveAnomaly(context.Background(), 11, "u-teacher", "actor-sa"); !errors.Is(err, ErrTeachingResolveNoOpenAnomaly) {
+		t.Fatalf("rerun must report no open anomaly, got %v", err)
+	}
+	if len(audit.entries) != first {
+		t.Fatalf("rerun must not duplicate audits, before=%d after=%d", first, len(audit.entries))
+	}
+	if roleOf(t, db, "u-other", 11) != types.TenantRoleViewer {
+		t.Fatalf("rerun must not change memberships")
+	}
+}
+
 // --- #21: pending-invitation normalization + atomic downgrade audits ---
 
 func seedInvitation(

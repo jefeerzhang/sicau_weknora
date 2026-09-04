@@ -126,8 +126,12 @@ func (h *SystemHandler) ResolveWorkspaceOwnershipAnomaly(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	case err != nil:
+		// Mid-transaction failure (member update, anomaly close or audit
+		// write): everything rolled back, the anomaly stays open and the
+		// response carries the underlying reason so the SuperAdmin can
+		// retry meaningfully (#23).
 		logger.Errorf(ctx, "ResolveWorkspaceOwnershipAnomaly: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resolve ownership anomaly"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resolve ownership anomaly", "detail": err.Error()})
 		return
 	}
 	// Audit trail: individual membership changes (downgrades and owner assignment)

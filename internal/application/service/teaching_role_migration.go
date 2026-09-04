@@ -435,7 +435,13 @@ func (m *TeachingRoleMigrator) ResolveAnomaly(
 				Update("role", desired).Error; err != nil {
 				return err
 			}
-			m.emitResolveAudit(ctx, tenantID, mem.UserID, actorUserID, oldRole, desired)
+			// #23: the success audit rides the SAME transaction as the
+			// role change. An audit failure rolls the membership back, so
+			// the audit trail can never claim a recovery that was rolled
+			// back and no rolled-back recovery leaves a success audit.
+			if err := m.emitResolveAuditTx(ctx, tx, tenantID, mem.UserID, actorUserID, oldRole, desired); err != nil {
+				return err
+			}
 		}
 
 		now := time.Now()
@@ -469,22 +475,25 @@ var (
 	ErrTeachingResolveNoOpenAnomaly   = fmt.Errorf("no open ownership anomaly for this workspace")
 )
 
-func (m *TeachingRoleMigrator) emitResolveAudit(
+// emitResolveAuditTx persists the recovery audit on the caller's
+// transaction (#23): SuperAdmin actor, workspace, target member, old/new
+// roles and the successful outcome, with the ownership-resolve reason.
+// The error is returned so the surrounding transaction rolls back when the
+// audit cannot be written — never swallowed, never written before commit.
+func (m *TeachingRoleMigrator) emitResolveAuditTx(
 	ctx context.Context,
+	tx *gorm.DB,
 	tenantID uint64,
 	targetUserID, actorUserID string,
 	oldRole, newRole types.TenantRole,
-) {
-	if m.audit == nil {
-		return
-	}
+) error {
 	details, _ := json.Marshal(map[string]string{
 		"old_role": string(oldRole),
 		"new_role": string(newRole),
 		"reason":   "teaching_ownership_resolve",
 		"source":   "superadmin",
 	})
-	_ = m.audit.Log(ctx, &types.AuditLog{
+	entry := &types.AuditLog{
 		TenantID:     tenantID,
 		ActorUserID:  actorUserID,
 		ActorRole:    "system_admin",
@@ -493,7 +502,8 @@ func (m *TeachingRoleMigrator) emitResolveAudit(
 		TargetUserID: targetUserID,
 		Outcome:      types.AuditOutcomeSuccess,
 		Details:      types.JSON(details),
-	})
+	}
+	return m.writeAuditTx(ctx, tx, entry)
 }
 
 func mustJSON(v any) []byte {
