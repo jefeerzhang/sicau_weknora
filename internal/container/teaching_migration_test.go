@@ -393,3 +393,82 @@ func TestVerifyTeachingMigrationTables_MissingTableFailsClosed(t *testing.T) {
 		t.Fatalf("error must name the missing table, got %v", err)
 	}
 }
+
+// TestInitDatabase_TeachingPhaseAfterAutoMigration drives the full
+// AUTO_MIGRATE=true startup: the first boot runs the real versioned SQLite
+// migrations from the repo, the second boot (with legacy rows seeded in
+// between, the way an upgrade would find them) must still normalize them
+// (#22 Testing Decisions: both AUTO_MIGRATE modes).
+func TestInitDatabase_TeachingPhaseAfterAutoMigration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("startup integration test")
+	}
+	// golang-migrate resolves "file://migrations/sqlite" relative to the
+	// process working directory; point it at the repo root for the run.
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir("../../"); err != nil {
+		t.Fatalf("chdir to repo root: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origWd) })
+
+	dbPath := filepath.Join(t.TempDir(), "auto_migrate_true.db")
+	t.Setenv("DB_DRIVER", "sqlite")
+	t.Setenv("DB_PATH", dbPath)
+	t.Setenv("AUTO_MIGRATE", "true")
+
+	// First boot: schema migrations run for real; the teaching phase
+	// completes on an empty dataset.
+	database.CacheTeachingMigrationError("")
+	db, err := initDatabase(&config.Config{})
+	if err != nil {
+		t.Fatalf("first initDatabase: %v", err)
+	}
+	if msg := database.CachedTeachingMigrationError(); msg != "" {
+		t.Fatalf("first boot must leave the teaching phase healthy, got %q", msg)
+	}
+
+	// Seed legacy rows as they would exist before an upgrade. The tenant
+	// row uses raw SQL because the versioned migrations lag behind the
+	// gorm model on non-essential tenant columns; the migrator only reads
+	// tenants.id.
+	if err := db.Exec(`INSERT INTO tenants (id, name, business, retriever_engines, storage_quota, storage_used, created_at, updated_at) VALUES (1, 'course', '', '[]', 10737418240, 0, datetime('now'), datetime('now'))`).Error; err != nil {
+		t.Fatalf("seed tenant: %v", err)
+	}
+	now := time.Now()
+	if err := db.Create(&types.TenantMember{UserID: "u-lead", TenantID: 1, Role: types.TenantRoleOwner, Status: types.TenantMemberStatusActive, JoinedAt: now}).Error; err != nil {
+		t.Fatalf("seed owner: %v", err)
+	}
+	if err := db.Create(&types.TenantMember{UserID: "u-admin", TenantID: 1, Role: types.TenantRoleAdmin, Status: types.TenantMemberStatusActive, JoinedAt: now}).Error; err != nil {
+		t.Fatalf("seed legacy admin: %v", err)
+	}
+	if err := db.Create(&types.TenantInvitation{TenantID: 1, InviteeUserID: "u-new", Role: types.TenantRoleContributor, Status: types.TenantInvitationStatusPending, ExpiresAt: now.Add(time.Hour)}).Error; err != nil {
+		t.Fatalf("seed legacy invitation: %v", err)
+	}
+	if sqlDB, err := db.DB(); err == nil {
+		_ = sqlDB.Close()
+	}
+
+	// Second boot: migrations are a no-op at the recorded version; the
+	// teaching phase still normalizes the legacy rows.
+	db2 := runInitDatabaseWithDBPath(t, dbPath, "true")
+	defer func() {
+		if sqlDB, err := db2.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	}()
+	if msg := database.CachedTeachingMigrationError(); msg != "" {
+		t.Fatalf("second boot must keep the teaching phase healthy, got %q", msg)
+	}
+	if got := readStartupMemberRole(t, db2, "u-admin"); got != types.TenantRoleViewer {
+		t.Fatalf("AUTO_MIGRATE=true boot must demote the legacy admin, got %s", got)
+	}
+	if got := readStartupInvitationRole(t, db2); got != types.TenantRoleViewer {
+		t.Fatalf("AUTO_MIGRATE=true boot must normalize the pending invitation, got %s", got)
+	}
+	if got := readStartupMemberRole(t, db2, "u-lead"); got != types.TenantRoleOwner {
+		t.Fatalf("owner must stay owner, got %s", got)
+	}
+}

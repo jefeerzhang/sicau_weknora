@@ -48,6 +48,16 @@ var (
 	// route layer so this error only surfaces on the /me/ paths.
 	ErrInvitationForbidden = errors.New("only the invitee can accept or decline this invitation")
 
+	// ErrInvitationRoleRestrictedToViewer is returned by Create /
+	// CreateShareLink when a caller asks for any role other than viewer.
+	// The teaching two-state model (#21) materialises invitations as the
+	// student relationship only; this is the creation-time enforcement
+	// that backs the HTTP guards, so no code path can persist an elevated
+	// invitation role. Legacy elevated rows from before the rule are
+	// handled at acceptance time (clamped) and by the normalization
+	// migration, never by new writes.
+	ErrInvitationRoleRestrictedToViewer = errors.New("invitations can only grant the student (viewer) role")
+
 	// ErrInvitationTokenInvalid is returned by LookupByToken /
 	// AcceptByToken when the supplied plaintext token does not match
 	// any active share-link row. The handler maps this to 410 Gone.
@@ -182,6 +192,9 @@ func (s *tenantInvitationService) Create(
 	}
 	if err := rejectAPIKeyOwnerAssignment(ctx, role); err != nil {
 		return nil, err
+	}
+	if role != types.TenantRoleViewer {
+		return nil, ErrInvitationRoleRestrictedToViewer
 	}
 	// Reject early if the invitee is already an active member; the
 	// handler renders this as "they're already in" rather than the
@@ -551,6 +564,9 @@ func (s *tenantInvitationService) CreateShareLink(
 	}
 	if err := rejectAPIKeyOwnerAssignment(ctx, role); err != nil {
 		return nil, "", err
+	}
+	if role != types.TenantRoleViewer {
+		return nil, "", ErrInvitationRoleRestrictedToViewer
 	}
 	s.sweep(ctx)
 	existing, err := s.repo.GetActiveShareLinkByTenant(ctx, tenantID)
