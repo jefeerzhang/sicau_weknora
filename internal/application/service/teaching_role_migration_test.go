@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"context"
 	"encoding/json"
 	"testing"
@@ -15,12 +16,26 @@ import (
 
 type recordingAudit struct {
 	entries []*types.AuditLog
+	// failLogTx makes the next N LogTx calls fail, simulating an audit
+	// persistence outage in the middle of a migration run.
+	failLogTx int
 }
 
 func (a *recordingAudit) Log(_ context.Context, entry *types.AuditLog) error {
 	cp := *entry
 	a.entries = append(a.entries, &cp)
 	return nil
+}
+
+// LogTx records the entry as if committed with the caller's transaction;
+// the fake has no real transaction semantics. When failLogTx is armed the
+// write fails so the caller's transaction must roll back.
+func (a *recordingAudit) LogTx(_ context.Context, _ *gorm.DB, entry *types.AuditLog) error {
+	if a.failLogTx > 0 {
+		a.failLogTx--
+		return errors.New("audit table unavailable")
+	}
+	return a.Log(context.Background(), entry)
 }
 
 func (a *recordingAudit) LogDenied(
@@ -47,6 +62,7 @@ func newTeachingMigrationDB(t *testing.T) *gorm.DB {
 		&types.Tenant{},
 		&types.User{},
 		&types.TenantMember{},
+		&types.TenantInvitation{},
 		&types.WorkspaceOwnershipAnomaly{},
 		&types.AuditLog{},
 	); err != nil {
@@ -272,5 +288,198 @@ func TestTeachingRoleResolve_SuccessMakesSoleOwner(t *testing.T) {
 	}
 	if len(open) != 0 {
 		t.Fatalf("resolved anomaly must leave open list, got %d", len(open))
+	}
+}
+
+// --- #21: pending-invitation normalization + atomic downgrade audits ---
+
+func seedInvitation(
+	t *testing.T,
+	db *gorm.DB,
+	tenantID uint64,
+	invitee, token string,
+	role types.TenantRole,
+	status types.TenantInvitationStatus,
+) uint64 {
+	t.Helper()
+	inv := &types.TenantInvitation{
+		TenantID:      tenantID,
+		InviteeUserID: invitee,
+		Token:         token,
+		Role:          role,
+		Status:        status,
+		ExpiresAt:     time.Now().Add(time.Hour),
+	}
+	if err := db.Create(inv).Error; err != nil {
+		t.Fatalf("seed invitation: %v", err)
+	}
+	return inv.ID
+}
+
+func readInvitationRole(t *testing.T, db *gorm.DB, id uint64) types.TenantRole {
+	t.Helper()
+	var inv types.TenantInvitation
+	if err := db.First(&inv, id).Error; err != nil {
+		t.Fatalf("read invitation %d: %v", id, err)
+	}
+	return inv.Role
+}
+
+func TestTeachingRoleMigration_NormalizesPendingElevatedInvitations(t *testing.T) {
+	db := newTeachingMigrationDB(t)
+	seedTenant(t, db, 7)
+
+	pendingAdmin := seedInvitation(t, db, 7, "u-bob", "", types.TenantRoleAdmin, types.TenantInvitationStatusPending)
+	pendingLink := seedInvitation(t, db, 7, "", "legacy-share-token", types.TenantRoleContributor, types.TenantInvitationStatusPending)
+	pendingViewer := seedInvitation(t, db, 7, "u-carol", "", types.TenantRoleViewer, types.TenantInvitationStatusPending)
+	acceptedAdmin := seedInvitation(t, db, 7, "u-dave", "", types.TenantRoleAdmin, types.TenantInvitationStatusAccepted)
+	declinedContrib := seedInvitation(t, db, 7, "u-eve", "", types.TenantRoleContributor, types.TenantInvitationStatusDeclined)
+
+	report, err := NewTeachingRoleMigrator(db, nil).Run(context.Background())
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if report.InvitationsDowngraded != 2 || report.Failed != 0 {
+		t.Fatalf("want 2 normalized invitations, 0 failed; got %+v", report)
+	}
+	if role := readInvitationRole(t, db, pendingAdmin); role != types.TenantRoleViewer {
+		t.Fatalf("pending admin email must be viewer, got %s", role)
+	}
+	if role := readInvitationRole(t, db, pendingLink); role != types.TenantRoleViewer {
+		t.Fatalf("pending share link must be viewer, got %s", role)
+	}
+	if role := readInvitationRole(t, db, pendingViewer); role != types.TenantRoleViewer {
+		t.Fatalf("pending viewer must stay viewer, got %s", role)
+	}
+	// Terminal history is never rewritten.
+	if role := readInvitationRole(t, db, acceptedAdmin); role != types.TenantRoleAdmin {
+		t.Fatalf("accepted history must keep its role, got %s", role)
+	}
+	if role := readInvitationRole(t, db, declinedContrib); role != types.TenantRoleContributor {
+		t.Fatalf("declined history must keep its role, got %s", role)
+	}
+
+	// One audit per normalized row, carrying the downgrade facts.
+	var audits []types.AuditLog
+	if err := db.Where("target_type = ?", "tenant_invitation").Find(&audits).Error; err != nil {
+		t.Fatalf("read audits: %v", err)
+	}
+	if len(audits) != 2 {
+		t.Fatalf("want 2 invitation audits, got %d", len(audits))
+	}
+	for _, a := range audits {
+		var details map[string]any
+		if err := json.Unmarshal(a.Details, &details); err != nil {
+			t.Fatalf("unmarshal details: %v", err)
+		}
+		if details["new_role"] != string(types.TenantRoleViewer) {
+			t.Fatalf("audit must record viewer, got %v", details)
+		}
+		if _, hasOld := details["old_role"]; !hasOld {
+			t.Fatalf("audit must record old_role, got %v", details)
+		}
+		if details["reason"] != teachingLegacyRoleMigrationReason {
+			t.Fatalf("audit must record migration reason, got %v", details)
+		}
+		if _, hasToken := details["token"]; hasToken {
+			t.Fatalf("audit details must not carry the invitation token: %v", details)
+		}
+	}
+
+	// Rerun is idempotent: nothing left to normalize, no new audits.
+	report2, err := NewTeachingRoleMigrator(db, nil).Run(context.Background())
+	if err != nil {
+		t.Fatalf("rerun: %v", err)
+	}
+	if report2.InvitationsDowngraded != 0 || report2.Failed != 0 {
+		t.Fatalf("rerun must normalize nothing, got %+v", report2)
+	}
+	var count int64
+	if err := db.Model(&types.AuditLog{}).Where("target_type = ?", "tenant_invitation").Count(&count).Error; err != nil {
+		t.Fatalf("count audits: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("rerun must not duplicate audits, got %d", count)
+	}
+}
+
+func TestTeachingRoleMigration_NormalizationAuditFailureRetries(t *testing.T) {
+	db := newTeachingMigrationDB(t)
+	seedTenant(t, db, 8)
+	invID := seedInvitation(t, db, 8, "u-bob", "", types.TenantRoleAdmin, types.TenantInvitationStatusPending)
+
+	audit := &recordingAudit{failLogTx: 1}
+	report, err := NewTeachingRoleMigrator(db, audit).Run(context.Background())
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if report.Failed != 1 {
+		t.Fatalf("audit failure must be reported, got %+v", report)
+	}
+	if role := readInvitationRole(t, db, invID); role != types.TenantRoleAdmin {
+		t.Fatalf("role update must roll back with the audit, got %s", role)
+	}
+	if len(audit.entries) != 0 {
+		t.Fatalf("failed audit must not persist, got %d entries", len(audit.entries))
+	}
+
+	// Retry after the outage heals downgrades the row exactly once.
+	audit.failLogTx = 0
+	report2, err := NewTeachingRoleMigrator(db, audit).Run(context.Background())
+	if err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	if report2.InvitationsDowngraded != 1 || report2.Failed != 0 {
+		t.Fatalf("retry must normalize the row, got %+v", report2)
+	}
+	if role := readInvitationRole(t, db, invID); role != types.TenantRoleViewer {
+		t.Fatalf("retry must downgrade to viewer, got %s", role)
+	}
+	if len(audit.entries) != 1 {
+		t.Fatalf("retry must leave exactly 1 audit, got %d", len(audit.entries))
+	}
+}
+
+func TestTeachingRoleMigration_MembershipDowngradeAuditFailureRollsBack(t *testing.T) {
+	db := newTeachingMigrationDB(t)
+	seedTenant(t, db, 9)
+	seedMember(t, db, "u-owner", 9, types.TenantRoleOwner)
+	seedMember(t, db, "u-admin", 9, types.TenantRoleAdmin)
+
+	audit := &recordingAudit{failLogTx: 1}
+	report, err := NewTeachingRoleMigrator(db, audit).Run(context.Background())
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if report.Failed != 1 {
+		t.Fatalf("audit failure must be reported, got %+v", report)
+	}
+	var admin types.TenantMember
+	if err := db.Where("user_id = ? AND tenant_id = ?", "u-admin", 9).First(&admin).Error; err != nil {
+		t.Fatalf("read member: %v", err)
+	}
+	if admin.Role != types.TenantRoleAdmin {
+		t.Fatalf("role update must roll back with the audit, got %s", admin.Role)
+	}
+	if len(audit.entries) != 0 {
+		t.Fatalf("failed audit must not persist, got %d entries", len(audit.entries))
+	}
+
+	audit.failLogTx = 0
+	report2, err := NewTeachingRoleMigrator(db, audit).Run(context.Background())
+	if err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	if report2.Downgraded != 1 || report2.Failed != 0 {
+		t.Fatalf("retry must downgrade the member, got %+v", report2)
+	}
+	if err := db.Where("user_id = ? AND tenant_id = ?", "u-admin", 9).First(&admin).Error; err != nil {
+		t.Fatalf("read member: %v", err)
+	}
+	if admin.Role != types.TenantRoleViewer {
+		t.Fatalf("retry must downgrade to viewer, got %s", admin.Role)
+	}
+	if len(audit.entries) != 1 {
+		t.Fatalf("retry must leave exactly 1 audit, got %d", len(audit.entries))
 	}
 }

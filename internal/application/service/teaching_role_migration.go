@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/logger"
@@ -28,15 +29,20 @@ func NewTeachingRoleMigrator(db *gorm.DB, audit interfaces.AuditLogService) *Tea
 	return &TeachingRoleMigrator{db: db, audit: audit}
 }
 
-// Run walks every tenant once. Idempotent: already-viewer rows are
-// skipped; open anomalies are upserted without duplicating audit on
-// re-run when no role actually changes.
+// Run normalizes pending legacy invitations and walks every tenant once.
+// Idempotent: already-viewer members and already-viewer pending
+// invitations are skipped; open anomalies are upserted without
+// duplicating audit on re-run when no role actually changes.
 func (m *TeachingRoleMigrator) Run(ctx context.Context) (*types.TeachingRoleMigrationReport, error) {
 	report := &types.TeachingRoleMigrationReport{
 		AnomalyTenantIDs: []uint64{},
 	}
 	if m == nil || m.db == nil {
 		return report, fmt.Errorf("teaching role migrator is not configured")
+	}
+
+	if err := m.normalizePendingInvitations(ctx, report); err != nil {
+		return report, err
 	}
 
 	var tenants []types.Tenant
@@ -51,6 +57,109 @@ func (m *TeachingRoleMigrator) Run(ctx context.Context) (*types.TeachingRoleMigr
 		}
 	}
 	return report, nil
+}
+
+// normalizePendingInvitations downgrades pending invitations whose role is
+// admin or contributor to viewer (#21) — email invitations and share-link
+// rows alike. Each changed row commits its role update and one success
+// audit in the same transaction, so a failed audit write rolls the role
+// back and the next run retries it. Terminal invitation history
+// (accepted/declined/revoked/expired) is never touched: the status filter
+// pins every write to still-pending rows. Token values are never written
+// to logs or audit details.
+func (m *TeachingRoleMigrator) normalizePendingInvitations(
+	ctx context.Context,
+	report *types.TeachingRoleMigrationReport,
+) error {
+	var invs []types.TenantInvitation
+	if err := m.db.WithContext(ctx).
+		Where("status = ? AND role IN ?",
+			types.TenantInvitationStatusPending,
+			[]types.TenantRole{types.TenantRoleAdmin, types.TenantRoleContributor}).
+		Find(&invs).Error; err != nil {
+		return err
+	}
+
+	for _, inv := range invs {
+		oldRole := inv.Role
+		changed := false
+		err := m.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			res := tx.Model(&types.TenantInvitation{}).
+				Where("id = ? AND status = ? AND role = ?",
+					inv.ID, types.TenantInvitationStatusPending, oldRole).
+				Update("role", types.TenantRoleViewer)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				// Lost a race with a concurrent transition; nothing
+				// changed, so no audit.
+				return nil
+			}
+			changed = true
+			return m.emitInvitationDowngradeAuditTx(ctx, tx, &inv, oldRole)
+		})
+		if err != nil {
+			report.Failed++
+			logger.Errorf(ctx, "normalize pending invitation %d (rolled back): %v", inv.ID, err)
+			continue
+		}
+		if changed {
+			report.InvitationsDowngraded++
+		}
+	}
+	return nil
+}
+
+// emitInvitationDowngradeAuditTx writes one success audit for a
+// normalized pending invitation, on the same transaction as the role
+// update. Details carry the old/new roles, the invitation id and the
+// kind of row (email invitee or share link) — never the token.
+func (m *TeachingRoleMigrator) emitInvitationDowngradeAuditTx(
+	ctx context.Context,
+	tx *gorm.DB,
+	inv *types.TenantInvitation,
+	oldRole types.TenantRole,
+) error {
+	kind := "email"
+	if inv.InviteeUserID == "" {
+		kind = "share_link"
+	}
+	details, _ := json.Marshal(map[string]any{
+		"old_role":      string(oldRole),
+		"new_role":      string(types.TenantRoleViewer),
+		"reason":        teachingLegacyRoleMigrationReason,
+		"source":        "system",
+		"invitation_id": inv.ID,
+		"kind":          kind,
+	})
+	entry := &types.AuditLog{
+		TenantID:     inv.TenantID,
+		ActorUserID:  "system",
+		ActorRole:    "system",
+		Action:       types.AuditActionMemberRoleChanged,
+		TargetType:   "tenant_invitation",
+		TargetID:     strconv.FormatUint(inv.ID, 10),
+		TargetUserID: inv.InviteeUserID,
+		Outcome:      types.AuditOutcomeSuccess,
+		Details:      types.JSON(details),
+	}
+	return m.writeAuditTx(ctx, tx, entry)
+}
+
+// writeAuditTx persists an audit entry on tx. When the audit service is
+// wired it rides the same transaction through LogTx; the startup path
+// (audit nil) falls back to a direct insert on tx so demotions still
+// leave an atomic trail.
+func (m *TeachingRoleMigrator) writeAuditTx(
+	ctx context.Context,
+	tx *gorm.DB,
+	entry *types.AuditLog,
+) error {
+	if m.audit != nil {
+		return m.audit.LogTx(ctx, tx, entry)
+	}
+	return tx.WithContext(ctx).Create(entry).Error
 }
 
 func (m *TeachingRoleMigrator) migrateTenant(
@@ -101,21 +210,36 @@ func (m *TeachingRoleMigrator) migrateTenant(
 			continue
 		}
 		oldRole := mem.Role
-		res := m.db.WithContext(ctx).
-			Model(&types.TenantMember{}).
-			Where("user_id = ? AND tenant_id = ? AND role = ?", mem.UserID, tenantID, oldRole).
-			Update("role", types.TenantRoleViewer)
-		if res.Error != nil {
+		// One transaction per member: the guarded role update and its
+		// success audit commit together (#21). An audit failure rolls
+		// the role back, so permissions and audit facts stay consistent
+		// and the next run retries the downgrade exactly once.
+		changed := false
+		err := m.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			res := tx.Model(&types.TenantMember{}).
+				Where("user_id = ? AND tenant_id = ? AND role = ?", mem.UserID, tenantID, oldRole).
+				Update("role", types.TenantRoleViewer)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				// Already downgraded by a concurrent run; nothing
+				// changed, so no audit.
+				return nil
+			}
+			changed = true
+			return m.emitDowngradeAuditTx(ctx, tx, tenantID, mem.UserID, oldRole)
+		})
+		if err != nil {
 			report.Failed++
-			logger.Warnf(ctx, "downgrade member %s tenant %d: %v", mem.UserID, tenantID, res.Error)
+			logger.Errorf(ctx, "downgrade member %s tenant %d (rolled back): %v", mem.UserID, tenantID, err)
 			continue
 		}
-		if res.RowsAffected == 0 {
+		if changed {
+			report.Downgraded++
+		} else {
 			report.Skipped++
-			continue
 		}
-		report.Downgraded++
-		m.emitDowngradeAudit(ctx, tenantID, mem.UserID, oldRole)
 	}
 	return nil
 }
@@ -158,12 +282,17 @@ func (m *TeachingRoleMigrator) upsertOpenAnomaly(
 	}).Create(&row).Error
 }
 
-func (m *TeachingRoleMigrator) emitDowngradeAudit(
+// emitDowngradeAuditTx builds and persists the success audit for one
+// legacy membership downgrade, on the same transaction as the guarded
+// role update. Details carry old_role/new_role and the migration reason —
+// never credentials or conversation content.
+func (m *TeachingRoleMigrator) emitDowngradeAuditTx(
 	ctx context.Context,
+	tx *gorm.DB,
 	tenantID uint64,
 	targetUserID string,
 	oldRole types.TenantRole,
-) {
+) error {
 	details, _ := json.Marshal(map[string]string{
 		"old_role": string(oldRole),
 		"new_role": string(types.TenantRoleViewer),
@@ -181,13 +310,7 @@ func (m *TeachingRoleMigrator) emitDowngradeAudit(
 		Details:      types.JSON(details),
 		CreatedAt:    time.Now(),
 	}
-	if m.audit != nil {
-		_ = m.audit.Log(ctx, entry)
-		return
-	}
-	// Startup path may construct the migrator before AuditLogService is
-	// wired; persist directly so demotions still leave an audit trail.
-	_ = m.db.WithContext(ctx).Create(entry).Error
+	return m.writeAuditTx(ctx, tx, entry)
 }
 
 // ListOpenAnomalies returns unresolved ownership anomalies for SuperAdmin (#19).

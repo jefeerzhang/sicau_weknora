@@ -54,4 +54,10 @@ type TeachingRoleMigrationReport struct {
 	Skipped          int      `json:"skipped"`
 	Failed           int      `json:"failed"`
 	AnomalyTenantIDs []uint64 `json:"anomaly_tenant_ids"`
+
+	// InvitationsDowngraded counts pending invitations (email and
+	// share-link rows) whose legacy admin/contributor role was normalized
+	// to viewer during this run (#21). Terminal invitation history is
+	// never touched, so the count reflects exactly the rows that changed.
+	InvitationsDowngraded int `json:"invitations_downgraded"`
 }

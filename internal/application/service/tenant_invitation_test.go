@@ -10,6 +10,7 @@ import (
 	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"gorm.io/gorm"
 )
 
 // fakeInvitationRepo is an in-memory stand-in for
@@ -222,6 +223,13 @@ func (r *fakeInvitationRepo) IncrementAcceptedCount(
 	return gormErrRecordNotFound
 }
 
+// WithTx is the transaction seam: the in-memory fake has no real
+// transactions, so it returns itself regardless of tx (nil in unit tests
+// without a gorm handle).
+func (r *fakeInvitationRepo) WithTx(_ *gorm.DB) interfaces.TenantInvitationRepository {
+	return r
+}
+
 var _ interfaces.TenantInvitationRepository = (*fakeInvitationRepo)(nil)
 
 // newInvitationSvc returns a service wired against in-memory fakes for
@@ -234,7 +242,7 @@ func newInvitationSvc() (
 ) {
 	invRepo := newFakeInvitationRepo()
 	memberSvc, _ := newServiceWithRepo()
-	svc := NewTenantInvitationService(invRepo, memberSvc, nil)
+	svc := NewTenantInvitationService(nil, invRepo, memberSvc, nil)
 	return svc, invRepo, memberSvc
 }
 
@@ -301,6 +309,9 @@ func TestInvitationService_Accept_OnlyByInvitee(t *testing.T) {
 func TestInvitationService_Accept_HappyPath_CreatesMembership(t *testing.T) {
 	svc, _, memberSvc := newInvitationSvc()
 	ctx := context.Background()
+	// A legacy pending invitation still carries an elevated role (rows
+	// created before the viewer-only guards shipped). Acceptance never
+	// trusts it (#21): the membership is materialised as viewer.
 	inv, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleAdmin, nil, "")
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -309,7 +320,7 @@ func TestInvitationService_Accept_HappyPath_CreatesMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("accept: %v", err)
 	}
-	if mb == nil || mb.UserID != "u-bob" || mb.Role != types.TenantRoleAdmin {
+	if mb == nil || mb.UserID != "u-bob" || mb.Role != types.TenantRoleViewer {
 		t.Fatalf("unexpected membership: %+v", mb)
 	}
 	// Re-acceptance must be a state-machine rejection, not silent
@@ -594,6 +605,8 @@ func TestInvitationService_LookupByToken_RejectsExpired(t *testing.T) {
 func TestInvitationService_AcceptByToken_HappyPath(t *testing.T) {
 	svc, repo, memberSvc := newInvitationSvc()
 	ctx := context.Background()
+	// Legacy elevated share links must still mint viewer memberships
+	// only (#21).
 	_, plain, err := svc.CreateShareLink(ctx, 1, types.TenantRoleAdmin, nil, "")
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -602,7 +615,7 @@ func TestInvitationService_AcceptByToken_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("accept-by-token: %v", err)
 	}
-	if mb == nil || mb.UserID != "u-alice" || mb.Role != types.TenantRoleAdmin {
+	if mb == nil || mb.UserID != "u-alice" || mb.Role != types.TenantRoleViewer {
 		t.Fatalf("unexpected membership: %+v", mb)
 	}
 	if got, _ := memberSvc.GetMembership(ctx, "u-alice", 1); got == nil {

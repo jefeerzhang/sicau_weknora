@@ -6,6 +6,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // AuditLogQuery is the cursor + filter set for listing audit log
@@ -57,6 +58,13 @@ type AuditLogService interface {
 	// Log writes a single audit entry. Callers fill TenantID + Action +
 	// any per-event fields; the service fills CreatedAt if zero.
 	Log(ctx context.Context, entry *types.AuditLog) error
+	// LogTx persists the entry on tx — the caller's *gorm.DB transaction —
+	// so a permission change and its success audit commit or roll back as
+	// one unit. Fills the same defaults as Log and returns the persistence
+	// error to the caller: inside a transaction the error must propagate
+	// (never be discarded), otherwise the audit and the state it describes
+	// would diverge.
+	LogTx(ctx context.Context, tx *gorm.DB, entry *types.AuditLog) error
 	// LogDenied records a middleware-level reject decision. Subject to
 	// 1-minute sliding-window dedup keyed by
 	// (tenant_id, actor_user_id, action, request_path) so a probing

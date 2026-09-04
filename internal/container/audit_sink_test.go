@@ -8,6 +8,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"gorm.io/gorm"
 )
 
 // fakeAuditSvc records Log calls.
@@ -25,6 +26,9 @@ func (f *fakeAuditSvc) LogDenied(context.Context, *gin.Context, uint64, string, 
 }
 func (f *fakeAuditSvc) List(context.Context, uint64, *interfaces.AuditLogQuery) ([]*types.AuditLog, error) {
 	return nil, nil
+}
+func (f *fakeAuditSvc) LogTx(ctx context.Context, _ *gorm.DB, entry *types.AuditLog) error {
+	return f.Log(ctx, entry)
 }
 func (f *fakeAuditSvc) Purge(context.Context, int) (int64, error) { return 0, nil }
 

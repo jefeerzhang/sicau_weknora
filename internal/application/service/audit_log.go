@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // auditLogService is the high-level wrapper around AuditLogRepository.
@@ -70,6 +72,33 @@ func (s *auditLogService) Log(ctx context.Context, entry *types.AuditLog) error 
 		return err
 	}
 	return nil
+}
+
+// LogTx is the transaction-aware write path: the entry is inserted on tx
+// so it commits or rolls back together with the permission change it
+// describes. Unlike Log, the error is ALWAYS returned to the caller —
+// swallowing it here would leave the business row committed while its
+// audit is gone. The tx-scoped repository is built on demand because the
+// service's own repo is bound to the shared connection, not to tx.
+func (s *auditLogService) LogTx(ctx context.Context, tx *gorm.DB, entry *types.AuditLog) error {
+	if tx == nil {
+		// No transaction in scope (unit-test doubles, degraded wiring):
+		// fall back to the plain write path so callers stay nil-tolerant.
+		return s.Log(ctx, entry)
+	}
+	if entry == nil {
+		return fmt.Errorf("audit log: nil entry")
+	}
+	if entry.Action == "" {
+		return fmt.Errorf("audit log: action is required")
+	}
+	if entry.Outcome == "" {
+		entry.Outcome = types.AuditOutcomeSuccess
+	}
+	if entry.CreatedAt.IsZero() {
+		entry.CreatedAt = s.now()
+	}
+	return apprepo.NewAuditLogRepository(tx).Create(ctx, entry)
 }
 
 // LogDenied records a middleware-level rejection. Subject to a

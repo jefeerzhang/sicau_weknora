@@ -150,6 +150,39 @@ func rejectAPIKeyOwnerAssignment(ctx context.Context, role types.TenantRole) err
 	return nil
 }
 
+// insertMembershipRow creates the row on the supplied repository view and
+// translates the unique-index race into ErrMembershipAlreadyExists. Shared
+// by AddMember (repo's own connection) and AddMemberTx (caller's tx).
+func (s *tenantMemberService) insertMembershipRow(
+	ctx context.Context,
+	repo interfaces.TenantMemberRepository,
+	userID string,
+	tenantID uint64,
+	role types.TenantRole,
+	invitedBy *string,
+) (*types.TenantMember, error) {
+	member := &types.TenantMember{
+		UserID:    userID,
+		TenantID:  tenantID,
+		Role:      role,
+		Status:    types.TenantMemberStatusActive,
+		InvitedBy: invitedBy,
+		JoinedAt:  time.Now(),
+	}
+	if err := repo.Create(ctx, member); err != nil {
+		// TOCTOU race: a concurrent AddMember / EnsureOwner slipped past
+		// the Get above. The DB's partial unique index on
+		// (user_id, tenant_id) WHERE deleted_at IS NULL caught it; map
+		// to the same sentinel the in-service check would have returned
+		// so callers get a clean 409 instead of an opaque 500.
+		if isDuplicateMembership(err) {
+			return nil, ErrMembershipAlreadyExists
+		}
+		return nil, err
+	}
+	return member, nil
+}
+
 // AddMember inserts a new active membership row. Returns
 // ErrMembershipAlreadyExists if the user is already an active member of
 // the tenant, and ErrInvalidTenantRole for unknown roles.
@@ -173,23 +206,8 @@ func (s *tenantMemberService) AddMember(
 	if existing != nil {
 		return nil, ErrMembershipAlreadyExists
 	}
-	member := &types.TenantMember{
-		UserID:    userID,
-		TenantID:  tenantID,
-		Role:      role,
-		Status:    types.TenantMemberStatusActive,
-		InvitedBy: invitedBy,
-		JoinedAt:  time.Now(),
-	}
-	if err := s.repo.Create(ctx, member); err != nil {
-		// TOCTOU race: a concurrent AddMember / EnsureOwner slipped past
-		// the Get above. The DB's partial unique index on
-		// (user_id, tenant_id) WHERE deleted_at IS NULL caught it; map
-		// to the same sentinel the in-service check would have returned
-		// so callers get a clean 409 instead of an opaque 500.
-		if isDuplicateMembership(err) {
-			return nil, ErrMembershipAlreadyExists
-		}
+	member, err := s.insertMembershipRow(ctx, s.repo, userID, tenantID, role, invitedBy)
+	if err != nil {
 		return nil, err
 	}
 	s.emitAudit(ctx, &types.AuditLog{
@@ -201,6 +219,53 @@ func (s *tenantMemberService) AddMember(
 		TargetUserID: userID,
 		Outcome:      types.AuditOutcomeSuccess,
 	})
+	return member, nil
+}
+
+// AddMemberTx is the transaction-scoped variant of AddMember: the
+// membership row and its rbac.member_added audit are written on tx so
+// invitation acceptance (#21) can commit the flip, the insert and both
+// audits as one unit. The audit error propagates — inside a transaction
+// a dropped audit must roll the row back, not the other way around.
+func (s *tenantMemberService) AddMemberTx(
+	ctx context.Context,
+	tx *gorm.DB,
+	userID string,
+	tenantID uint64,
+	role types.TenantRole,
+	invitedBy *string,
+) (*types.TenantMember, error) {
+	if !role.IsValid() {
+		return nil, ErrInvalidTenantRole
+	}
+	if err := rejectAPIKeyOwnerAssignment(ctx, role); err != nil {
+		return nil, err
+	}
+	txRepo := s.repo.WithTx(tx)
+	existing, err := txRepo.Get(ctx, userID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, ErrMembershipAlreadyExists
+	}
+	member, err := s.insertMembershipRow(ctx, txRepo, userID, tenantID, role, invitedBy)
+	if err != nil {
+		return nil, err
+	}
+	if s.audit != nil {
+		if err := s.audit.LogTx(ctx, tx, &types.AuditLog{
+			TenantID:     tenantID,
+			ActorUserID:  auditActor(ctx),
+			ActorRole:    auditActorRole(ctx),
+			Action:       types.AuditActionMemberAdded,
+			TargetType:   "tenant_member",
+			TargetUserID: userID,
+			Outcome:      types.AuditOutcomeSuccess,
+		}); err != nil {
+			return nil, err
+		}
+	}
 	return member, nil
 }
 

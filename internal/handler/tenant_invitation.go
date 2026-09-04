@@ -379,6 +379,10 @@ func (h *TenantInvitationHandler) autoAcceptInvitationAndRespond(
 	role types.TenantRole,
 	invitedBy *string,
 ) {
+	// #21: the teaching model materialises invitation joins as students
+	// only. The creation guard already forces viewer; clamping here makes
+	// the boundary self-contained instead of trusting every caller.
+	role = types.TenantRoleViewer
 	member, err := h.memberService.AddMember(ctx, user.ID, tenantID, role, invitedBy)
 	if err != nil {
 		writeAddMemberError(c, ctx, user, tenantID, err)

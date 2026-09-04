@@ -8,6 +8,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"gorm.io/gorm"
 )
 
 // fakeMemberService is a hand-rolled stand-in for
@@ -140,6 +141,14 @@ func (f *fakeMemberService) RemoveMember(ctx context.Context, userID string, ten
 }
 func (f *fakeMemberService) MemberUsageStats(context.Context, uint64) ([]types.TenantMemberUsageStat, error) {
 	return nil, nil
+}
+
+// AddMemberTx mirrors AddMember; the fake has no real transactions.
+func (f *fakeMemberService) AddMemberTx(
+	ctx context.Context, _ *gorm.DB, userID string, tenantID uint64,
+	role types.TenantRole, invitedBy *string,
+) (*types.TenantMember, error) {
+	return f.AddMember(ctx, userID, tenantID, role, invitedBy)
 }
 
 var _ interfaces.TenantMemberService = (*fakeMemberService)(nil)

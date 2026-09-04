@@ -15,6 +15,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"gorm.io/gorm"
 )
 
 // Sentinel errors returned by tenantInvitationService. Callers compare
@@ -85,6 +86,10 @@ func invitationTTL() time.Duration {
 
 // tenantInvitationService implements interfaces.TenantInvitationService.
 type tenantInvitationService struct {
+	// db is the application database handle, used to open the acceptance
+	// transaction. Nil is tolerated in unit tests whose doubles carry no
+	// gorm handle (see runInTx).
+	db *gorm.DB
 	repo      interfaces.TenantInvitationRepository
 	memberSvc interfaces.TenantMemberService
 	audit     interfaces.AuditLogService // optional; nil ⇒ no audit, business ops still succeed
@@ -94,18 +99,42 @@ type tenantInvitationService struct {
 // NewTenantInvitationService wires the dependencies. memberSvc is
 // required (Accept must create the tenant_members row); audit is
 // optional and matches the same nil-safe pattern tenantMemberService
-// uses.
+// uses. db opens the acceptance transaction; nil keeps the unit-test
+// doubles working unchanged.
 func NewTenantInvitationService(
+	db *gorm.DB,
 	repo interfaces.TenantInvitationRepository,
 	memberSvc interfaces.TenantMemberService,
 	audit interfaces.AuditLogService,
 ) interfaces.TenantInvitationService {
 	return &tenantInvitationService{
+		db:        db,
 		repo:      repo,
 		memberSvc: memberSvc,
 		audit:     audit,
 		now:       time.Now,
 	}
+}
+
+// runInTx executes fn on a database transaction when the service carries
+// a db handle. Unit tests wiring in-memory doubles pass db=nil; their
+// WithTx implementations return themselves for a nil tx, so the flow runs
+// unbatched exactly as before. Production always has a handle.
+func (s *tenantInvitationService) runInTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
+	if s.db == nil {
+		return fn(nil)
+	}
+	return s.db.WithContext(ctx).Transaction(fn)
+}
+
+// emitAuditTx writes an audit entry on tx (the acceptance transaction) so
+// the permission change and its trail commit or roll back together. When
+// audit is unwired the flow stays nil-safe.
+func (s *tenantInvitationService) emitAuditTx(ctx context.Context, tx *gorm.DB, entry *types.AuditLog) error {
+	if s.audit == nil {
+		return nil
+	}
+	return s.audit.LogTx(ctx, tx, entry)
 }
 
 // emitAudit is the best-effort audit hook; mirrors tenantMemberService.
@@ -196,17 +225,17 @@ func (s *tenantInvitationService) Create(
 	return inv, nil
 }
 
-// Accept transitions a pending invitation into accepted AND creates
-// the active tenant_members row in the same flow. We do NOT wrap both
-// writes in a single DB transaction because TenantMemberService.AddMember
-// owns its own write + audit emit and reaching across services here
-// would force the audit-log writes to commit/rollback in lockstep.
-// Instead, we order operations so the user-visible failure mode is
-// "you couldn't accept the invitation"; if the membership insert fails
-// AFTER the invitation transition committed (rare; collision on the
-// tenant_members unique index would be the only realistic case), the
-// row already in tenant_members wins and a subsequent Accept call sees
-// ErrInvitationNotPending which the handler renders as 409.
+// Accept transitions a pending invitation into accepted AND creates the
+// active tenant_members row inside a single database transaction, together
+// with the rbac.member_added and rbac.invitation_accepted audit rows: any
+// failure rolls the flip, the membership and both audits back, so a retry
+// starts from a clean pending state (#21).
+//
+// The persisted invitation role is never trusted at this boundary — a
+// pre-upgrade pending row may still carry admin/contributor — so the
+// membership is always materialised as viewer (the teaching "student"
+// relationship). An invitee who is already an active member keeps their
+// existing membership untouched (no downgrade, no duplicate audit).
 func (s *tenantInvitationService) Accept(
 	ctx context.Context,
 	invID uint64,
@@ -234,37 +263,47 @@ func (s *tenantInvitationService) Accept(
 		return nil, ErrInvitationExpired
 	}
 
-	now := s.now()
-	if err := s.repo.MarkStatusIfPending(ctx, invID, types.TenantInvitationStatusAccepted, now); err != nil {
-		// Another goroutine (concurrent click) won the race. Honour
-		// the state machine.
-		return nil, ErrInvitationNotPending
-	}
+	// #21: invitation acceptance materialises viewer (student) only.
+	memberRole := types.TenantRoleViewer
 
-	// Create the actual tenant_members row. Cross-service hop: the
-	// member service handles its own audit (rbac.member_added) and
-	// also enforces the (user, tenant) uniqueness invariant via the
-	// repo. If it fails here the invitation is already accepted —
-	// see comment above for why we don't rollback the invitation.
-	member, err := s.memberSvc.AddMember(ctx, inv.InviteeUserID, inv.TenantID, inv.Role, inv.InvitedBy)
-	if err != nil {
-		// Special-case "already a member": that's the idempotent
-		// outcome we want. Return the existing membership instead of
-		// bubbling the error up to the invitee.
-		if errors.Is(err, ErrMembershipAlreadyExists) {
-			existing, getErr := s.memberSvc.GetMembership(ctx, inv.InviteeUserID, inv.TenantID)
-			if getErr == nil && existing != nil {
-				s.emitInvitationAccepted(ctx, inv)
-				return existing, nil
-			}
+	now := s.now()
+	var member *types.TenantMember
+	err = s.runInTx(ctx, func(tx *gorm.DB) error {
+		if err := s.repo.WithTx(tx).MarkStatusIfPending(ctx, invID, types.TenantInvitationStatusAccepted, now); err != nil {
+			// Another goroutine (concurrent click) won the race. Honour
+			// the state machine.
+			return ErrInvitationNotPending
 		}
-		logger.Errorf(ctx,
-			"invitation %d accepted but tenant_members insert failed: %v",
-			invID, err)
+
+		m, err := s.memberSvc.AddMemberTx(ctx, tx, inv.InviteeUserID, inv.TenantID, memberRole, inv.InvitedBy)
+		if err != nil {
+			// "Already a member" is the idempotent outcome: keep the
+			// flip and the accepted audit, return the existing
+			// membership instead of bubbling the error up. The
+			// membership itself is never rewritten, so an elevated
+			// pre-existing role cannot be clobbered here.
+			if errors.Is(err, ErrMembershipAlreadyExists) {
+				existing, getErr := s.memberSvc.GetMembership(ctx, inv.InviteeUserID, inv.TenantID)
+				if getErr == nil && existing != nil {
+					member = existing
+					return s.emitInvitationAcceptedTx(ctx, tx, inv, memberRole)
+				}
+			}
+			return err
+		}
+		member = m
+		return s.emitInvitationAcceptedTx(ctx, tx, inv, memberRole)
+	})
+	if err != nil {
+		// The transaction rolled back: invitation still pending, no
+		// membership, no audits — a retry is safe.
+		if !errors.Is(err, ErrInvitationNotPending) {
+			logger.Errorf(ctx,
+				"invitation %d accept failed (rolled back): %v",
+				invID, err)
+		}
 		return nil, err
 	}
-
-	s.emitInvitationAccepted(ctx, inv)
 	return member, nil
 }
 
@@ -287,11 +326,18 @@ func (s *tenantInvitationService) MarkPendingAcceptedIfExists(
 	return s.repo.MarkStatusIfPending(ctx, inv.ID, types.TenantInvitationStatusAccepted, s.now())
 }
 
-// emitInvitationAccepted writes the rbac.invitation_accepted audit row.
-// Actor is the invitee (acting on their own inbox); target is the same
-// user since the action is self-directed.
-func (s *tenantInvitationService) emitInvitationAccepted(ctx context.Context, inv *types.TenantInvitation) {
-	s.emitAudit(ctx, &types.AuditLog{
+// emitInvitationAcceptedTx writes the rbac.invitation_accepted audit row
+// on tx. Actor is the invitee (acting on their own inbox); target is the
+// same user since the action is self-directed. role is the role the
+// acceptance actually materialised (viewer in the teaching model), which
+// is what the audit must record.
+func (s *tenantInvitationService) emitInvitationAcceptedTx(
+	ctx context.Context,
+	tx *gorm.DB,
+	inv *types.TenantInvitation,
+	role types.TenantRole,
+) error {
+	return s.emitAuditTx(ctx, tx, &types.AuditLog{
 		TenantID:     inv.TenantID,
 		ActorUserID:  auditActor(ctx),
 		ActorRole:    auditActorRole(ctx),
@@ -300,7 +346,7 @@ func (s *tenantInvitationService) emitInvitationAccepted(ctx context.Context, in
 		TargetID:     strconv.FormatUint(inv.ID, 10),
 		TargetUserID: inv.InviteeUserID,
 		Outcome:      types.AuditOutcomeSuccess,
-		Details:      detailsFor(inv.ID, inv.Role),
+		Details:      detailsFor(inv.ID, role),
 	})
 }
 
@@ -581,11 +627,13 @@ func (s *tenantInvitationService) LookupByToken(
 	return inv, nil
 }
 
-// AcceptByToken adds newUserID to the share-link's tenant + role.
-// Unlike Accept, the invitation row itself is NOT mutated — share-link
-// rows stay pending across uses. Idempotent: an existing membership
-// is returned untouched (callers shouldn't see role downgrade just
-// because they clicked the same link twice from different devices).
+// AcceptByToken adds newUserID to the share-link's tenant. Unlike Accept,
+// the invitation row itself is NOT mutated — share-link rows stay pending
+// across uses. The membership insert and its audits run in one transaction
+// (#21): the persisted link role is never trusted, so the membership is
+// always materialised as viewer (student). Idempotent: an existing
+// membership is returned untouched (no downgrade, no duplicate audit, no
+// second usage bump).
 func (s *tenantInvitationService) AcceptByToken(
 	ctx context.Context,
 	plainToken string,
@@ -598,38 +646,47 @@ func (s *tenantInvitationService) AcceptByToken(
 	if err != nil {
 		return nil, err
 	}
-	member, err := s.memberSvc.AddMember(ctx, newUserID, inv.TenantID, inv.Role, inv.InvitedBy)
-	if err != nil {
-		if errors.Is(err, ErrMembershipAlreadyExists) {
-			existing, getErr := s.memberSvc.GetMembership(ctx, newUserID, inv.TenantID)
-			if getErr == nil && existing != nil {
-				return existing, nil
+	// #21: share-link acceptance materialises viewer (student) only.
+	memberRole := types.TenantRoleViewer
+
+	var member *types.TenantMember
+	fresh := false
+	err = s.runInTx(ctx, func(tx *gorm.DB) error {
+		m, err := s.memberSvc.AddMemberTx(ctx, tx, newUserID, inv.TenantID, memberRole, inv.InvitedBy)
+		if err != nil {
+			if errors.Is(err, ErrMembershipAlreadyExists) {
+				// Repeat click of the same link: return the existing
+				// membership unchanged and skip the usage counter and
+				// the accepted audit (already written on first use).
+				existing, getErr := s.memberSvc.GetMembership(ctx, newUserID, inv.TenantID)
+				if getErr == nil && existing != nil {
+					member = existing
+					return nil
+				}
 			}
+			return err
 		}
+		member = m
+		fresh = true
+		return s.emitInvitationAcceptedTx(ctx, tx, inv, memberRole)
+	})
+	if err != nil {
+		// Rolled back: no membership, no audit — a retry is safe.
 		logger.Errorf(ctx,
-			"share-link %d accept failed for user %s: %v",
+			"share-link %d accept failed for user %s (rolled back): %v",
 			inv.ID, newUserID, err)
 		return nil, err
 	}
 	// Bump usage counter so the management UI can show "N 人已加入".
-	// Best-effort: a failure here doesn't undo the membership the user
-	// just earned — log and move on. The counter is for display only;
-	// audit log + tenant_members rows are the authoritative trail.
-	if incErr := s.repo.IncrementAcceptedCount(ctx, inv.ID); incErr != nil {
-		logger.Warnf(ctx,
-			"share-link %d accepted_count bump failed (membership still created): %v",
-			inv.ID, incErr)
+	// Best-effort and outside the acceptance transaction: the counter is
+	// for display only; audit log + tenant_members rows are the
+	// authoritative trail. Only fresh joins bump the count.
+	if fresh {
+		if incErr := s.repo.IncrementAcceptedCount(ctx, inv.ID); incErr != nil {
+			logger.Warnf(ctx,
+				"share-link %d accepted_count bump failed (membership still created): %v",
+				inv.ID, incErr)
+		}
 	}
-	s.emitAudit(ctx, &types.AuditLog{
-		TenantID:     inv.TenantID,
-		ActorUserID:  auditActor(ctx),
-		ActorRole:    auditActorRole(ctx),
-		Action:       types.AuditActionInvitationAccepted,
-		TargetType:   "tenant_invitation",
-		TargetID:     strconv.FormatUint(inv.ID, 10),
-		TargetUserID: newUserID,
-		Outcome:      types.AuditOutcomeSuccess,
-		Details:      detailsFor(inv.ID, inv.Role),
-	})
 	return member, nil
 }

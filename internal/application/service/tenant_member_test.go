@@ -254,6 +254,13 @@ func (r *fakeTenantMemberRepo) MemberUsageStats(context.Context, uint64) ([]type
 	return nil, nil
 }
 
+// WithTx is the transaction seam: the in-memory fake has no real
+// transactions, so it returns itself regardless of tx (nil in unit tests
+// without a gorm handle).
+func (r *fakeTenantMemberRepo) WithTx(_ *gorm.DB) interfaces.TenantMemberRepository {
+	return r
+}
+
 // Compile-time guard so the test stays in sync with the interface.
 var _ interfaces.TenantMemberRepository = (*fakeTenantMemberRepo)(nil)
 

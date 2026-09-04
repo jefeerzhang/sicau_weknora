@@ -25,7 +25,7 @@ func newTeachingHandlerFixture(t *testing.T) (*SystemHandler, *gorm.DB) {
 		t.Fatalf("sqlite: %v", err)
 	}
 	if err := db.AutoMigrate(
-		&types.Tenant{}, &types.User{}, &types.TenantMember{}, &types.WorkspaceOwnershipAnomaly{}, &types.AuditLog{},
+		&types.Tenant{}, &types.User{}, &types.TenantMember{}, &types.TenantInvitation{}, &types.WorkspaceOwnershipAnomaly{}, &types.AuditLog{},
 	); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

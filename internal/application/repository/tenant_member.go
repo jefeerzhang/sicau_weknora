@@ -36,6 +36,17 @@ func NewTenantMemberRepository(db *gorm.DB) interfaces.TenantMemberRepository {
 	return &tenantMemberRepository{db: db}
 }
 
+// WithTx returns a view of this repository bound to tx so membership
+// writes and their audits execute inside the caller's transaction. A nil
+// tx keeps the repository's own connection (unit-test doubles rely on
+// the same fallback).
+func (r *tenantMemberRepository) WithTx(tx *gorm.DB) interfaces.TenantMemberRepository {
+	if tx == nil {
+		return r
+	}
+	return &tenantMemberRepository{db: tx}
+}
+
 // Create inserts a new active membership row. Status defaults to
 // TenantMemberStatusActive when the caller leaves it blank, and JoinedAt
 // defaults to the current time, matching service-layer expectations.

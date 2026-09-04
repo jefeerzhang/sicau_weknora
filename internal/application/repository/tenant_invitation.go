@@ -27,6 +27,17 @@ func NewTenantInvitationRepository(db *gorm.DB) interfaces.TenantInvitationRepos
 	return &tenantInvitationRepository{db: db}
 }
 
+// WithTx returns a view of this repository bound to tx so the invitation
+// state machine and its audits execute inside the caller's transaction.
+// A nil tx keeps the repository's own connection (unit-test doubles rely
+// on the same fallback).
+func (r *tenantInvitationRepository) WithTx(tx *gorm.DB) interfaces.TenantInvitationRepository {
+	if tx == nil {
+		return r
+	}
+	return &tenantInvitationRepository{db: tx}
+}
+
 // Create inserts a new pending invitation row. The partial unique
 // index on (tenant_id, invitee_user_id) WHERE status='pending' is the
 // authoritative guard against duplicates, but we ALSO pre-check via

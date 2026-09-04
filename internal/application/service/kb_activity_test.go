@@ -8,6 +8,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type captureKBActivityAudit struct {
@@ -17,6 +18,10 @@ type captureKBActivityAudit struct {
 func (c *captureKBActivityAudit) Log(_ context.Context, entry *types.AuditLog) error {
 	c.entry = entry
 	return nil
+}
+
+func (c *captureKBActivityAudit) LogTx(_ context.Context, _ *gorm.DB, entry *types.AuditLog) error {
+	return c.Log(context.Background(), entry)
 }
 
 func (*captureKBActivityAudit) LogDenied(context.Context, *gin.Context, uint64, string, string, types.TenantRole) error {

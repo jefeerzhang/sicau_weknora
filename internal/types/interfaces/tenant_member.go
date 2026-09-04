@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Tencent/WeKnora/internal/types"
+	"gorm.io/gorm"
 )
 
 // TenantMemberRepository persists (user, tenant) membership rows that
@@ -13,6 +14,13 @@ import (
 // docstring explicitly says otherwise. Soft deletion is handled by GORM
 // via the DeletedAt field on TenantMember.
 type TenantMemberRepository interface {
+	// WithTx returns a view of this repository whose every call executes
+	// on tx — the caller's database transaction. It is the seam that lets
+	// a membership insert and its success audit commit or roll back as one
+	// unit. A nil tx falls back to the repository's own connection
+	// (unit-test doubles return themselves).
+	WithTx(tx *gorm.DB) TenantMemberRepository
+
 	// Create inserts a new active membership row. Caller is responsible
 	// for ensuring no other active row exists for the same (user, tenant)
 	// pair; the partial unique index will return a conflict error otherwise.

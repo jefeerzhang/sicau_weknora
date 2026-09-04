@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Tencent/WeKnora/internal/types"
+	"gorm.io/gorm"
 )
 
 // TenantMemberService is the business-logic layer over TenantMemberRepository.
@@ -15,6 +16,14 @@ type TenantMemberService interface {
 	// AddMember inserts a new active membership row. Returns an error if
 	// (user, tenant) already has an active membership.
 	AddMember(ctx context.Context, userID string, tenantID uint64, role types.TenantRole, invitedBy *string) (*types.TenantMember, error)
+
+	// AddMemberTx is the transaction-scoped variant of AddMember: the
+	// membership row and its rbac.member_added audit are written on tx —
+	// the caller's database transaction — so they commit or roll back
+	// together. Same sentinel contract as AddMember
+	// (ErrMembershipAlreadyExists on an active duplicate). Callers that
+	// have no transaction use AddMember.
+	AddMemberTx(ctx context.Context, tx *gorm.DB, userID string, tenantID uint64, role types.TenantRole, invitedBy *string) (*types.TenantMember, error)
 
 	// EnsureOwner is an idempotent helper used by the registration flow:
 	// if the user already has an active membership in the tenant, return
