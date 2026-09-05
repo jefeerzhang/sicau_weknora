@@ -99,3 +99,22 @@ test('creatChat.vue wires the shared empty-state shell', () => {
   assert.match(source, /suggested-questions-container/)
   assert.match(source, /<InputField\b/)
 })
+
+test('empty-state layout stylesheet owns centering contract', () => {
+  const lessPath = join(here, 'newConversationEmptyState.less')
+  const less = readFileSync(lessPath, 'utf8')
+  assert.match(less, /\.dialogue-wrap\s*\{[^}]*flex:\s*1/s)
+  assert.match(less, /\.dialogue-wrap\s*\{[^}]*display:\s*flex/s)
+  assert.match(less, /\.dialogue-wrap\s*\{[^}]*justify-content:\s*center/s)
+  assert.match(less, /\.dialogue-wrap\s*\{[^}]*align-items:\s*center/s)
+  assert.match(less, /\.dialogue-answers\s*\{/s)
+  assert.match(less, /\.dialogue-title\s*\{/s)
+})
+
+test('creatChat.vue does not reintroduce broken :deep dialogue-wrap layout', () => {
+  const source = readFileSync(join(here, 'creatChat.vue'), 'utf8')
+  assert.doesNotMatch(source, /:deep\(\s*\.dialogue-wrap\s*\)/)
+  assert.doesNotMatch(source, /:deep\(\s*\.dialogue-answers\s*\)/)
+  assert.doesNotMatch(source, /:deep\(\s*\.dialogue-title\s*\)/)
+  assert.match(source, /newConversationEmptyState\.less/)
+})
