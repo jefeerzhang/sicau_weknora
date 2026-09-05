@@ -52,11 +52,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    # #24: the teaching data migration fails startup closed; the restart
-    # policy makes the next boot retry until the schema/data is repaired
-    # (compose has no default restart policy — without this a blocked
-    # startup would leave the container permanently Exited).
-    restart: unless-stopped
     # Source .env so deployment-specific variables (e.g. those referenced by
     # config/builtin_models.yaml via ${ENV}, or any future feature) reach the
     # app container without having to be enumerated under `environment:`.
