@@ -36,10 +36,6 @@ func (s *tenantPolicySettingService) GetBool(context.Context, string, string, bo
 	return s.enabled
 }
 
-func (s *tenantPolicySettingService) GetString(_ context.Context, _ string, _ string, def string) string {
-	return def
-}
-
 func (s *tenantPolicySettingService) GetInt(_ context.Context, _ string, _ string, def int64) int64 {
 	return def
 }
@@ -125,6 +121,69 @@ func TestCreateTenantAllowsCrossTenantSuperuserWhenSelfServiceDisabled(t *testin
 	}
 }
 
+func TestCreateTenantAllowsTeacherWhenSelfServiceEnabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tenants := &tenantPolicyTenantService{}
+	on := true
+	h := &TenantHandler{
+		service: tenants,
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:        "teacher-1",
+			TenantID:  1, // already has a home tenant; skip default-tenant UpdateUser
+			IsTeacher: true,
+		}},
+		config: &config.Config{Tenant: &config.TenantConfig{
+			SelfServiceCreationEnabled: &on,
+		}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: true},
+	}
+	r := gin.New()
+	r.Use(tenantPolicyErrorCapture())
+	r.POST("/tenants", h.CreateTenant)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tenants", bytes.NewBufferString(`{"name":"course-a"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if tenants.createCalls != 1 {
+		t.Fatalf("CreateTenant called %d times, want 1", tenants.createCalls)
+	}
+}
+
+func TestCreateTenantRejectsNonTeacherWhenSelfServiceEnabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tenants := &tenantPolicyTenantService{}
+	on := true
+	h := &TenantHandler{
+		service: tenants,
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:        "student-1",
+			IsTeacher: false,
+		}},
+		config: &config.Config{Tenant: &config.TenantConfig{
+			SelfServiceCreationEnabled: &on,
+		}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: true},
+	}
+	r := gin.New()
+	r.Use(tenantPolicyErrorCapture())
+	r.POST("/tenants", h.CreateTenant)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tenants", bytes.NewBufferString(`{"name":"blocked"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if tenants.createCalls != 0 {
+		t.Fatalf("CreateTenant called %d times, want 0", tenants.createCalls)
+	}
+}
+
 func TestAuthMeProjectsTenantCreationCapability(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := &AuthHandler{
@@ -146,5 +205,258 @@ func TestAuthMeProjectsTenantCreationCapability(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), `"can_create_tenant":false`) {
 		t.Fatalf("response missing capability: %s", w.Body.String())
+	}
+}
+
+func TestAuthMeTeacherCanCreateTenantWhenSelfServiceOn(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	on := true
+	h := &AuthHandler{
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:        "teacher-me",
+			Username:  "teacher",
+			Email:     "teacher@example.com",
+			IsTeacher: true,
+		}},
+		configInfo: &config.Config{Tenant: &config.TenantConfig{
+			SelfServiceCreationEnabled: &on,
+		}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: true},
+	}
+	r := gin.New()
+	r.GET("/auth/me", h.GetCurrentUser)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/auth/me", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"can_create_tenant":true`) {
+		t.Fatalf("teacher should be able to create tenant: %s", w.Body.String())
+	}
+}
+
+// #13: the composite SuperAdmin must be able to create its own workspace
+// without a separate teacher appointment, even when public self-service
+// creation is disabled (the teaching default).
+func TestCreateTenantAllowsSuperAdminWhenSelfServiceDisabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tenants := &tenantPolicyTenantService{}
+	h := &TenantHandler{
+		service: tenants,
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:            "sa-1",
+			TenantID:      1, // composite SuperAdmin is tenantless at bootstrap; pre-set home to skip UpdateUser
+			IsSystemAdmin: true,
+		}},
+		config:           &config.Config{Tenant: &config.TenantConfig{}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: false},
+	}
+	r := gin.New()
+	r.Use(tenantPolicyErrorCapture())
+	r.POST("/tenants", h.CreateTenant)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tenants", bytes.NewBufferString(`{"name":"sa-space"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if tenants.createCalls != 1 {
+		t.Fatalf("CreateTenant called %d times, want 1", tenants.createCalls)
+	}
+}
+
+func TestCreateTenantAllowsSuperAdminWhenSelfServiceEnabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tenants := &tenantPolicyTenantService{}
+	on := true
+	h := &TenantHandler{
+		service: tenants,
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:            "sa-1",
+			TenantID:      1,
+			IsSystemAdmin: true,
+		}},
+		config: &config.Config{Tenant: &config.TenantConfig{
+			SelfServiceCreationEnabled: &on,
+		}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: true},
+	}
+	r := gin.New()
+	r.Use(tenantPolicyErrorCapture())
+	r.POST("/tenants", h.CreateTenant)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tenants", bytes.NewBufferString(`{"name":"sa-space"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if tenants.createCalls != 1 {
+		t.Fatalf("CreateTenant called %d times, want 1", tenants.createCalls)
+	}
+}
+
+// #13: /auth/me must advertise the SuperAdmin's inherited teacher
+// capability regardless of the self-service flag, so the workspace-creation
+// entry stays consistent with the backend gate.
+func TestAuthMeSuperAdminCanCreateTenant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &AuthHandler{
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:            "sa-1",
+			Username:      "sa",
+			Email:         "sa@example.com",
+			IsSystemAdmin: true,
+		}},
+		configInfo:       &config.Config{Tenant: &config.TenantConfig{}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: false},
+	}
+	r := gin.New()
+	r.GET("/auth/me", h.GetCurrentUser)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/auth/me", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	// CONTEXT.md "用户身份标签": /auth/me must project the unified platform
+	// identity so the user info page can render it. A composite SuperAdmin is
+	// classified as superadmin even without a teacher appointment.
+	if !strings.Contains(w.Body.String(), `"platform_identity":"superadmin"`) {
+		t.Fatalf("superadmin platform_identity missing: %s", w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"can_create_tenant":true`) {
+		t.Fatalf("superadmin should be able to create tenant: %s", w.Body.String())
+	}
+}
+
+// Platform identity projection is deterministic for the other two identities:
+// an appointed teacher is classified as teacher; a plain account is student.
+// This locks the "用户身份标签" self-visible on the user info page.
+func TestAuthMePlatformIdentityProjection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cases := []struct {
+		name string
+		user *types.User
+		want string
+	}{
+		{"appointed teacher", &types.User{ID: "u", Username: "t", Email: "t@example.com", IsTeacher: true}, "teacher"},
+		{"default student", &types.User{ID: "u", Username: "s", Email: "s@example.com"}, "student"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := &AuthHandler{
+				userService:      &tenantPolicyUserService{user: tc.user},
+				configInfo:       &config.Config{Tenant: &config.TenantConfig{}},
+				systemSettingSvc: &tenantPolicySettingService{enabled: false},
+			}
+			r := gin.New()
+			r.GET("/auth/me", h.GetCurrentUser)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/auth/me", nil))
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+			needle := `"platform_identity":"` + tc.want + `"`
+			if !strings.Contains(w.Body.String(), needle) {
+				t.Fatalf("platform_identity=%s missing: %s", tc.want, w.Body.String())
+			}
+		})
+	}
+}
+
+// #14: an API-key platform principal must be able to create a tenant even if
+// the underlying user row carries no teacher/admin flags, and /auth/me must
+// advertise that so the frontend capability never disagrees with the backend
+// gate in CreateTenant (catalogManager || HasTeacherCapability).
+func TestAuthMePlatformCallerCanCreateTenant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &AuthHandler{
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:       "platform-caller",
+			Username: "platform",
+			Email:    "platform@example.com",
+			// deliberately no CanAccessAllTenants / IsTeacher / IsSystemAdmin
+		}},
+		configInfo:       &config.Config{Tenant: &config.TenantConfig{}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: false},
+	}
+	r := gin.New()
+	r.GET("/auth/me", h.GetCurrentUser)
+
+	// Inject a platform API-key scope into the request context, the same way
+	// the API-key middleware populates it for platform-scoped calls.
+	ctx := types.WithTenantAPIKeyScope(context.Background(), types.TenantAPIKeyScope{
+		ScopeType: types.APIKeyScopePlatform,
+	})
+	w := httptest.NewRecorder()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/auth/me", nil)
+	if err != nil {
+		t.Fatalf("failed to build request: %v", err)
+	}
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"can_create_tenant":true`) {
+		t.Fatalf("platform caller should be able to create tenant: %s", w.Body.String())
+	}
+}
+
+// recordEnsureOwner is a minimal TenantMemberService stub that records the
+// EnsureOwner call so we can assert the composite SuperAdmin becomes the
+// Owner of the workspace it just created (#13 AC1/AC3).
+type recordEnsureOwner struct {
+	interfaces.TenantMemberService
+	userID   string
+	tenantID uint64
+	calls    int
+}
+
+func (m *recordEnsureOwner) EnsureOwner(_ context.Context, userID string, tenantID uint64) (*types.TenantMember, error) {
+	m.userID = userID
+	m.tenantID = tenantID
+	m.calls++
+	return nil, nil
+}
+
+func (m *recordEnsureOwner) ListByUser(_ context.Context, _ string) ([]*types.TenantMember, error) {
+	return nil, nil
+}
+
+func TestCreateTenantSuperAdminBecomesOwner(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tenants := &tenantPolicyTenantService{}
+	ms := &recordEnsureOwner{}
+	h := &TenantHandler{
+		service:       tenants,
+		memberService: ms,
+		userService: &tenantPolicyUserService{user: &types.User{
+			ID:            "sa-1",
+			TenantID:      1,
+			IsSystemAdmin: true,
+		}},
+		config:           &config.Config{Tenant: &config.TenantConfig{}},
+		systemSettingSvc: &tenantPolicySettingService{enabled: false},
+	}
+	r := gin.New()
+	r.Use(tenantPolicyErrorCapture())
+	r.POST("/tenants", h.CreateTenant)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tenants", bytes.NewBufferString(`{"name":"sa-space"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if ms.calls != 1 || ms.userID != "sa-1" || ms.tenantID != 99 {
+		t.Fatalf("EnsureOwner not called once for SuperAdmin on tenant 99: userID=%q tenant=%d calls=%d", ms.userID, ms.tenantID, ms.calls)
 	}
 }

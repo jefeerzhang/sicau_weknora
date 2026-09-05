@@ -117,6 +117,10 @@ const (
 	// TenantID=0 because the change is system-scope.
 	AuditActionSystemAdminRevoked AuditAction = "system.admin_revoked"
 
+	// Teacher appointment actions (platform identity, TenantID=0).
+	AuditActionTeacherAppointed AuditAction = "system.teacher_appointed"
+	AuditActionTeacherRevoked   AuditAction = "system.teacher_revoked"
+
 	// AuditActionSystemUserPasswordReset fires when a SystemAdmin replaces
 	// another user's local password. Details identify the target and record
 	// session revocation, but never contain the old or new password.
