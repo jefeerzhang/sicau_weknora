@@ -67,6 +67,10 @@ type SystemHandler struct {
 	// teachingMigrator runs #18/#19 membership demotion and ownership recovery.
 	// Optional — nil when dig wiring is incomplete in unit tests.
 	teachingMigrator *service.TeachingRoleMigrator
+	// teachingPhase is the shared startup/manual-retry teaching migration
+	// phase (#24/#25): same schema pre-check and success semantics for
+	// both paths. Optional — nil in partially-wired unit tests.
+	teachingPhase *service.TeachingMigrationPhase
 	// startup snapshot for GET /system/capabilities; bound in router.NewRouter.
 	deploymentCapabilities DeploymentCapabilitiesData
 }
@@ -85,6 +89,7 @@ func NewSystemHandler(cfg *config.Config,
 	storageBackendRepo interfaces.StorageBackendRepository,
 	sandboxConfigSvc *service.TenantSandboxConfigService,
 	teachingMigrator *service.TeachingRoleMigrator,
+	teachingPhase *service.TeachingMigrationPhase,
 ) *SystemHandler {
 	return &SystemHandler{
 		cfg:                cfg,
@@ -100,6 +105,7 @@ func NewSystemHandler(cfg *config.Config,
 		storageBackendRepo: storageBackendRepo,
 		sandboxConfigSvc:   sandboxConfigSvc,
 		teachingMigrator:   teachingMigrator,
+		teachingPhase:      teachingPhase,
 	}
 }
 

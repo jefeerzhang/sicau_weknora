@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"errors"
 	"net/http"
 	"strconv"
@@ -11,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/Tencent/WeKnora/internal/application/service"
-	"github.com/Tencent/WeKnora/internal/database"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 )
@@ -19,34 +17,35 @@ import (
 // RunTeachingRoleMigration triggers the idempotent teaching membership
 // migrator (#18): demote admin/contributor to viewer and refresh the
 // open ownership-anomaly list. SuperAdmin only.
+//
+// The retry goes through the shared TeachingMigrationPhase (#25): the same
+// schema pre-check and success judgement as the startup path, so a missing
+// table or unique index fails the retry with an actionable error and keeps
+// the blocked state — even when there is nothing left to normalize — while
+// a successful run after a schema repair records the real audits and clears
+// the state.
 func (h *SystemHandler) RunTeachingRoleMigration(c *gin.Context) {
 	ctx := logger.CloneContext(c.Request.Context())
-	if h.teachingMigrator == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "teaching role migrator unavailable"})
+	if h.teachingPhase == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "teaching migration phase unavailable"})
 		return
 	}
-	report, err := h.teachingMigrator.Run(ctx)
+	report, err := h.teachingPhase.RunAndRecord(ctx)
 	if err != nil {
 		logger.Errorf(ctx, "RunTeachingRoleMigration: %v", err)
-		database.CacheTeachingMigrationError(err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "migration failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "teaching data migration failed; blocked state preserved",
+			"detail": err.Error(),
+		})
 		return
 	}
-	// A successful manual retry clears the blocked state recorded at
-	// startup; a partially failed run re-arms it (#22).
-	if report.Failed > 0 {
-		database.CacheTeachingMigrationError(fmt.Sprintf(
-			"teaching data migration left %d item(s) unresolved", report.Failed))
-	} else {
-		database.CacheTeachingMigrationError("")
-	}
 	h.emitAdminAudit(ctx, types.AuditActionMemberRoleChanged, nil, map[string]any{
-		"reason":               "teaching_legacy_role_migration",
-		"source":               "superadmin_trigger",
-		"downgraded":           report.Downgraded,
-		"skipped":              report.Skipped,
-		"failed":               report.Failed,
-		"anomaly_tenant_ids":   report.AnomalyTenantIDs,
+		"reason":             "teaching_legacy_role_migration",
+		"source":             "superadmin_trigger",
+		"downgraded":         report.Downgraded,
+		"skipped":            report.Skipped,
+		"failed":             report.Failed,
+		"anomaly_tenant_ids": report.AnomalyTenantIDs,
 	})
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": report})
 }

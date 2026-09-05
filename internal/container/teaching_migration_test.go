@@ -1,7 +1,6 @@
 package container
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -159,12 +158,11 @@ func TestEnsureTeachingMigrationState_MissingTablesBlockedThenRetry(t *testing.T
 	// not applied the schema yet" state. The phase must fail closed with a
 	// blocked state instead of crashing or silently succeeding.
 	dbPath := filepath.Join(t.TempDir(), "blocked.db")
-	db := runInitDatabaseWithDBPath(t, dbPath, "false")
-	defer func() {
-		if sqlDB, err := db.DB(); err == nil {
-			_ = sqlDB.Close()
-		}
-	}()
+	// #24: missing tables must propagate as a startup failure, not just a
+	// cached message on a running service.
+	if _, err := tryInitDatabaseWithDBPath(t, dbPath, "false"); err == nil {
+		t.Fatalf("missing tables must fail startup closed")
+	}
 
 	msg := database.CachedTeachingMigrationError()
 	if msg == "" {
@@ -194,6 +192,16 @@ func TestEnsureTeachingMigrationState_MissingTablesBlockedThenRetry(t *testing.T
 	if msg := database.CachedTeachingMigrationError(); msg != "" {
 		t.Fatalf("retry must clear the blocked state, got %q", msg)
 	}
+}
+
+// tryInitDatabaseWithDBPath runs initDatabase and returns the error instead
+// of failing the test — the fail-closed startup path under test (#24).
+func tryInitDatabaseWithDBPath(t *testing.T, dbPath, autoMigrate string) (*gorm.DB, error) {
+	t.Helper()
+	t.Setenv("DB_DRIVER", "sqlite")
+	t.Setenv("DB_PATH", dbPath)
+	t.Setenv("AUTO_MIGRATE", autoMigrate)
+	return initDatabase(&config.Config{})
 }
 
 // runInitDatabaseWithDBPath is runInitDatabase with an explicit pre-existing
@@ -266,27 +274,29 @@ func TestEnsureTeachingMigrationState_AuditFailureBlocksStartup(t *testing.T) {
 		_ = sqlDB.Close()
 	}
 
-	db = runInitDatabaseWithDBPath(t, dbPath, "false")
-	defer func() {
-		if sqlDB, err := db.DB(); err == nil {
-			_ = sqlDB.Close()
-		}
-	}()
+	// #24: the mid-run failure must propagate as a startup failure.
+	if _, err := tryInitDatabaseWithDBPath(t, dbPath, "false"); err == nil {
+		t.Fatalf("mid-run audit failure must fail startup closed")
+	}
 
 	if msg := database.CachedTeachingMigrationError(); msg == "" {
 		t.Fatalf("mid-run audit failure must record a blocked state")
 	}
 	// The downgrade rolled back with its audit: permissions and audit
 	// facts stay consistent even on the startup path.
-	if got := readStartupMemberRole(t, db, "u-admin"); got != types.TenantRoleAdmin {
+	probe, err := gorm.Open(sqlite.Open(dbPath+"?_journal_mode=WAL"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("reopen after failure: %v", err)
+	}
+	if got := readStartupMemberRole(t, probe, "u-admin"); got != types.TenantRoleAdmin {
 		t.Fatalf("failed downgrade must roll back to admin, got %s", got)
+	}
+	if sqlDB, err := probe.DB(); err == nil {
+		_ = sqlDB.Close()
 	}
 
 	// Operator repairs the audit table; the next startup retry completes
 	// the downgrade and clears the blocked state.
-	if sqlDB, err := db.DB(); err == nil {
-		_ = sqlDB.Close()
-	}
 	repair, err := gorm.Open(sqlite.Open(dbPath+"?_journal_mode=WAL"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("reopen for repair: %v", err)
@@ -314,84 +324,6 @@ func TestEnsureTeachingMigrationState_AuditFailureBlocksStartup(t *testing.T) {
 		t.Fatalf("retry after repair must demote the legacy admin, got %s", got)
 	}
 	assertNormalizationAudits(t, db2)
-}
-
-func TestRunTeachingDataMigration_RunnerOutcomes(t *testing.T) {
-	ctx := context.Background()
-	db := newRunnerFixtureDB(t)
-
-	// Runner reports failure → phase fails closed.
-	if err := runTeachingDataMigration(ctx, db, &stubTeachingRunner{failed: 3}); err == nil {
-		t.Fatalf("runner failure must propagate")
-	}
-	// Runner errors → phase fails closed.
-	if err := runTeachingDataMigration(ctx, db, &stubTeachingRunner{runErr: true}); err == nil {
-		t.Fatalf("runner error must propagate")
-	}
-	// Runner succeeds → phase succeeds (missing-table check passes on the
-	// fully migrated fixture).
-	if err := runTeachingDataMigration(ctx, db, &stubTeachingRunner{}); err != nil {
-		t.Fatalf("runner success must pass: %v", err)
-	}
-	if msg := database.CachedTeachingMigrationError(); msg != "" {
-		// runTeachingDataMigration itself does not cache; only
-		// ensureTeachingMigrationState does. The global state from earlier
-		// tests must not be confused with this success path.
-		t.Logf("cached state after direct run (informational): %q", msg)
-	}
-}
-
-// stubTeachingRunner injects migrator outcomes without a database.
-type stubTeachingRunner struct {
-	failed int
-	runErr bool
-}
-
-func (s *stubTeachingRunner) Run(ctx context.Context) (*types.TeachingRoleMigrationReport, error) {
-	if s.runErr {
-		return nil, os.ErrDeadlineExceeded
-	}
-	return &types.TeachingRoleMigrationReport{
-		Downgraded:         0,
-		Skipped:            0,
-		Failed:             s.failed,
-		AnomalyTenantIDs:   []uint64{},
-		InvitationsDowngraded: 0,
-	}, nil
-}
-
-// newRunnerFixtureDB provides a schema-complete sqlite handle for
-// verifyTeachingMigrationTables.
-func newRunnerFixtureDB(t *testing.T) *gorm.DB {
-	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file:runner_fixture_"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(
-		&types.Tenant{}, &types.TenantMember{}, &types.TenantInvitation{},
-		&types.WorkspaceOwnershipAnomaly{}, &types.AuditLog{},
-	); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	return db
-}
-
-func TestVerifyTeachingMigrationTables_MissingTableFailsClosed(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file:verify_tables_"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	if err := db.AutoMigrate(&types.Tenant{}, &types.TenantMember{}); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	err = verifyTeachingMigrationTables(db)
-	if err == nil {
-		t.Fatalf("missing tables must fail closed")
-	}
-	if !strings.Contains(err.Error(), "tenant_invitations") {
-		t.Fatalf("error must name the missing table, got %v", err)
-	}
 }
 
 // TestInitDatabase_TeachingPhaseAfterAutoMigration drives the full
