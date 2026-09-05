@@ -1,0 +1,275 @@
+package handler
+
+// sicau-v1 announcements: /announcements CRUD + comments + attachment
+// download. Posting is Contributor+; reads are Viewer+; deletes are
+// author-or-admin (service-enforced via role from ctx). Web JWT path only
+// (IM synthetic accounts share a user_id — notes design §7 applies here too).
+
+import (
+	"errors"
+	"mime"
+	"net/http"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
+	"github.com/Tencent/WeKnora/internal/logger"
+	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+type MeAnnouncementHandler struct {
+	service interfaces.TenantAnnouncementService
+	fileSvc interfaces.FileService
+}
+
+func NewMeAnnouncementHandler(service interfaces.TenantAnnouncementService, fileSvc interfaces.FileService) *MeAnnouncementHandler {
+	return &MeAnnouncementHandler{service: service, fileSvc: fileSvc}
+}
+
+// mapAnnouncementError converts service-layer sentinels into
+// HTTP-appropriate app errors: missing announcements/comments → 404,
+// anything else passes through for the error middleware.
+func mapAnnouncementError(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return apperrors.NewNotFoundError("announcement not found")
+	}
+	return err
+}
+
+// publicAnnouncement copies a for JSON so FileService storage paths never
+// leave the process. Download still resolves path via a fresh service.Get.
+func publicAnnouncement(a *types.Announcement) *types.Announcement {
+	if a == nil {
+		return nil
+	}
+	out := *a
+	if len(a.Attachments) == 0 {
+		out.Attachments = []types.AnnouncementAttachment{}
+		return &out
+	}
+	atts := make([]types.AnnouncementAttachment, len(a.Attachments))
+	for i, att := range a.Attachments {
+		atts[i] = types.AnnouncementAttachment{Name: att.Name, Size: att.Size}
+	}
+	out.Attachments = atts
+	return &out
+}
+
+func publicAnnouncements(items []*types.Announcement) []*types.Announcement {
+	out := make([]*types.Announcement, 0, len(items))
+	for _, a := range items {
+		out = append(out, publicAnnouncement(a))
+	}
+	return out
+}
+
+// List godoc
+// @Summary      公告列表
+// @Description  全员可读；按创建时间倒序；不含正文与留言
+// @Tags         Announcements
+// @Success      200  {object}  map[string]interface{}
+// @Security     Bearer
+// @Router       /announcements [get]
+func (h *MeAnnouncementHandler) List(c *gin.Context) {
+	items, err := h.service.List(c.Request.Context())
+	if err != nil {
+		c.Error(mapAnnouncementError(err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"announcements": publicAnnouncements(items)}})
+}
+
+// Create godoc
+// @Summary      发布公告
+// @Description  multipart：title + content + files[]（≤5 个、单个 ≤50MB、白名单类型）；Contributor+
+// @Tags         Announcements
+// @Accept       multipart/form-data
+// @Param        title    formData  string  true  "标题"
+// @Param        content  formData  string  false "正文（Markdown）"
+// @Param        files    formData  file    false "附件（可多个）"
+// @Success      201  {object}  map[string]interface{}
+// @Failure      400  {object}  apperrors.AppError
+// @Failure      403  {object}  apperrors.AppError
+// @Security     Bearer
+// @Router       /announcements [post]
+func (h *MeAnnouncementHandler) Create(c *gin.Context) {
+	title := strings.TrimSpace(c.PostForm("title"))
+	content := c.PostForm("content")
+
+	form, err := c.MultipartForm()
+	if err != nil {
+		c.Error(apperrors.NewValidationError("invalid multipart form").WithDetails(err.Error()))
+		return
+	}
+	var files []interfaces.AnnouncementUploadFile
+	if form != nil {
+		for _, fh := range form.File["files"] {
+			f, err := fh.Open()
+			if err != nil {
+				c.Error(apperrors.NewValidationError("cannot read uploaded file: " + fh.Filename))
+				return
+			}
+			// 50MB cap re-checked here: MultipartForm already parsed the
+			// body, but the per-file read is bounded explicitly.
+			data, err := readUploadFull(f, fh.Size)
+			f.Close()
+			if err != nil {
+				c.Error(apperrors.NewValidationError("cannot read uploaded file: " + fh.Filename).WithDetails(err.Error()))
+				return
+			}
+			files = append(files, interfaces.AnnouncementUploadFile{Name: filepath.Base(fh.Filename), Data: data})
+		}
+	}
+
+	announcement, err := h.service.Create(c.Request.Context(), title, content, files)
+	if err != nil {
+		c.Error(mapAnnouncementError(err))
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": publicAnnouncement(announcement)})
+}
+
+// Get godoc
+// @Summary      公告详情
+// @Description  全文 + 附件元数据 + 作者名
+// @Tags         Announcements
+// @Param        id  path  string  true  "公告 ID"
+// @Success      200  {object}  map[string]interface{}
+// @Security     Bearer
+// @Router       /announcements/{id} [get]
+func (h *MeAnnouncementHandler) Get(c *gin.Context) {
+	announcement, err := h.service.Get(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.Error(mapAnnouncementError(err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": publicAnnouncement(announcement)})
+}
+
+// Delete godoc
+// @Summary      删除公告
+// @Description  作者或 admin；连带删除附件文件与留言
+// @Tags         Announcements
+// @Param        id  path  string  true  "公告 ID"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      403  {object}  apperrors.AppError
+// @Failure      404  {object}  apperrors.AppError
+// @Security     Bearer
+// @Router       /announcements/{id} [delete]
+func (h *MeAnnouncementHandler) Delete(c *gin.Context) {
+	if err := h.service.Delete(c.Request.Context(), c.Param("id")); err != nil {
+		c.Error(mapAnnouncementError(err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// DownloadAttachment godoc
+// @Summary      下载公告附件
+// @Description  按 jsonb 数组下标取附件并流式返回；登录即可
+// @Tags         Announcements
+// @Param        id     path  string  true  "公告 ID"
+// @Param        index  path  int     true  "附件下标（0 起）"
+// @Success      200  {file}  binary
+// @Failure      404  {object}  apperrors.AppError
+// @Security     Bearer
+// @Router       /announcements/{id}/attachments/{index} [get]
+func (h *MeAnnouncementHandler) DownloadAttachment(c *gin.Context) {
+	announcement, err := h.service.Get(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.Error(mapAnnouncementError(err))
+		return
+	}
+	index, err := strconv.Atoi(c.Param("index"))
+	if err != nil {
+		c.Error(apperrors.NewValidationError("invalid attachment index"))
+		return
+	}
+	if index < 0 || index >= len(announcement.Attachments) {
+		c.Error(apperrors.NewNotFoundError("attachment not found"))
+		return
+	}
+	att := announcement.Attachments[index]
+	stream, err := h.fileSvc.GetFile(c.Request.Context(), att.Path)
+	if err != nil {
+		logger.Errorf(c.Request.Context(), "[announcements] attachment open failed: path=%s err=%v", att.Path, err)
+		c.Error(apperrors.NewNotFoundError("attachment not found"))
+		return
+	}
+	defer stream.Close()
+
+	cd := mime.FormatMediaType("attachment", map[string]string{"filename": att.Name})
+	if cd == "" {
+		cd = "attachment"
+	}
+	c.Header("Content-Disposition", cd)
+	c.DataFromReader(http.StatusOK, att.Size, "application/octet-stream", stream, nil)
+}
+
+// ListComments godoc
+// @Summary      公告留言列表
+// @Description  平铺，时间正序，含作者名
+// @Tags         Announcements
+// @Param        id  path  string  true  "公告 ID"
+// @Success      200  {object}  map[string]interface{}
+// @Security     Bearer
+// @Router       /announcements/{id}/comments [get]
+func (h *MeAnnouncementHandler) ListComments(c *gin.Context) {
+	items, err := h.service.ListComments(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.Error(mapAnnouncementError(err))
+		return
+	}
+	if items == nil {
+		items = []types.AnnouncementCommentItem{}
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"comments": items}})
+}
+
+// CreateComment godoc
+// @Summary      发表留言
+// @Description  纯文本；全员可用；公告不存在 404
+// @Tags         Announcements
+// @Accept       json
+// @Param        id      path  string  true  "公告 ID"
+// @Param        request  body  object  true  "{\"content\":\"text\"}"
+// @Success      201  {object}  map[string]interface{}
+// @Security     Bearer
+// @Router       /announcements/{id}/comments [post]
+func (h *MeAnnouncementHandler) CreateComment(c *gin.Context) {
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(apperrors.NewValidationError("invalid request body").WithDetails(err.Error()))
+		return
+	}
+	item, err := h.service.CreateComment(c.Request.Context(), c.Param("id"), req.Content)
+	if err != nil {
+		c.Error(mapAnnouncementError(err))
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": item})
+}
+
+// DeleteComment godoc
+// @Summary      删除留言
+// @Description  留言作者或 admin；他人留言与不存在的留言同样 404（不泄露存在性）
+// @Tags         Announcements
+// @Param        id   path  string  true  "公告 ID"
+// @Param        cid  path  string  true  "留言 ID"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      404  {object}  apperrors.AppError
+// @Security     Bearer
+// @Router       /announcements/{id}/comments/{cid} [delete]
+func (h *MeAnnouncementHandler) DeleteComment(c *gin.Context) {
+	if err := h.service.DeleteComment(c.Request.Context(), c.Param("id"), c.Param("cid")); err != nil {
+		c.Error(mapAnnouncementError(err))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}

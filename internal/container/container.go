@@ -305,6 +305,8 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	// authority is different in kind: it derives the identity from the context
 	// and touches only that identity's rows.
 	must(container.Provide(service.NewUserEnvService))
+	must(container.Provide(repository.NewTenantNoteRepository))
+	must(container.Provide(service.NewTenantNoteService))
 
 	// ArtifactCollector drains skill-generated files from the sandbox on
 	// each agent turn (see spec at
@@ -413,6 +415,10 @@ func BuildContainer(container *dig.Container) *dig.Container {
 		return handler.NewSandboxSkillHandler(s, streams)
 	}))
 	must(container.Provide(handler.NewMeEnvVarHandler))
+	must(container.Provide(handler.NewMeNoteHandler))
+	must(container.Provide(repository.NewTenantAnnouncementRepository))
+	must(container.Provide(service.NewTenantAnnouncementService))
+	must(container.Provide(handler.NewMeAnnouncementHandler))
 	must(container.Provide(handler.NewEvaluationHandler))
 	must(container.Provide(handler.NewInitializationHandler))
 	must(container.Provide(handler.NewAuthHandler))

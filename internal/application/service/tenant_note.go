@@ -1,0 +1,244 @@
+package service
+
+import (
+	"context"
+	"strings"
+
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
+	"github.com/Tencent/WeKnora/internal/logger"
+	"github.com/Tencent/WeKnora/internal/types"
+	"github.com/Tencent/WeKnora/internal/types/interfaces"
+)
+
+type tenantNoteService struct {
+	repo interfaces.TenantNoteRepository
+}
+
+func NewTenantNoteService(repo interfaces.TenantNoteRepository) interfaces.TenantNoteService {
+	return &tenantNoteService{repo: repo}
+}
+
+// caller resolves whose notes this call may touch. A missing principal is
+// an error rather than a default: falling back to any other identity would
+// let one member read or overwrite another's notes (notes design N-1).
+func (s *tenantNoteService) caller(ctx context.Context) (uint64, string, error) {
+	tenantID, ok := types.TenantIDFromContext(ctx)
+	if !ok || tenantID == 0 {
+		return 0, "", apperrors.NewUnauthorizedError(
+			"workspace context is required to access notes")
+	}
+	userID, ok := types.UserIDFromContext(ctx)
+	if !ok || userID == "" {
+		return 0, "", apperrors.NewUnauthorizedError(
+			"user context is required to access notes")
+	}
+	return tenantID, userID, nil
+}
+
+// List returns the caller's notes as (id, title, updated_at) items, newest
+// first. Content never leaves the list endpoint.
+func (s *tenantNoteService) List(ctx context.Context) ([]types.TenantNoteListItem, error) {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	notes, err := s.repo.ListHead(ctx, tenantID, userID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]types.TenantNoteListItem, 0, len(notes))
+	for _, n := range notes {
+		if n == nil {
+			continue
+		}
+		items = append(items, types.TenantNoteListItem{
+			ID:        n.ID,
+			Title:     deriveNoteTitle(n.Content),
+			UpdatedAt: n.UpdatedAt,
+		})
+	}
+	return items, nil
+}
+
+func (s *tenantNoteService) Create(ctx context.Context, content string) (types.TenantNote, error) {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return types.TenantNote{}, err
+	}
+	if err := validateNoteContent(content); err != nil {
+		return types.TenantNote{}, err
+	}
+	note := types.TenantNote{
+		TenantID: tenantID,
+		UserID:   userID,
+		Content:  content,
+	}
+	if err := s.repo.CreateWithLimit(ctx, tenantID, userID, &note); err != nil {
+		return types.TenantNote{}, err
+	}
+	logger.Infof(ctx, "[notes] created note %s for user %s tenant %d", note.ID, userID, tenantID)
+	return note, nil
+}
+
+func (s *tenantNoteService) Get(ctx context.Context, noteID string) (*types.TenantNote, error) {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetByID(ctx, tenantID, userID, noteID)
+}
+
+func (s *tenantNoteService) Update(ctx context.Context, noteID string, content string) error {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return err
+	}
+	if err := validateNoteContent(content); err != nil {
+		return err
+	}
+	old, err := s.repo.GetByID(ctx, tenantID, userID, noteID)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.UpdateContent(ctx, tenantID, userID, noteID, content); err != nil {
+		return err
+	}
+	// GC images that this note used to reference but the new content does
+	// not. deletedNoteID is left empty so the updated row itself is
+	// scanned (its new body no longer matches the removed ids).
+	removed := imageIDsRemoved(old.Content, content)
+	if len(removed) > 0 {
+		if gcErr := s.repo.DeleteUnreferencedImages(ctx, tenantID, userID, "", removed); gcErr != nil {
+			logger.Warnf(ctx, "[notes] image GC after update failed: note=%s err=%v", noteID, gcErr)
+		}
+	}
+	return nil
+}
+
+func imageIDsRemoved(before, after string) []string {
+	keep := make(map[string]struct{})
+	for _, id := range types.ExtractNoteImageIDs(after) {
+		keep[id] = struct{}{}
+	}
+	var out []string
+	for _, id := range types.ExtractNoteImageIDs(before) {
+		if _, ok := keep[id]; !ok {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func (s *tenantNoteService) Delete(ctx context.Context, noteID string) error {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return err
+	}
+	note, err := s.repo.GetByID(ctx, tenantID, userID, noteID)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.Delete(ctx, tenantID, userID, noteID); err != nil {
+		return err
+	}
+	// ticket 07：图片 GC —— 回收仅被被删笔记引用的图片，即时释放配额。
+	// Best-effort：GC 失败不影响笔记删除本身。
+	if ids := types.ExtractNoteImageIDs(note.Content); len(ids) > 0 {
+		if gcErr := s.repo.DeleteUnreferencedImages(ctx, tenantID, userID, noteID, ids); gcErr != nil {
+			logger.Warnf(ctx, "[notes] image GC after delete failed: note=%s err=%v", noteID, gcErr)
+		}
+	}
+	return nil
+}
+
+// CreateImage validates an uploaded note image (magic-byte sniffed type,
+// ≤2MB, ≤200/user) and stores it. The multipart Content-Type header is
+// ignored — sniffing wins (notes ticket 07).
+func (s *tenantNoteService) CreateImage(ctx context.Context, data []byte) (types.TenantNoteImage, error) {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return types.TenantNoteImage{}, err
+	}
+	if len(data) > types.MaxNoteImageBytes {
+		return types.TenantNoteImage{}, types.ErrNoteImageTooLarge
+	}
+	mime := types.DetectNoteImageMime(data)
+	if mime == "" {
+		return types.TenantNoteImage{}, types.ErrNoteImageTypeUnsupport
+	}
+	image := types.TenantNoteImage{
+		TenantID: tenantID,
+		UserID:   userID,
+		Mime:     mime,
+		Bytes:    data,
+	}
+	if err := s.repo.CreateImage(ctx, tenantID, userID, &image); err != nil {
+		return types.TenantNoteImage{}, err
+	}
+	logger.Infof(ctx, "[notes] stored image %s (%d bytes, %s) for user %s", image.ID, len(data), mime, userID)
+	return image, nil
+}
+
+func (s *tenantNoteService) GetImage(ctx context.Context, imageID string) (*types.TenantNoteImage, error) {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetImageByID(ctx, tenantID, userID, imageID)
+}
+
+func (s *tenantNoteService) DeleteImage(ctx context.Context, imageID string) error {
+	tenantID, userID, err := s.caller(ctx)
+	if err != nil {
+		return err
+	}
+	return s.repo.DeleteImage(ctx, tenantID, userID, imageID)
+}
+
+// validateNoteContent enforces the per-note size limit (UTF-8 bytes).
+func validateNoteContent(content string) error {
+	if len(content) > types.MaxNoteContentBytes {
+		return types.ErrNoteTooLarge
+	}
+	return nil
+}
+
+// deriveNoteTitle implements notes design N-6: the first `#` heading wins
+// (scanning the whole head), else the first non-empty line; both truncated
+// to 50 runes. Empty content yields an empty title (the frontend renders
+// "无标题"). The input is a bounded content head from the repository,
+// never the full content.
+func deriveNoteTitle(contentHead string) string {
+	lines := strings.Split(contentHead, "\n")
+	// Pass 1: ticket 06 — the first `#` heading wins even when plain
+	// lines come before it. Bare "###" separators carry no text and are
+	// skipped.
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		stripped := strings.TrimSpace(strings.TrimLeft(trimmed, "#"))
+		if stripped == "" {
+			continue
+		}
+		return truncateNoteTitle(stripped, types.NoteTitleMaxRunes)
+	}
+	// Pass 2: no heading anywhere — fall back to the first non-empty line.
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.TrimSpace(strings.TrimLeft(trimmed, "#")) == "" {
+			continue
+		}
+		return truncateNoteTitle(trimmed, types.NoteTitleMaxRunes)
+	}
+	return ""
+}
+
+func truncateNoteTitle(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max])
+}

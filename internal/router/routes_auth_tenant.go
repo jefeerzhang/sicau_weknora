@@ -206,6 +206,48 @@ func RegisterMyEnvVarRoutes(r *gin.RouterGroup, h *handler.MeEnvVarHandler) {
 	}
 }
 
+// RegisterMyNoteRoutes registers the per-user notes CRUD surface
+// (sicau-v1 notes, /me/notes). Web JWT path ONLY - see notes design §7:
+// IM synthetic accounts share a user_id, so this must never hang off IM
+// auth. No role gate: every authenticated member manages their own notes;
+// isolation is structural (owner-scoped queries, no cross-user endpoint).
+func RegisterMyNoteRoutes(r *gin.RouterGroup, h *handler.MeNoteHandler) {
+	if h == nil {
+		return
+	}
+	me := r.Group("/me/notes")
+	{
+		me.GET("", h.List)
+		me.POST("", h.Create)
+		me.GET("/:id", h.Get)
+		me.PUT("/:id", h.Update)
+		me.DELETE("/:id", h.Delete)
+		me.POST("/images", h.UploadImage)
+		me.GET("/images/:id", h.GetImage)
+		me.DELETE("/images/:id", h.DeleteImage)
+	}
+}
+
+// RegisterAnnouncementRoutes registers the course announcement board
+// (sicau-v1). Reads Viewer+; posting Contributor+; deletes author-or-admin
+// (service-enforced). Web JWT path only - notes design §7 applies.
+func RegisterAnnouncementRoutes(r *gin.RouterGroup, h *handler.MeAnnouncementHandler, g *rbacGuards) {
+	if h == nil {
+		return
+	}
+	ann := r.Group("/announcements")
+	{
+		ann.GET("", g.Viewer(), h.List)
+		ann.POST("", g.Contributor(), h.Create)
+		ann.GET("/:id", g.Viewer(), h.Get)
+		ann.DELETE("/:id", g.Contributor(), h.Delete)
+		ann.GET("/:id/attachments/:index", g.Viewer(), h.DownloadAttachment)
+		ann.GET("/:id/comments", g.Viewer(), h.ListComments)
+		ann.POST("/:id/comments", g.Viewer(), h.CreateComment)
+		ann.DELETE("/:id/comments/:cid", g.Viewer(), h.DeleteComment)
+	}
+}
+
 // RegisterAuthRoutes registers authentication routes
 func RegisterAuthRoutes(r *gin.RouterGroup, handler *handler.AuthHandler, g *rbacGuards) {
 	r.POST("/auth/register", handler.Register)
