@@ -2282,6 +2282,7 @@ export default {
     all: 'All',
     clear: 'Clear',
     website: 'Official Website',
+    teacherHome: 'Teacher Home',
     clawhubSkill: 'Claw Skill',
     github: 'GitHub',
     githubStarTip: 'Open the repo on GitHub — star it if you find it useful',
@@ -4568,11 +4569,21 @@ export default {
   },
 
   platform: {
-    subtitle: 'LLM-Powered Enterprise Knowledge Framework',
+    subtitle: 'LLM-Powered Knowledge Base',
+    note: 'This system is built on the open-source project ',
+    noteSuffix: ', customized for Sichuan Agricultural University\'s teaching and research document retrieval.',
+    loginFeature1: 'Real materials',
+    loginFeature2: 'Real cases',
+    loginFeature3: 'Multimodal documents & ReAct',
+    highlight: {
+      ragDesc: 'Hybrid retrieval & recall',
+      agentDesc: 'Multi-step reasoning & tools',
+      wikiDesc: 'Auto-extract & structure',
+    },
     description: 'RAG retrieval, agentic reasoning and Wiki knowledge bases — so your documents are truly understood and put to work',
-    rag: 'RAG Enhanced Generation',
-    agent: 'ReAct Agent',
-    wiki: 'Wiki Knowledge Base',
+    rag: 'Retrieval-Augmented Q&A',
+    agent: 'Agent Reasoning',
+    wiki: 'Knowledge Base',
     hybridSearch: 'Hybrid Search',
     multimodalParsing: 'Multimodal Document Parsing',
     hybridSearchEngine: 'Hybrid Search + Knowledge Graph',
@@ -6586,6 +6597,16 @@ export default {
   userProfile: {
     title: 'User Profile',
     description: 'View your account info (user ID, username, email, registration time) and change your password.',
+    platformIdentity: {
+      label: 'Platform identity',
+      description: 'Platform-level identity label that does not change when switching workspaces; separate from Owner/Admin/Contributor/Viewer roles inside a workspace.',
+      values: {
+        superadmin: 'Super admin (teacher capability)',
+        teacher: 'Teacher',
+        student: 'Student',
+        unset: 'Identity unset',
+      },
+    },
     changePassword: {
       label: 'Change password',
       description: 'Verify your current password, then set a new one. All signed-in sessions will be revoked and you will need to sign in again.',

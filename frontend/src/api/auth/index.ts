@@ -104,6 +104,8 @@ export interface UserPreferences {
 }
 
 // 用户信息接口
+export type PlatformIdentity = 'superadmin' | 'teacher' | 'student' | 'unset'
+
 export interface UserInfo {
   id: string
   username: string
@@ -113,6 +115,10 @@ export interface UserInfo {
   can_access_all_tenants?: boolean
   preferences?: UserPreferences
   is_system_admin?: boolean
+  must_change_password?: boolean
+  is_teacher?: boolean
+  // Platform identity label - independent of workspace Owner/Admin/Contributor/Viewer.
+  platform_identity?: PlatformIdentity
   created_at: string
   updated_at: string
 }
@@ -152,6 +158,9 @@ export function userInfoFromApi(
     tenant_id: String(tid) || '',
     can_access_all_tenants: u?.can_access_all_tenants === true,
     is_system_admin: u?.is_system_admin === true,
+    must_change_password: u?.must_change_password === true,
+    is_teacher: u?.is_teacher === true,
+    platform_identity: (u?.platform_identity as PlatformIdentity) || 'unset',
     preferences: u?.preferences,
     created_at: u?.created_at || new Date().toISOString(),
     updated_at: u?.updated_at || new Date().toISOString(),

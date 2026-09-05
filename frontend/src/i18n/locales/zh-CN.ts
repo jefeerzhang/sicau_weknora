@@ -227,6 +227,16 @@ export default {
   userProfile: {
     title: '用户信息',
     description: '查看您的账户基础信息（用户 ID、用户名、邮箱、注册时间），并可修改登录密码',
+    platformIdentity: {
+      label: '平台身份',
+      description: '平台层身份分类（用户身份标签），不随工作空间切换变化；与空间内 Owner/Admin/Contributor/Viewer 角色分开表达。',
+      values: {
+        superadmin: '超级管理员（教师能力）',
+        teacher: '教师',
+        student: '学生',
+        unset: '身份未设置',
+      },
+    },
     changePassword: {
       label: '修改密码',
       description: '使用当前密码验证后设置新密码。修改成功后所有设备上的登录状态将失效，需要重新登录。',
@@ -2295,11 +2305,16 @@ export default {
   },
 
   platform: {
-    subtitle: '大模型驱动的企业级知识框架',
+    subtitle: '大模型驱动的知识库',
+    note: '本系统基于开源项目 ',
+    noteSuffix: ' 构建，专为川农校内教学与科研资料检索场景定制。',
+    loginFeature1: '真实资料',
+    loginFeature2: '真实案例',
+    loginFeature3: '多模态文档与 ReAct',
     description: 'RAG 检索、智能体推理、Wiki 知识库，让文档真正被理解和运用',
-    rag: 'RAG 增强生成',
-    agent: 'ReAct 智能体',
-    wiki: 'Wiki 知识库',
+    rag: '检索增强问答',
+    agent: '智能体推理',
+    wiki: '知识库',
     hybridSearch: '混合检索',
     multimodalParsing: '多模态文档解析',
     hybridSearchEngine: '混合检索 + 知识图谱',
@@ -2307,6 +2322,11 @@ export default {
     independentTenant: '独立空间',
     fullApiAccess: '完整 API 访问',
     knowledgeBaseManagement: '知识库管理',
+    highlight: {
+      ragDesc: '混合检索 · 精准召回',
+      agentDesc: '多步推理 · 工具调用',
+      wikiDesc: '自动抽取 · 结构关联',
+    },
     carousel: {
       agenticRagTitle: 'Agentic RAG',
       agenticRagDesc: 'ReAct 推理 + 工具调用 + 多步思考',
@@ -4557,6 +4577,7 @@ export default {
     all: '全部',
     clear: '清空',
     website: '官方网站',
+    teacherHome: '教师主页',
     clawhubSkill: 'Claw Skill',
     github: 'GitHub',
     githubStarTip: '在 GitHub 打开仓库，若觉得有用欢迎点个 Star',

@@ -55,6 +55,17 @@
         </div>
       </div>
 
+      <!-- 平台身份（用户身份标签） -->
+      <div class="setting-row" data-testid="platform-identity-row">
+        <div class="setting-info">
+          <label>{{ $t('userProfile.platformIdentity.label') }}</label>
+          <p class="desc">{{ $t('userProfile.platformIdentity.description') }}</p>
+        </div>
+        <div class="setting-control">
+          <span class="platform-identity-tag">{{ platformIdentityLabel }}</span>
+        </div>
+      </div>
+
       <!-- 注册时间 -->
       <div class="setting-row">
         <div class="setting-info">
@@ -184,6 +195,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
 import { newPasswordRules } from '@/utils/passwordPolicy'
+import { platformIdentityKey } from '@/utils/platformIdentity'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -203,6 +215,14 @@ const passwordForm = reactive({
   confirmPassword: '',
 })
 
+const oidcOnlyLogin = computed(
+  () => userInfo.value?.preferences?.oidc_only_login === true,
+)
+
+const platformIdentityLabel = computed(() =>
+  t(platformIdentityKey(userInfo.value?.platform_identity)),
+)
+
 const loadPasswordPolicy = async () => {
   try {
     const resp = await getAuthConfig()
@@ -211,10 +231,6 @@ const loadPasswordPolicy = async () => {
     complexPasswordEnabled.value = false
   }
 }
-
-const oidcOnlyLogin = computed(
-  () => userInfo.value?.preferences?.oidc_only_login === true,
-)
 
 watch(passwordPopupVisible, (open) => {
   if (!open) {
@@ -436,6 +452,18 @@ onMounted(loadInfo)
 .password-mask {
   letter-spacing: 0.12em;
   color: var(--td-text-color-secondary);
+}
+
+.platform-identity-tag {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: right;
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+  border-radius: 4px;
+  padding: 2px 10px;
+  white-space: nowrap;
 }
 
 .password-popup-inner {
