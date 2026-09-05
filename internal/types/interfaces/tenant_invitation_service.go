@@ -56,6 +56,10 @@ type TenantInvitationService interface {
 	// management UI after the lazy sweep (same filtering as ListByTenant).
 	ListTenantInvitationsPage(ctx context.Context, tenantID uint64, includeTerminal bool, page, pageSize int) ([]*types.TenantInvitation, int64, error)
 
+	// GetActiveShareLink returns the tenant's reusable pending share link,
+	// independent of invitation-list pagination.
+	GetActiveShareLink(ctx context.Context, tenantID uint64) (*types.TenantInvitation, error)
+
 	// ListByInvitee returns invitations addressed to the user across
 	// all tenants. Always runs the lazy sweep first.
 	ListByInvitee(ctx context.Context, inviteeUserID string, includeTerminal bool) ([]*types.TenantInvitation, error)
@@ -70,8 +74,8 @@ type TenantInvitationService interface {
 	// returned for the handler to compose the registration URL — the
 	// token stays available via list/get for as long as the row is
 	// pending so Owners can re-share without "copy now or lose it"
-	// pressure. Multiple share-link rows can coexist on the same
-	// tenant (different roles, or just multiple campaigns).
+	// pressure. Repeated calls reuse the tenant's current pending link;
+	// a new one is issued only after revocation or expiry.
 	CreateShareLink(
 		ctx context.Context,
 		tenantID uint64,
@@ -92,9 +96,7 @@ type TenantInvitationService interface {
 	// the invitation row into a terminal state — share-link rows stay
 	// pending so subsequent invitees can also register through the
 	// same link. Idempotent: if the user already has membership, the
-	// existing row is returned. If the same user also has a pending direct
-	// invitation for the tenant, it is reconciled to accepted so the inbox
-	// cannot offer a second acceptance after membership already exists.
+	// existing row is returned.
 	AcceptByToken(ctx context.Context, plainToken string, newUserID string) (*types.TenantMember, error)
 
 	// MarkPendingAcceptedIfExists transitions a per-user pending invitation

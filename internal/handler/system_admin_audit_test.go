@@ -8,6 +8,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"gorm.io/gorm"
 )
 
 // capturingAuditService implements just AuditLogService.Log for the
@@ -23,6 +24,12 @@ type capturingAuditService struct {
 func (c *capturingAuditService) Log(_ context.Context, entry *types.AuditLog) error {
 	c.entries = append(c.entries, entry)
 	return c.logErr
+}
+
+// LogTx mirrors Log so transaction-scoped callers record through the same
+// capture; the embedded interface stays nil on purpose.
+func (c *capturingAuditService) LogTx(ctx context.Context, _ *gorm.DB, entry *types.AuditLog) error {
+	return c.Log(ctx, entry)
 }
 
 // newSystemHandlerWithAudit constructs a SystemHandler with only the

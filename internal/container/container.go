@@ -218,6 +218,8 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(service.NewEvaluationService))
 	must(container.Provide(service.NewUserService))
 	must(container.Provide(service.NewSystemSettingService))
+	must(container.Provide(service.NewTeachingRoleMigrator))
+	must(container.Provide(service.NewTeachingMigrationPhase))
 	must(container.Provide(func(
 		repo repository.TenantSandboxConfigRepository,
 		agents interfaces.CustomAgentRepository,
@@ -766,6 +768,18 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 		}
 	} else {
 		logger.Infof(context.Background(), "Auto-migration is disabled (AUTO_MIGRATE=false)")
+	}
+
+	// Teaching data normalization runs unconditionally AFTER schema
+	// handling (#22): whether the schema was applied above or by an
+	// external migration tool, legacy elevated memberships and pending
+	// elevated invitations must be downgraded before the deployment is
+	// treated as upgraded. A failure fails startup closed (#24): the
+	// process exits, the orchestrator restarts it and the next startup
+	// retries; /health also reports the blocked state for as long as a
+	// process may still be running with one.
+	if err := ensureTeachingMigrationState(context.Background(), db); err != nil {
+		return nil, err
 	}
 
 	// Get underlying SQL DB object

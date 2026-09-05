@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Tencent/WeKnora/internal/types"
+	"gorm.io/gorm"
 )
 
 // TenantMemberRepository persists (user, tenant) membership rows that
@@ -13,6 +14,13 @@ import (
 // docstring explicitly says otherwise. Soft deletion is handled by GORM
 // via the DeletedAt field on TenantMember.
 type TenantMemberRepository interface {
+	// WithTx returns a view of this repository whose every call executes
+	// on tx — the caller's database transaction. It is the seam that lets
+	// a membership insert and its success audit commit or roll back as one
+	// unit. A nil tx falls back to the repository's own connection
+	// (unit-test doubles return themselves).
+	WithTx(tx *gorm.DB) TenantMemberRepository
+
 	// Create inserts a new active membership row. Caller is responsible
 	// for ensuring no other active row exists for the same (user, tenant)
 	// pair; the partial unique index will return a conflict error otherwise.
@@ -68,4 +76,11 @@ type TenantMemberRepository interface {
 	// RemoveOwnerAtomically soft-deletes an Owner row under the same
 	// lock as DemoteOwnerAtomically.
 	RemoveOwnerAtomically(ctx context.Context, userID string, tenantID uint64) error
+
+	// MemberUsageStats aggregates per-user teaching usage (sicau-v1
+	// ticket 05): question count (user-role messages across the user's
+	// sessions in the tenant) and last activity time. Read-only; used by
+	// the Admin+ member page. Users with no sessions are absent from the
+	// result — the frontend renders 0 / "never active" for them.
+	MemberUsageStats(ctx context.Context, tenantID uint64) ([]types.TenantMemberUsageStat, error)
 }

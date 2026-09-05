@@ -10,6 +10,7 @@ import (
 	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"gorm.io/gorm"
 )
 
 // fakeInvitationRepo is an in-memory stand-in for
@@ -58,6 +59,20 @@ func (r *fakeInvitationRepo) GetPendingByPair(
 	for _, e := range r.rows {
 		if e.TenantID == tenantID &&
 			e.InviteeUserID == inviteeUserID &&
+			e.Status == types.TenantInvitationStatusPending {
+			cp := *e
+			return &cp, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r *fakeInvitationRepo) GetActiveShareLinkByTenant(
+	ctx context.Context, tenantID uint64,
+) (*types.TenantInvitation, error) {
+	for i := len(r.rows) - 1; i >= 0; i-- {
+		e := r.rows[i]
+		if e.TenantID == tenantID && e.InviteeUserID == "" && e.Token != "" &&
 			e.Status == types.TenantInvitationStatusPending {
 			cp := *e
 			return &cp, nil
@@ -208,7 +223,39 @@ func (r *fakeInvitationRepo) IncrementAcceptedCount(
 	return gormErrRecordNotFound
 }
 
+// WithTx is the transaction seam: the in-memory fake has no real
+// transactions, so it returns itself regardless of tx (nil in unit tests
+// without a gorm handle).
+func (r *fakeInvitationRepo) WithTx(_ *gorm.DB) interfaces.TenantInvitationRepository {
+	return r
+}
+
 var _ interfaces.TenantInvitationRepository = (*fakeInvitationRepo)(nil)
+
+// seedLegacyInvitation inserts a pre-upgrade invitation row straight into
+// the fake repo: the service no longer persists elevated invitation roles
+// (#21), so tests simulating historical data must bypass the service.
+func seedLegacyInvitation(
+	t *testing.T,
+	repo *fakeInvitationRepo,
+	tenantID uint64,
+	invitee, token string,
+	role types.TenantRole,
+) *types.TenantInvitation {
+	t.Helper()
+	inv := &types.TenantInvitation{
+		TenantID:      tenantID,
+		InviteeUserID: invitee,
+		Token:         token,
+		Role:          role,
+		Status:        types.TenantInvitationStatusPending,
+		ExpiresAt:     time.Now().Add(time.Hour),
+	}
+	if err := repo.Create(context.Background(), inv); err != nil {
+		t.Fatalf("seed legacy invitation: %v", err)
+	}
+	return inv
+}
 
 // newInvitationSvc returns a service wired against in-memory fakes for
 // both the invitation repo and the member service. Audit is nil so
@@ -220,7 +267,7 @@ func newInvitationSvc() (
 ) {
 	invRepo := newFakeInvitationRepo()
 	memberSvc, _ := newServiceWithRepo()
-	svc := NewTenantInvitationService(invRepo, memberSvc, nil)
+	svc := NewTenantInvitationService(nil, invRepo, memberSvc, nil)
 	return svc, invRepo, memberSvc
 }
 
@@ -254,7 +301,7 @@ func TestInvitationService_Create_RejectsAlreadyActiveMember(t *testing.T) {
 	if _, err := memberSvc.AddMember(ctx, "u-bob", 1, types.TenantRoleContributor, nil); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	_, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleContributor, nil, "")
+	_, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleViewer, nil, "")
 	if !errors.Is(err, ErrAlreadyMember) {
 		t.Fatalf("want ErrAlreadyMember, got %v", err)
 	}
@@ -263,12 +310,31 @@ func TestInvitationService_Create_RejectsAlreadyActiveMember(t *testing.T) {
 func TestInvitationService_Create_DedupsPending(t *testing.T) {
 	svc, _, _ := newInvitationSvc()
 	ctx := context.Background()
-	if _, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleContributor, nil, ""); err != nil {
+	if _, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleViewer, nil, ""); err != nil {
 		t.Fatalf("first invite: %v", err)
 	}
-	_, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleContributor, nil, "")
+	_, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleViewer, nil, "")
 	if !errors.Is(err, ErrPendingInvitationExists) {
 		t.Fatalf("want ErrPendingInvitationExists, got %v", err)
+	}
+}
+
+func TestInvitationService_Create_RestrictsToViewer(t *testing.T) {
+	// Creation-time enforcement of the teaching two-state model (#21):
+	// no code path may persist an elevated invitation role, so the
+	// service rejects anything but viewer outright.
+	svc, repo, _ := newInvitationSvc()
+	ctx := context.Background()
+	for _, role := range []types.TenantRole{types.TenantRoleOwner, types.TenantRoleAdmin, types.TenantRoleContributor} {
+		if _, err := svc.Create(ctx, 1, "u-bob", role, nil, ""); !errors.Is(err, ErrInvitationRoleRestrictedToViewer) {
+			t.Fatalf("role %s must be rejected, got %v", role, err)
+		}
+	}
+	if _, _, err := svc.CreateShareLink(ctx, 1, types.TenantRoleAdmin, nil, ""); !errors.Is(err, ErrInvitationRoleRestrictedToViewer) {
+		t.Fatalf("share-link role admin must be rejected, got %v", err)
+	}
+	if len(repo.rows) != 0 {
+		t.Fatalf("elevated invitations must not be persisted, got %d rows", len(repo.rows))
 	}
 }
 
@@ -285,17 +351,17 @@ func TestInvitationService_Accept_OnlyByInvitee(t *testing.T) {
 }
 
 func TestInvitationService_Accept_HappyPath_CreatesMembership(t *testing.T) {
-	svc, _, memberSvc := newInvitationSvc()
+	svc, invRepo, memberSvc := newInvitationSvc()
 	ctx := context.Background()
-	inv, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleAdmin, nil, "")
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
+	// A legacy pending invitation still carries an elevated role (rows
+	// created before the viewer-only guards shipped). Acceptance never
+	// trusts it (#21): the membership is materialised as viewer.
+	inv := seedLegacyInvitation(t, invRepo, 1, "u-bob", "", types.TenantRoleAdmin)
 	mb, err := svc.Accept(ctx, inv.ID, "u-bob")
 	if err != nil {
 		t.Fatalf("accept: %v", err)
 	}
-	if mb == nil || mb.UserID != "u-bob" || mb.Role != types.TenantRoleAdmin {
+	if mb == nil || mb.UserID != "u-bob" || mb.Role != types.TenantRoleViewer {
 		t.Fatalf("unexpected membership: %+v", mb)
 	}
 	// Re-acceptance must be a state-machine rejection, not silent
@@ -317,10 +383,7 @@ func TestInvitationService_Accept_IdempotentWhenAlreadyMember(t *testing.T) {
 	// are already in" and flip the invitation to accepted for audit.
 	svc, invRepo, memberSvc := newInvitationSvc()
 	ctx := context.Background()
-	inv, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleContributor, nil, "")
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
+	inv := seedLegacyInvitation(t, invRepo, 1, "u-bob", "", types.TenantRoleContributor)
 	// Side-effect: mint the membership directly.
 	if _, err := memberSvc.AddMember(ctx, "u-bob", 1, types.TenantRoleViewer, nil); err != nil {
 		t.Fatalf("side-effect AddMember: %v", err)
@@ -364,10 +427,7 @@ func TestInvitationService_Decline_MarksDeclined(t *testing.T) {
 func TestInvitationService_Revoke_MarksRevoked(t *testing.T) {
 	svc, invRepo, _ := newInvitationSvc()
 	ctx := context.Background()
-	inv, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleAdmin, nil, "")
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
+	inv := seedLegacyInvitation(t, invRepo, 1, "u-bob", "", types.TenantRoleAdmin)
 	if err := svc.Revoke(ctx, inv.ID); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
@@ -376,8 +436,9 @@ func TestInvitationService_Revoke_MarksRevoked(t *testing.T) {
 		t.Fatalf("want revoked status, got %s", row.Status)
 	}
 	// Revoked rows can be re-invited via a fresh Create — the
-	// partial unique index only guards PENDING.
-	if _, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleContributor, nil, ""); err != nil {
+	// partial unique index only guards PENDING. Fresh invites are
+	// viewer-only (#21).
+	if _, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleViewer, nil, ""); err != nil {
 		t.Fatalf("re-invite after revoke must succeed, got %v", err)
 	}
 }
@@ -420,7 +481,7 @@ func TestInvitationService_CountPending(t *testing.T) {
 	if _, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleViewer, nil, ""); err != nil {
 		t.Fatalf("seed1: %v", err)
 	}
-	if _, err := svc.Create(ctx, 2, "u-bob", types.TenantRoleAdmin, nil, ""); err != nil {
+	if _, err := svc.Create(ctx, 2, "u-bob", types.TenantRoleViewer, nil, ""); err != nil {
 		t.Fatalf("seed2: %v", err)
 	}
 	n, err := svc.CountPendingByInvitee(ctx, "u-bob")
@@ -446,7 +507,7 @@ func TestInvitationService_CountPending(t *testing.T) {
 func TestInvitationService_CreateShareLink_PersistsToken(t *testing.T) {
 	svc, repo, _ := newInvitationSvc()
 	inv, plain, err := svc.CreateShareLink(
-		context.Background(), 1, types.TenantRoleContributor, nil, "")
+		context.Background(), 1, types.TenantRoleViewer, nil, "")
 	if err != nil {
 		t.Fatalf("create-share-link: %v", err)
 	}
@@ -465,6 +526,69 @@ func TestInvitationService_CreateShareLink_PersistsToken(t *testing.T) {
 	}
 	if row.Status != types.TenantInvitationStatusPending {
 		t.Fatalf("status must be pending, got %s", row.Status)
+	}
+}
+
+func TestInvitationService_CreateShareLink_ReusesPendingLink(t *testing.T) {
+	svc, repo, _ := newInvitationSvc()
+	ctx := context.Background()
+	first, firstToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	second, secondToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("second create: %v", err)
+	}
+	if second.ID != first.ID || secondToken != firstToken {
+		t.Fatalf("pending link must be reused: first=(%d,%q) second=(%d,%q)",
+			first.ID, firstToken, second.ID, secondToken)
+	}
+	if len(repo.rows) != 1 {
+		t.Fatalf("reuse must not insert another row, got %d", len(repo.rows))
+	}
+}
+
+func TestInvitationService_CreateShareLink_CreatesAfterRevoke(t *testing.T) {
+	svc, repo, _ := newInvitationSvc()
+	ctx := context.Background()
+	first, firstToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	if err := svc.Revoke(ctx, first.ID); err != nil {
+		t.Fatalf("revoke: %v", err)
+	}
+	second, secondToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("create after revoke: %v", err)
+	}
+	if second.ID == first.ID || secondToken == firstToken {
+		t.Fatalf("revoked link must be replaced")
+	}
+	if len(repo.rows) != 2 {
+		t.Fatalf("expected historical plus new row, got %d", len(repo.rows))
+	}
+}
+
+func TestInvitationService_CreateShareLink_CreatesAfterExpiry(t *testing.T) {
+	svc, repo, _ := newInvitationSvc()
+	ctx := context.Background()
+	first, firstToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	repo.rows[0].ExpiresAt = time.Now().Add(-time.Hour)
+
+	second, secondToken, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
+	if err != nil {
+		t.Fatalf("create after expiry: %v", err)
+	}
+	if second.ID == first.ID || secondToken == firstToken {
+		t.Fatalf("expired link must be replaced")
+	}
+	if repo.rows[0].Status != types.TenantInvitationStatusExpired {
+		t.Fatalf("old link must be swept to expired, got %s", repo.rows[0].Status)
 	}
 }
 
@@ -517,15 +641,16 @@ func TestInvitationService_LookupByToken_RejectsExpired(t *testing.T) {
 func TestInvitationService_AcceptByToken_HappyPath(t *testing.T) {
 	svc, repo, memberSvc := newInvitationSvc()
 	ctx := context.Background()
-	_, plain, err := svc.CreateShareLink(ctx, 1, types.TenantRoleAdmin, nil, "")
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
+	// Legacy elevated share links must still mint viewer memberships
+	// only (#21). The row is seeded directly because the service no
+	// longer persists elevated invitation roles.
+	legacyLink := seedLegacyInvitation(t, repo, 1, "", "legacy-admin-link", types.TenantRoleAdmin)
+	plain := legacyLink.Token
 	mb, err := svc.AcceptByToken(ctx, plain, "u-alice")
 	if err != nil {
 		t.Fatalf("accept-by-token: %v", err)
 	}
-	if mb == nil || mb.UserID != "u-alice" || mb.Role != types.TenantRoleAdmin {
+	if mb == nil || mb.UserID != "u-alice" || mb.Role != types.TenantRoleViewer {
 		t.Fatalf("unexpected membership: %+v", mb)
 	}
 	if got, _ := memberSvc.GetMembership(ctx, "u-alice", 1); got == nil {
@@ -555,66 +680,6 @@ func TestInvitationService_AcceptByToken_AllowsMultipleUsers(t *testing.T) {
 	b, _ := memberSvc.GetMembership(ctx, "u-bob", 1)
 	if a == nil || b == nil {
 		t.Fatalf("both users should have membership: alice=%v bob=%v", a, b)
-	}
-}
-
-func TestInvitationService_AcceptByToken_ReconcilesDirectInvitation(t *testing.T) {
-	svc, repo, _ := newInvitationSvc()
-	ctx := context.Background()
-	direct, err := svc.Create(ctx, 1, "u-alice", types.TenantRoleViewer, nil, "")
-	if err != nil {
-		t.Fatalf("create direct invitation: %v", err)
-	}
-	_, plain, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
-	if err != nil {
-		t.Fatalf("create share link: %v", err)
-	}
-
-	if _, err := svc.AcceptByToken(ctx, plain, "u-alice"); err != nil {
-		t.Fatalf("accept by token: %v", err)
-	}
-
-	got, err := repo.GetByID(ctx, direct.ID)
-	if err != nil {
-		t.Fatalf("get direct invitation: %v", err)
-	}
-	if got.Status != types.TenantInvitationStatusAccepted {
-		t.Fatalf("direct invitation must be reconciled as accepted, got %s", got.Status)
-	}
-	pending, err := svc.CountPendingByInvitee(ctx, "u-alice")
-	if err != nil {
-		t.Fatalf("count pending: %v", err)
-	}
-	if pending != 0 {
-		t.Fatalf("joined user must not retain an actionable invitation, got %d", pending)
-	}
-}
-
-func TestInvitationService_AcceptByToken_ReconcilesDirectInvitationForExistingMember(t *testing.T) {
-	svc, repo, memberSvc := newInvitationSvc()
-	ctx := context.Background()
-	direct, err := svc.Create(ctx, 1, "u-alice", types.TenantRoleViewer, nil, "")
-	if err != nil {
-		t.Fatalf("create direct invitation: %v", err)
-	}
-	_, plain, err := svc.CreateShareLink(ctx, 1, types.TenantRoleViewer, nil, "")
-	if err != nil {
-		t.Fatalf("create share link: %v", err)
-	}
-	if _, err := memberSvc.AddMember(ctx, "u-alice", 1, types.TenantRoleViewer, nil); err != nil {
-		t.Fatalf("seed membership: %v", err)
-	}
-
-	if _, err := svc.AcceptByToken(ctx, plain, "u-alice"); err != nil {
-		t.Fatalf("idempotent accept by token: %v", err)
-	}
-
-	got, err := repo.GetByID(ctx, direct.ID)
-	if err != nil {
-		t.Fatalf("get direct invitation: %v", err)
-	}
-	if got.Status != types.TenantInvitationStatusAccepted {
-		t.Fatalf("direct invitation must be reconciled for an existing member, got %s", got.Status)
 	}
 }
 

@@ -127,10 +127,9 @@ func NewRouter(params RouterParams) *gin.Engine {
 	r.Use(middleware.Recovery())
 	r.Use(middleware.ErrorHandler())
 
-	// 健康检查（不需要认证）
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
+	// 健康检查（不需要认证）；教学迁移阻断时返回 503，让 Docker
+	// healthcheck 与 Helm 探针停止路由并触发重启重试 (#24)
+	r.GET("/health", NewHealthHandler())
 
 	// Swagger API 文档（仅在非生产环境下启用）
 	// 通过 GIN_MODE 环境变量判断：release 模式下禁用 Swagger

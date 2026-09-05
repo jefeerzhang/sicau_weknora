@@ -64,6 +64,13 @@ type SystemHandler struct {
 	// unit tests, in which case only the legacy config is consulted.
 	storageBackendRepo interfaces.StorageBackendRepository
 	sandboxConfigSvc   sandboxConfigService
+	// teachingMigrator runs #18/#19 membership demotion and ownership recovery.
+	// Optional — nil when dig wiring is incomplete in unit tests.
+	teachingMigrator *service.TeachingRoleMigrator
+	// teachingPhase is the shared startup/manual-retry teaching migration
+	// phase (#24/#25): same schema pre-check and success semantics for
+	// both paths. Optional — nil in partially-wired unit tests.
+	teachingPhase *service.TeachingMigrationPhase
 	// startup snapshot for GET /system/capabilities; bound in router.NewRouter.
 	deploymentCapabilities DeploymentCapabilitiesData
 }
@@ -81,6 +88,8 @@ func NewSystemHandler(cfg *config.Config,
 	knowledgeSvc interfaces.KnowledgeService,
 	storageBackendRepo interfaces.StorageBackendRepository,
 	sandboxConfigSvc *service.TenantSandboxConfigService,
+	teachingMigrator *service.TeachingRoleMigrator,
+	teachingPhase *service.TeachingMigrationPhase,
 ) *SystemHandler {
 	return &SystemHandler{
 		cfg:                cfg,
@@ -95,6 +104,8 @@ func NewSystemHandler(cfg *config.Config,
 		knowledgeSvc:       knowledgeSvc,
 		storageBackendRepo: storageBackendRepo,
 		sandboxConfigSvc:   sandboxConfigSvc,
+		teachingMigrator:   teachingMigrator,
+		teachingPhase:      teachingPhase,
 	}
 }
 
@@ -293,6 +304,13 @@ type GetSystemInfoResponse struct {
 	// succeeded; non-empty values let the frontend surface a troubleshooting
 	// banner instead of silently hiding the DB version row (see issue #1319).
 	DBMigrationError string `json:"db_migration_error,omitempty"`
+	// TeachingMigrationError carries the failure reason recorded when the
+	// most recent teaching data migration attempt failed (startup phase or
+	// SuperAdmin retry). Empty means the deployment is normalized and
+	// upgraded; a non-empty value is a blocked state - legacy elevated
+	// memberships or pending invitations may remain until a retry
+	// succeeds (#22). Values never embed invitation tokens or credentials.
+	TeachingMigrationError string `json:"teaching_migration_error,omitempty"`
 	// StartedAt is the server process boot time (RFC3339, UTC).
 	StartedAt string `json:"started_at,omitempty"`
 	// UptimeSeconds is seconds elapsed since process start.
@@ -356,19 +374,20 @@ func (h *SystemHandler) GetSystemInfo(c *gin.Context) {
 	}
 
 	response := GetSystemInfoResponse{
-		Version:             Version,
-		Edition:             Edition,
-		CommitID:            CommitID,
-		BuildTime:           BuildTime,
-		GoVersion:           GoVersion,
-		KeywordIndexEngine:  keywordIndexEngine,
-		VectorStoreEngine:   vectorStoreEngine,
-		GraphDatabaseEngine: graphDatabaseEngine,
-		MinioEnabled:        minioEnabled,
-		DBVersion:           dbVersion,
-		DBMigrationError:    dbMigrationErr,
-		StartedAt:           startedAt,
-		UptimeSeconds:       uptimeSec,
+		Version:                Version,
+		Edition:                Edition,
+		CommitID:               CommitID,
+		BuildTime:              BuildTime,
+		GoVersion:              GoVersion,
+		KeywordIndexEngine:     keywordIndexEngine,
+		VectorStoreEngine:      vectorStoreEngine,
+		GraphDatabaseEngine:    graphDatabaseEngine,
+		MinioEnabled:           minioEnabled,
+		DBVersion:              dbVersion,
+		DBMigrationError:       dbMigrationErr,
+		TeachingMigrationError: database.CachedTeachingMigrationError(),
+		StartedAt:              startedAt,
+		UptimeSeconds:          uptimeSec,
 	}
 
 	logger.Info(ctx, "System info retrieved successfully")

@@ -112,6 +112,11 @@ type Tenant struct {
 	StorageEngineConfig *StorageEngineConfig `yaml:"storage_engine_config" json:"storage_engine_config" gorm:"type:jsonb"`
 	// DefaultStorageBackendID is the workspace default concrete storage instance.
 	DefaultStorageBackendID *string `yaml:"default_storage_backend_id" json:"default_storage_backend_id,omitempty" gorm:"column:default_storage_backend_id;type:varchar(36)"`
+	// DefaultAgentID is the agent auto-selected for new conversations in this
+	// workspace (sicau-v1 ticket 04). Empty/nil means no default. Clearing it
+	// goes through the dedicated map-based update — struct Updates() skips
+	// zero values and would silently keep the old agent.
+	DefaultAgentID *string `yaml:"default_agent_id" json:"default_agent_id,omitempty" gorm:"column:default_agent_id;type:varchar(36)"`
 	// Chat history config: knowledge base configuration for indexing and searching chat messages via vector search
 	ChatHistoryConfig *ChatHistoryConfig `yaml:"chat_history_config" json:"chat_history_config" gorm:"type:jsonb"`
 	// Retrieval config: global search/retrieval parameters shared by knowledge search and message search
@@ -374,17 +379,18 @@ func ResolveMinerUParseMethod(method string, legacyOCREnabled *bool) string {
 }
 
 func (c *ParserEngineConfig) ResolveChatParserEngine(fileType string) string {
-	if c != nil {
-		normalized := normalizeParserFileType(fileType)
-		for _, rule := range c.ChatParserEngineRules {
-			for _, candidate := range rule.FileTypes {
-				if normalizeParserFileType(candidate) == normalized {
-					return strings.TrimSpace(rule.Engine)
-				}
+	if c == nil {
+		return ""
+	}
+	fileType = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(fileType)), ".")
+	for _, rule := range c.ChatParserEngineRules {
+		for _, candidate := range rule.FileTypes {
+			if strings.TrimPrefix(strings.ToLower(strings.TrimSpace(candidate)), ".") == fileType {
+				return strings.TrimSpace(rule.Engine)
 			}
 		}
 	}
-	return DefaultParserEngine(fileType)
+	return ""
 }
 
 // ToOverridesMap returns a map suitable for ParserEngineOverrides in parse requests.
@@ -665,7 +671,7 @@ type TenantSandboxConfig struct {
 	SkillRollout string `json:"skill_rollout,omitempty"`
 
 	// Network is the outbound/inbound network policy applied to every sandbox
-	// created from this config — chat sessions, skill installs and deep
+	// created from this config - chat sessions, skill installs and deep
 	// connectivity probes alike. nil and the zero value mean the same thing:
 	// outbound egress allowed, inbound public access closed.
 	Network *SandboxNetworkPolicy `json:"network,omitempty"`

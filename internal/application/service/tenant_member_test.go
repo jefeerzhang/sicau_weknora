@@ -248,6 +248,19 @@ func (r *fakeTenantMemberRepo) RemoveOwnerAtomically(
 	return nil
 }
 
+// MemberUsageStats — sicau-v1 ticket 05 interface surface; these tests
+// exercise membership invariants only, so the aggregate is a stub.
+func (r *fakeTenantMemberRepo) MemberUsageStats(context.Context, uint64) ([]types.TenantMemberUsageStat, error) {
+	return nil, nil
+}
+
+// WithTx is the transaction seam: the in-memory fake has no real
+// transactions, so it returns itself regardless of tx (nil in unit tests
+// without a gorm handle).
+func (r *fakeTenantMemberRepo) WithTx(_ *gorm.DB) interfaces.TenantMemberRepository {
+	return r
+}
+
 // Compile-time guard so the test stays in sync with the interface.
 var _ interfaces.TenantMemberRepository = (*fakeTenantMemberRepo)(nil)
 
@@ -297,6 +310,9 @@ func (r *cleanupUserRepo) ListUsers(context.Context, int, int) ([]*types.User, e
 	return nil, nil
 }
 func (r *cleanupUserRepo) ListSystemAdmins(context.Context, int, int) ([]*types.User, int64, error) {
+	return nil, 0, nil
+}
+func (r *cleanupUserRepo) ListTeachers(context.Context, int, int) ([]*types.User, int64, error) {
 	return nil, 0, nil
 }
 func (r *cleanupUserRepo) RevokeSystemAdmin(context.Context, string, string) (*types.User, error) {

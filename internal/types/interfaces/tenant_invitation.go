@@ -5,12 +5,20 @@ import (
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/types"
+	"gorm.io/gorm"
 )
 
 // TenantInvitationRepository persists tenant_invitations rows that
 // capture the "pending invite" intent before it becomes a real
 // tenant_members row. All read methods skip GORM soft-deleted rows.
 type TenantInvitationRepository interface {
+	// WithTx returns a view of this repository whose every call executes
+	// on tx — the caller's database transaction. It is the seam that lets
+	// the invitation state machine and its success audits commit or roll
+	// back as one unit. A nil tx falls back to the repository's own
+	// connection (unit-test doubles return themselves).
+	WithTx(tx *gorm.DB) TenantInvitationRepository
+
 	// Create inserts a new pending invitation. Returns the conflict
 	// error sentinel (ErrPendingInvitationExists) if the (tenant_id,
 	// invitee) partial unique index rejects the insert.
@@ -25,6 +33,10 @@ type TenantInvitationRepository interface {
 	// service layer to short-circuit duplicate Create calls before
 	// they hit the unique index.
 	GetPendingByPair(ctx context.Context, tenantID uint64, inviteeUserID string) (*types.TenantInvitation, error)
+
+	// GetActiveShareLinkByTenant returns the tenant's single pending
+	// share-link row, or (nil, nil) when no reusable link exists.
+	GetActiveShareLinkByTenant(ctx context.Context, tenantID uint64) (*types.TenantInvitation, error)
 
 	// GetActiveByToken looks up the share-link row matching the
 	// supplied plaintext token. Returns (nil, nil) if no row matches

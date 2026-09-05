@@ -228,6 +228,19 @@ func (h *TenantInvitationHandler) ListTenantInvitations(c *gin.Context) {
 
 	usersByID := h.hydrateUsers(c, rows)
 	showShareLinks := types.TenantRoleFromContext(ctx).HasPermission(types.TenantRoleOwner)
+	var activeShareLink *types.TenantInvitationResponse
+	if showShareLinks {
+		active, activeErr := h.invitationService.GetActiveShareLink(ctx, tenantID)
+		if activeErr != nil {
+			logger.Errorf(ctx, "GetActiveShareLink failed: tenant=%d err=%v", tenantID, activeErr)
+			c.Error(apperrors.NewInternalServerError("failed to load active share link").WithDetails(activeErr.Error()))
+			return
+		}
+		if active != nil {
+			projected := h.projectInvitationWithLink(active, usersByID, nil)
+			activeShareLink = &projected
+		}
+	}
 	resp := make([]types.TenantInvitationResponse, 0, len(rows))
 	for _, inv := range rows {
 		// Within the tenant view we don't bother hydrating tenant name
@@ -243,10 +256,11 @@ func (h *TenantInvitationHandler) ListTenantInvitations(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"invitations": resp,
-			"total":       total,
-			"page":        page,
-			"page_size":   pageSize,
+			"invitations":       resp,
+			"active_share_link": activeShareLink,
+			"total":             total,
+			"page":              page,
+			"page_size":         pageSize,
 		},
 	})
 }
@@ -276,6 +290,14 @@ func (h *TenantInvitationHandler) CreateInvitation(c *gin.Context) {
 	}
 	if !req.Role.IsValid() {
 		c.Error(apperrors.NewValidationError("role must be one of owner/admin/contributor/viewer"))
+		return
+	}
+	// sicau-v1 ticket 02 (ADR-009-4) + teaching #17: invitations are
+	// viewer-only (Student). Elevated workspace roles are not mintable
+	// through invite or member-management teaching routes.
+	if req.Role != types.TenantRoleViewer {
+		c.Error(apperrors.NewValidationError(
+			"invitation role is fixed to viewer (student)"))
 		return
 	}
 
@@ -357,6 +379,10 @@ func (h *TenantInvitationHandler) autoAcceptInvitationAndRespond(
 	role types.TenantRole,
 	invitedBy *string,
 ) {
+	// #21: the teaching model materialises invitation joins as students
+	// only. The creation guard already forces viewer; clamping here makes
+	// the boundary self-contained instead of trusting every caller.
+	role = types.TenantRoleViewer
 	member, err := h.memberService.AddMember(ctx, user.ID, tenantID, role, invitedBy)
 	if err != nil {
 		writeAddMemberError(c, ctx, user, tenantID, err)
