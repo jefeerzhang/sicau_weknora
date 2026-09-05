@@ -13,6 +13,12 @@ export const INTEGRATION_TABS: IntegrationTab[] = ['im', 'embed', 'api', 'chrome
 export type IntegrationTabRole = 'viewer' | 'contributor' | 'admin' | 'owner'
 
 export const INTEGRATION_TAB_MIN_ROLE: Partial<Record<IntegrationTab, IntegrationTabRole>> = {
+  // sicau-v1 ADR-009-7: students (viewer) cannot manage publish channels;
+  // teachers/TAs start at contributor. API remains owner-only.
+  im: 'contributor',
+  embed: 'contributor',
+  chrome: 'contributor',
+  claw: 'contributor',
   api: 'owner',
 }
 

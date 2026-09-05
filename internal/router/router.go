@@ -268,7 +268,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterMessageRoutes(v1, params.MessageHandler, rbacGuards)
 		RegisterModelRoutes(v1, params.ModelHandler, params.ModelCredentialsHandler, rbacGuards)
 		RegisterSandboxConfigRoutes(v1, params.SandboxConfigHandler, params.SandboxSkillHandler, rbacGuards)
-		RegisterMyEnvVarRoutes(v1, params.MeEnvVarHandler)
+		RegisterMyEnvVarRoutes(v1, params.MeEnvVarHandler, rbacGuards)
 		RegisterMyNoteRoutes(v1, params.MeNoteHandler)
 		RegisterAnnouncementRoutes(v1, params.MeAnnouncementHandler, rbacGuards)
 		RegisterEvaluationRoutes(v1, params.EvaluationHandler, rbacGuards)

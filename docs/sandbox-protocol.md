@@ -5,8 +5,8 @@
 ## 结论
 
 - 跨主机、需要内核级隔离的部署走 E2B 协议（控制面 REST + 数据面 envd）：WeKnora 只维护一套这样的客户端，具体隔离能力由社区实现提供，见下面的选型表。
-- 单机 / 私有化部署可以直接用 `docker` 后端：它现在也是会话级后端（一个会话一个长驻容器），在应用层与 E2B 行为一致，代价是空闲回收、执行超时这些控制面职责由 WeKnora 承担。详见 [Docker 沙箱后端](./sandbox-docker-backend.md)。
-- `local` 后端在 WeKnora 主机上直接跑脚本，没有任何隔离，只适合可信的开发空间。
+- 单机 / 私有化部署可以直接用 `docker` 后端：它现在也是会话级后端（一个会话一个长驻容器），在应用层与 E2B 行为一致，代价是空闲回收、执行超时这些控制面职责由 WeKnora 承担。详见 [Docker 沙箱后端](./sandbox-docker-backend.md)。**教学 / 川农默认关闭** Docker 沙箱（`WEKNORA_SANDBOX_DOCKER_ENABLED=false`），需显式 opt-in。
+- **`local` 后端已在 v0.8.0 删除**：不再提供本机无隔离进程沙箱；请改用 Docker（opt-in）或 E2B/Cube。
 
 ## 当前的后端形态
 
@@ -14,10 +14,9 @@
 | --- | --- | --- | --- | --- |
 | `e2b` | E2B 协议 | 持久（一个会话一个沙箱） | 支持 | 生产主路径，可指向任意 E2B 兼容控制面 |
 | `cube` | E2B 兼容（走 Cube 官方 Go SDK） | 持久 | 支持 | CubeSandbox 专用适配器，见“为什么还留着 cube 适配器” |
-| `docker` | 无（Docker Engine API） | 持久（一个会话一个容器） | 支持 | 单机 / 私有化部署，见 [Docker 沙箱后端](./sandbox-docker-backend.md) |
-| `local` | 无（本机进程） | 无 | 不支持 | 本机开发调试，隔离性最弱 |
+| `docker` | 无（Docker Engine API） | 持久（一个会话一个容器） | 支持 | 单机 / 私有化；**默认关闭**，见 [Docker 沙箱后端](./sandbox-docker-backend.md) |
 
-`docker` 与 E2B 协议后端的分界不在能力而在规模：一个 docker 配置就是一台 daemon，跨主机调度、内核级隔离、内存态快照都不在它的能力范围内，那些正是 E2B 兼容实现提供的东西。`local` 依然不参与会话级能力集。能力矩阵在 `internal/sandbox/capabilities.go` 中显式表达，agent 侧据此决定是否注册 shell/文件类工具。
+`docker` 与 E2B 协议后端的分界不在能力而在规模：一个 docker 配置就是一台 daemon，跨主机调度、内核级隔离、内存态快照都不在它的能力范围内，那些正是 E2B 兼容实现提供的东西。能力矩阵在 `internal/sandbox/capabilities.go` 中显式表达，agent 侧据此决定是否注册 shell/文件类工具。
 
 ## 可直接使用的开源实现
 

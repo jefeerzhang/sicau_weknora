@@ -8,7 +8,10 @@ import {
 } from './settingsAccess'
 
 test('management shortcuts are stricter than read-only settings pages', () => {
-  assert.equal(SETTINGS_SECTION_MIN_ROLE.members, 'viewer')
+  // sicau-v1 ticket 01: the roster itself is Admin+ (names/emails/student
+  // IDs), so the members section is no longer a viewer-readable page — the
+  // "stricter shortcut" rationale below keeps applying to models only.
+  assert.equal(SETTINGS_SECTION_MIN_ROLE.members, 'admin')
   assert.equal(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.members, 'owner')
   assert.equal(SETTINGS_SECTION_MIN_ROLE.models, 'viewer')
   assert.equal(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.models, 'admin')
@@ -17,11 +20,12 @@ test('management shortcuts are stricter than read-only settings pages', () => {
 test('the skill catalog is admin-only like the sandbox it installs into', () => {
   assert.equal(SETTINGS_SECTION_MIN_ROLE.skills, 'admin')
   assert.equal(SETTINGS_SECTION_MIN_ROLE.skills, SETTINGS_SECTION_MIN_ROLE.sandbox)
-  assert.equal(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.skills, 'admin')
 })
 
-test('personal skill environment variables are visible to every member', () => {
-  assert.equal(SETTINGS_SECTION_MIN_ROLE.envvars, 'viewer')
+test('sicau-v1: personal sandbox secrets stay contributor+ (students sealed)', () => {
+  // ADR-009-7 / issue #4: viewers (students) must not see or manage
+  // settings.envvars; teachers/TAs remain contributor+.
+  assert.equal(SETTINGS_SECTION_MIN_ROLE.envvars, 'contributor')
   // Workspace-wide skill env values live on the Admin+ skills page; a
   // management shortcut on the avatar menu would only duplicate that entrance.
   assert.equal(

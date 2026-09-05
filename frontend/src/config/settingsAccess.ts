@@ -25,12 +25,15 @@ export const SETTINGS_SECTION_MIN_ROLE: Record<string, SettingsRoleKey> = {
   system: 'viewer',
   userprofile: 'viewer',
   tenant: 'viewer',
-  members: 'viewer',
+  // sicau-v1 ticket 01: the member roster (names/emails/student IDs) is
+  // teacher-only. Mirrors the backend Admin+ guard on GET /tenants/:id/members.
+  members: 'admin',
   mymemory: 'viewer',
   memory: 'admin',
-  // Every member fills in their own environment variables; the workspace-wide
-  // values stay on the Admin+ skills page.
-  envvars: 'viewer',
+  // sicau-v1 ADR-009-7 / issue #4: personal sandbox secrets are teacher-side
+  // (contributor+). Students (viewers) use pure Q&A and must not manage keys.
+  // Workspace-wide values stay on the Admin+ skills page.
+  envvars: 'contributor',
 }
 
 /**
@@ -40,7 +43,6 @@ export const SETTINGS_SECTION_MIN_ROLE: Record<string, SettingsRoleKey> = {
 export const SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE = {
   members: 'owner',
   models: 'admin',
-  skills: 'admin',
 } as const satisfies Record<string, SettingsRoleKey>
 
 export const SYSTEM_ADMIN_SETTINGS_SECTIONS = new Set([

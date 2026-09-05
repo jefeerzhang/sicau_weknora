@@ -181,9 +181,9 @@ func RegisterMyInvitationRoutes(r *gin.RouterGroup, invitationHandler *handler.T
 }
 
 // RegisterMyEnvVarRoutes wires the caller's own environment variables under
-// /me/env-vars. The v1 group already applies middleware.Auth, and no role gate
-// is added on purpose: these are the caller's own values, and the service
-// derives whose they are from the context rather than the request.
+// /me/env-vars. Values are still principal-scoped in the service (derived from
+// context, never from the request body), but sicau-v1 ADR-009-7 seals the
+// surface for students (viewers): Contributor+ only, matching settings.envvars.
 //
 // This deliberately does not reuse /sandbox-configs/:id/skills*, which is
 // Admin+ even for reads (see routes_infra.go): an upload there drives a root
@@ -192,11 +192,11 @@ func RegisterMyInvitationRoutes(r *gin.RouterGroup, invitationHandler *handler.T
 //
 // h may be nil in environments built without the dependency wired; a no-op
 // registration is preferable to a startup crash, as with the invitation inbox.
-func RegisterMyEnvVarRoutes(r *gin.RouterGroup, h *handler.MeEnvVarHandler) {
+func RegisterMyEnvVarRoutes(r *gin.RouterGroup, h *handler.MeEnvVarHandler, g *rbacGuards) {
 	if h == nil {
 		return
 	}
-	me := r.Group("/me/env-vars")
+	me := r.Group("/me/env-vars", g.Contributor())
 	{
 		me.GET("", h.List)
 		me.PUT("/skill", h.SetSkill)

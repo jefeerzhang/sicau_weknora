@@ -264,17 +264,18 @@ func RegisterEmbedChannelRoutes(r *gin.RouterGroup, embedHandler *handler.EmbedC
 	agentEmbed := g.apiKeyGroup(r.Group("/agents/:id/embed-channels"), apiKeyManageChannels(apiKeyFullAccess()))
 	{
 		agentEmbed.POST("", g.Admin(), embedHandler.CreateEmbedChannel)
-		agentEmbed.GET("", g.Viewer(), embedHandler.ListEmbedChannels)
+		// sicau-v1 ADR-009-7: management reads are Contributor+ (students sealed).
+		agentEmbed.GET("", g.Contributor(), embedHandler.ListEmbedChannels)
 	}
 	channels := g.apiKeyGroup(r.Group("/embed-channels"), apiKeyManageChannels(apiKeyFullAccess()))
 	{
-		channels.GET("", g.Viewer(), embedHandler.ListAllEmbedChannels)
-		channels.GET("/:channel_id", g.Viewer(), embedHandler.GetEmbedChannel)
+		channels.GET("", g.Contributor(), embedHandler.ListAllEmbedChannels)
+		channels.GET("/:channel_id", g.Contributor(), embedHandler.GetEmbedChannel)
 		channels.PUT("/:channel_id", g.Admin(), embedHandler.UpdateEmbedChannel)
 		channels.DELETE("/:channel_id", g.Admin(), embedHandler.DeleteEmbedChannel)
 		channels.POST("/:channel_id/rotate-token", g.Admin(), embedHandler.RotateEmbedToken)
-		channels.POST("/:channel_id/preview-session", g.Viewer(), embedHandler.IssuePreviewSession)
-		channels.GET("/:channel_id/stats", g.Viewer(), embedHandler.GetEmbedChannelStats)
+		channels.POST("/:channel_id/preview-session", g.Contributor(), embedHandler.IssuePreviewSession)
+		channels.GET("/:channel_id/stats", g.Contributor(), embedHandler.GetEmbedChannelStats)
 	}
 }
 
@@ -291,20 +292,21 @@ func RegisterIMRoutes(r *gin.Engine, imHandler *handler.IMHandler) {
 // RegisterIMChannelRoutes registers IM channel CRUD routes (requires authentication).
 //
 // IM channels carry external bot credentials (WeChat/Feishu/Slack/...);
-// listing is Viewer+ but any mutation, toggle, or QR-code login flow
-// (which can hijack a personal WeChat session) is Admin+.
+// sicau-v1 ADR-009-7 seals listing for students (Contributor+). Mutations,
+// toggle, or QR-code login flow (which can hijack a personal WeChat session)
+// stay Admin+.
 func RegisterIMChannelRoutes(r *gin.RouterGroup, imHandler *handler.IMHandler, g *rbacGuards) {
 	// Channel CRUD under agents
 	agentChannels := g.apiKeyGroup(r.Group("/agents/:id/im-channels"), apiKeyManageChannels(apiKeyFullAccess()))
 	{
 		agentChannels.POST("", g.Admin(), imHandler.CreateIMChannel)
-		agentChannels.GET("", g.Viewer(), imHandler.ListIMChannels)
+		agentChannels.GET("", g.Contributor(), imHandler.ListIMChannels)
 	}
 
 	// Channel operations by channel ID
 	channels := g.apiKeyGroup(r.Group("/im-channels"), apiKeyManageChannels(apiKeyFullAccess()))
 	{
-		channels.GET("", g.Viewer(), imHandler.ListAllIMChannels)
+		channels.GET("", g.Contributor(), imHandler.ListAllIMChannels)
 		channels.PUT("/:id", g.Admin(), imHandler.UpdateIMChannel)
 		channels.DELETE("/:id", g.Admin(), imHandler.DeleteIMChannel)
 		channels.POST("/:id/toggle", g.Admin(), imHandler.ToggleIMChannel)
