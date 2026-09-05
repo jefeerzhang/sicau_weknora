@@ -17,7 +17,21 @@ $src = (Resolve-Path $Worktree).Path -replace '\\', '/'
 $args = @("test") + ($Packages -split '\s+' | Where-Object { $_ }) + @("-count=1", "-timeout", $Timeout)
 if ($Run) { $args += @("-run", $Run) }
 
-Write-Host "docker $Image go $($args -join ' ')  (workdir=$src)"
+# sqlite-vec / some packages need C headers; slim golang images omit them.
+# Keep PATH explicit: apt-get can run in a context where /usr/local/go/bin
+# is not inherited by `bash -lc` depending on image entrypoint.
+$quoted = ($args | ForEach-Object {
+    "'" + ($_ -replace "'", "'\''") + "'"
+}) -join ' '
+$shell = @"
+set -e
+export PATH="/usr/local/go/bin:`$PATH"
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libsqlite3-dev >/dev/null
+go $quoted
+"@
+
+Write-Host "docker $Image go $($args -join ' ')  (workdir=$src; +libsqlite3-dev)"
 docker run --rm `
   -v "${src}:/src" `
   -v weknora-go-mod-cache:/go/pkg/mod `
@@ -25,4 +39,4 @@ docker run --rm `
   -w /src `
   -e CGO_ENABLED=1 `
   $Image `
-  go @args
+  bash -lc $shell
