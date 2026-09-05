@@ -264,6 +264,7 @@ func TestEnsureTeachingMigrationState_AuditFailureBlocksStartup(t *testing.T) {
 	if err := db.Create(&types.TenantInvitation{
 		TenantID:      1,
 		InviteeUserID: "u-new",
+		Token:         "secret-share-token",
 		Role:          types.TenantRoleContributor,
 		Status:        types.TenantInvitationStatusPending,
 		ExpiresAt:     now.Add(time.Hour),
@@ -281,6 +282,11 @@ func TestEnsureTeachingMigrationState_AuditFailureBlocksStartup(t *testing.T) {
 
 	if msg := database.CachedTeachingMigrationError(); msg == "" {
 		t.Fatalf("mid-run audit failure must record a blocked state")
+	}
+	// Even the raw driver error surfaced through the blocked state must
+	// never carry invitation token values (#24).
+	if strings.Contains(database.CachedTeachingMigrationError(), "secret-share-token") {
+		t.Fatalf("blocked state must not leak invitation tokens: %q", database.CachedTeachingMigrationError())
 	}
 	// The downgrade rolled back with its audit: permissions and audit
 	// facts stay consistent even on the startup path.

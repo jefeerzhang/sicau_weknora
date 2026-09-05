@@ -95,10 +95,13 @@ func (p *TeachingMigrationPhase) hasAnomalyTenantUniqueIndex() bool {
 		if !ok || !unique {
 			continue
 		}
-		for _, col := range idx.Columns() {
-			if strings.EqualFold(col, "tenant_id") {
-				return true
-			}
+		cols := idx.Columns()
+		// Single-column unique on tenant_id only: the anomaly upsert relies
+		// on ON CONFLICT (tenant_id), which a composite index does not
+		// satisfy — accepting it would trade the actionable schema error
+		// for a raw SQL failure mid-run.
+		if len(cols) == 1 && strings.EqualFold(cols[0], "tenant_id") {
+			return true
 		}
 	}
 	return false
