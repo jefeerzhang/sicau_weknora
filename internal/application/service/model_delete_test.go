@@ -310,6 +310,9 @@ func (s *stubTenantServiceForModelDelete) ListTenants(context.Context) ([]*types
 func (s *stubTenantServiceForModelDelete) UpdateTenant(context.Context, *types.Tenant) (*types.Tenant, error) {
 	return nil, nil
 }
+func (s *stubTenantServiceForModelDelete) UpdateTenantDefaultAgentID(context.Context, uint64, string) error {
+	return nil
+}
 func (s *stubTenantServiceForModelDelete) DeleteTenant(context.Context, uint64) error { return nil }
 func (s *stubTenantServiceForModelDelete) ListAllTenants(context.Context) ([]*types.Tenant, error) {
 	return nil, nil

@@ -1,6 +1,12 @@
 import { defineStore } from "pinia";
 import { nextTick } from "vue";
 import { BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from "@/api/agent";
+
+// Workspace default agent is auto-applied only until the user explicitly
+// picks an agent. While this flag is set in localStorage, Input-field skips
+// force-applying the tenant default over the local choice.
+export const EXPLICIT_AGENT_CHOSEN_KEY = 'weknora_agent_explicitly_chosen';
+export const markAgentExplicitlyChosen = () => { try { localStorage.setItem(EXPLICIT_AGENT_CHOSEN_KEY, '1'); } catch { /* ignore */ } };
 import { getApiBaseUrl } from "@/utils/api-base";
 import { isAgentStreamAgentId } from "@/utils/agent-mode";
 import { loadAndReconcileSettings } from "@/stores/settingsStorage";

@@ -4,7 +4,9 @@ import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
 import { onBeforeRouteUpdate } from 'vue-router';
 import { MessagePlugin } from "tdesign-vue-next";
-import { useSettingsStore } from '@/stores/settings';
+import { useSettingsStore, markAgentExplicitlyChosen, EXPLICIT_AGENT_CHOSEN_KEY } from '@/stores/settings';
+import { useAuthStore } from '@/stores/auth';
+import { getDefaultAgentId } from '@/api/tenant';
 import { useUIStore } from '@/stores/ui';
 import { useMenuStore } from '@/stores/menu';
 import { listKnowledgeBases, searchKnowledge, batchQueryKnowledge, listKnowledgeTags } from '@/api/knowledge-base';
@@ -51,6 +53,7 @@ import { SKILL_ICON, type MentionItem, type MentionItemType, type MentionRequest
 const route = useRoute();
 const router = useRouter();
 const settingsStore = useSettingsStore();
+const authStore = useAuthStore();
 const uiStore = useUIStore();
 const orgStore = useOrganizationStore();
 const menuStore = useMenuStore();
@@ -100,7 +103,9 @@ const handleDroppedFiles = (files: File[]) => {
     }
   }
 
-  if (attachmentFiles.length > 0) {
+  // Course students (viewer) cannot upload chat attachments; match the hidden upload button.
+  const attachmentsBlocked = !authStore.hasRole('contributor');
+  if (attachmentFiles.length > 0 && !attachmentsBlocked) {
     attachmentUploadRef.value?.addFiles(attachmentFiles);
   }
 };
@@ -155,7 +160,10 @@ const agentModeDropdownStyle = ref<Record<string, string>>({});
 
 const selectedAgentId = computed({
   get: () => settingsStore.selectedAgentId || BUILTIN_QUICK_ANSWER_ID,
-  set: (val: string) => settingsStore.selectAgent(val)
+  set: (val: string) => {
+    markAgentExplicitlyChosen();
+    settingsStore.selectAgent(val);
+  }
 });
 const selectedAgent = computed(() => {
   // When a shared-agent source tenant is set, resolve from sharedAgents FIRST.
@@ -854,10 +862,28 @@ const loadAgents = async (force = false) => {
   try {
     await chatResources.ensureAgents(force);
     ensureSelectedAgentNotDisabled();
+    await applyWorkspaceDefaultAgent();
   } catch (error) {
     console.error('Failed to load agents:', error);
   }
 };
+
+// Apply workspace default agent so course students land ready to ask.
+// Skip when the member already picked an agent (localStorage flag) or local
+// state already holds a non-builtin selection. Missing/deleted defaults are ignored.
+async function applyWorkspaceDefaultAgent() {
+  try {
+    if (localStorage.getItem(EXPLICIT_AGENT_CHOSEN_KEY) === '1') return;
+    if ((settingsStore.settings.selectedAgentId || '') !== BUILTIN_QUICK_ANSWER_ID) return;
+    const res = await getDefaultAgentId();
+    const defaultId = res?.data?.agent_id;
+    if (!defaultId) return;
+    if (!agents.value.some(a => a.id === defaultId)) return;
+    settingsStore.selectAgent(defaultId);
+  } catch (error) {
+    console.warn('[InputField] apply workspace default agent failed:', error);
+  }
+}
 
 // 默认选中的 builtin（builtin-quick-answer）也可能被当前空间管理员停用。
 // 列表加载完后做一次纠偏：若当前选中的是本空间停用的 agent（仅限「我的/builtin」，
@@ -2176,6 +2202,7 @@ const handleSelectAgent = async (agent: CustomAgent, sourceTenantId?: string) =>
     return;
   }
 
+  markAgentExplicitlyChosen();
   settingsStore.selectAgent(agent.id, sourceTenantId);
   settingsStore.toggleAgent(!!isAgentType);
 
@@ -2636,8 +2663,8 @@ defineExpose({
             </div>
           </t-tooltip>
 
-          <!-- 附件上传按钮 -->
-          <t-tooltip placement="top" theme="light" :popupProps="{ overlayClassName: 'input-field-tooltip' }">
+          <!-- 附件上传按钮：学生 (viewer) 不展示；后端同步拒绝 -->
+          <t-tooltip v-if="authStore.hasRole('contributor')" placement="top" theme="light" :popupProps="{ overlayClassName: 'input-field-tooltip' }">
             <template #content>
               <span>{{ uploadedAttachments.length > 0 ? $t('chat.attachmentWithCount', {
                 count: uploadedAttachments.length

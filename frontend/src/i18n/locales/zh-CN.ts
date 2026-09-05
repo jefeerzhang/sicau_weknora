@@ -5700,6 +5700,12 @@ export default {
     }
   },
   agent: {
+    setAsDefault: '设为空间默认',
+    unsetAsDefault: '取消空间默认',
+    defaultBadge: '默认',
+    defaultAgentSet: '已设为空间默认',
+    defaultAgentCleared: '已取消空间默认',
+    defaultAgentSetFailed: '设置默认智能体失败',
     taskLabel: '任务:',
     think: '思考',
     copy: '复制',
@@ -5713,6 +5719,7 @@ export default {
       collecting: '正在保存生成的文件…',
       download: '下载',
       downloadFailed: '下载失败，请稍后重试',
+      downloadDisabled: '当前角色不支持文件下载',
       inlinePreviewHint: '点击预览',
       inlineMissing: '文件不可用',
     },

@@ -799,6 +799,12 @@ export default {
     }
   },
   agent: {
+    setAsDefault: 'Set as workspace default',
+    unsetAsDefault: 'Unset workspace default',
+    defaultBadge: 'Default',
+    defaultAgentSet: 'Workspace default agent set',
+    defaultAgentCleared: 'Workspace default agent cleared',
+    defaultAgentSetFailed: 'Failed to set the default agent',
     taskLabel: 'Task:',
     think: 'Thinking',
     copy: 'Copy',
@@ -812,6 +818,7 @@ export default {
       collecting: 'Saving generated files…',
       download: 'Download',
       downloadFailed: 'Download failed, please retry.',
+      downloadDisabled: 'File download is not available for your role',
       inlinePreviewHint: 'Click to preview',
       inlineMissing: 'File unavailable',
     },

@@ -193,6 +193,10 @@
                   <div v-else-if="agent.avatar" class="builtin-avatar agent-emoji">{{ agent.avatar }}</div>
                   <AgentAvatar v-else :name="agent.name" size="small" />
                   <span class="card-title" :title="agent.name">{{ agent.name }}</span>
+                  <t-tag v-if="defaultAgentId === agent.id" theme="success" variant="light" size="small"
+                    class="default-agent-badge">
+                    {{ t('agent.defaultBadge') }}
+                  </t-tag>
                 </div>
                 <t-popup
                   v-if="agent.isMine && (canManageAgent(agent) || authStore.hasRole('contributor') || authStore.hasRole('admin'))"
@@ -214,6 +218,11 @@
                         @click="handleToggleDisabled(agent)">
                         <t-icon class="menu-icon" name="poweroff" />
                         <span>{{ agent.disabled_by_me ? $t('agent.enable') : $t('agent.disable') }}</span>
+                      </div>
+                      <div v-if="authStore.hasRole('admin')" class="popup-menu-item"
+                        @click="handleSetDefaultAgent(agent)">
+                        <t-icon class="menu-icon" name="star" />
+                        <span>{{ defaultAgentId === agent.id ? t('agent.unsetAsDefault') : t('agent.setAsDefault') }}</span>
                       </div>
                       <div v-if="!agent.is_builtin && canManageAgent(agent)" class="popup-menu-item delete"
                         @click="handleDelete(agent)"><t-icon class="menu-icon" name="delete" /><span>{{
@@ -395,6 +404,10 @@
                   <div v-else-if="agent.avatar" class="builtin-avatar agent-emoji">{{ agent.avatar }}</div>
                   <AgentAvatar v-else :name="agent.name" size="small" />
                   <span class="card-title" :title="agent.name">{{ agent.name }}</span>
+                  <t-tag v-if="defaultAgentId === agent.id" theme="success" variant="light" size="small"
+                    class="default-agent-badge">
+                    {{ t('agent.defaultBadge') }}
+                  </t-tag>
                 </div>
                 <t-popup v-if="canManageAgent(agent) || authStore.hasRole('contributor') || authStore.hasRole('admin')"
                   :visible="openMoreAgentId === agent.id" trigger="hover" overlayClassName="card-more-popup"
@@ -418,6 +431,11 @@
                         @click="handleToggleDisabled(agent)">
                         <t-icon class="menu-icon" name="poweroff" />
                         <span>{{ agent.disabled_by_me ? $t('agent.enable') : $t('agent.disable') }}</span>
+                      </div>
+                      <div v-if="authStore.hasRole('admin')" class="popup-menu-item"
+                        @click="handleSetDefaultAgent(agent)">
+                        <t-icon class="menu-icon" name="star" />
+                        <span>{{ defaultAgentId === agent.id ? t('agent.unsetAsDefault') : t('agent.setAsDefault') }}</span>
                       </div>
                       <div v-if="!agent.is_builtin && canManageAgent(agent)" class="popup-menu-item delete"
                         @click="handleDelete(agent)">
@@ -822,7 +840,7 @@ import { useI18n } from 'vue-i18n'
 import { createSessions } from '@/api/chat/index'
 import { useOrganizationStore } from '@/stores/organization'
 import { setSharedAgentDisabledByMe, listOrganizationSharedAgents } from '@/api/organization'
-import { useSettingsStore } from '@/stores/settings'
+import { useSettingsStore, markAgentExplicitlyChosen } from '@/stores/settings'
 import { useMenuStore } from '@/stores/menu'
 import type { SharedAgentInfo, OrganizationSharedAgentItem } from '@/api/organization'
 import AgentEditorModal from './AgentEditorModal.vue'
@@ -836,6 +854,7 @@ import ListSpaceSidebar from '@/components/ListSpaceSidebar.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
 import { shouldShowResourceOriginBadge } from '@/utils/card-list-badge'
 import { useAuthStore } from '@/stores/auth'
+import { getDefaultAgentId, putDefaultAgentId } from '@/api/tenant'
 import { useListUrlState } from '@/composables/useListUrlState'
 import { useResourcePins } from '@/composables/useResourcePins'
 import { integrationSectionKey } from '@/config/settingsRoute'
@@ -1238,8 +1257,37 @@ watch(creatorFilter, () => {
   fetchList(true)
 })
 
+const defaultAgentId = ref('')
+const defaultAgentLoading = ref(false)
+
+async function loadDefaultAgentId() {
+  if (defaultAgentLoading.value) return
+  defaultAgentLoading.value = true
+  try {
+    const res = await getDefaultAgentId()
+    defaultAgentId.value = res?.data?.agent_id || ''
+  } catch {
+    defaultAgentId.value = ''
+  } finally {
+    defaultAgentLoading.value = false
+  }
+}
+
+/** Set/clear workspace default agent (Admin+; server enforces the same). */
+async function handleSetDefaultAgent(agent: CustomAgent) {
+  const target = defaultAgentId.value === agent.id ? '' : agent.id
+  const res = await putDefaultAgentId(target)
+  if (res?.success) {
+    defaultAgentId.value = target
+    MessagePlugin.success(target ? t('agent.defaultAgentSet') : t('agent.defaultAgentCleared'))
+  } else {
+    MessagePlugin.error(res?.message || t('agent.defaultAgentSetFailed'))
+  }
+}
+
 onMounted(() => {
   fetchList()
+  loadDefaultAgentId()
   window.addEventListener('openAgentEditor', handleOpenAgentEditor as EventListener)
 })
 
@@ -1302,6 +1350,7 @@ async function handleUseSharedAgentInChat(shared: SharedAgentInfo) {
   closeSharedAgentDetail()
   const settingsStore = useSettingsStore()
   const menuStore = useMenuStore()
+  markAgentExplicitlyChosen()
   settingsStore.selectAgent(shared.agent.id, String(shared.source_tenant_id))
   try {
     const res = await createSessions({})

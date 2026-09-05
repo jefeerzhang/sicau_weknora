@@ -58,11 +58,14 @@ func RegisterSessionRoutes(
 		sessions.DELETE("/:id", handler.DeleteSession)
 		sessions.DELETE("/:id/messages", handler.ClearSessionMessages)
 		sessions.POST("/:session_id/generate_title", handler.GenerateTitle)
-		sessions.POST("/:session_id/attachments", handler.UploadTemporaryDocument)
-		sessions.GET("/:id/attachments", handler.ListTemporaryDocuments)
-		sessions.GET("/:id/attachments/:attachment_id", handler.GetTemporaryDocument)
-		sessions.GET("/:id/attachments/:attachment_id/preview", handler.PreviewTemporaryDocument)
-		sessions.DELETE("/:id/attachments/:attachment_id", handler.DeleteTemporaryDocument)
+		// sicau-v1: course students (viewers) cannot upload chat
+		// attachments - pure Q&A deployment (design ADR-009-6 pattern,
+		// backend-enforced rather than frontend-hidden only).
+		sessions.POST("/:session_id/attachments", g.Contributor(), handler.UploadTemporaryDocument)
+		sessions.GET("/:id/attachments", g.Contributor(), handler.ListTemporaryDocuments)
+		sessions.GET("/:id/attachments/:attachment_id", g.Contributor(), handler.GetTemporaryDocument)
+		sessions.GET("/:id/attachments/:attachment_id/preview", g.Contributor(), handler.PreviewTemporaryDocument)
+		sessions.DELETE("/:id/attachments/:attachment_id", g.Contributor(), handler.DeleteTemporaryDocument)
 		sessions.POST("/:session_id/stop", handler.StopSession)
 		// POST and DELETE share this path but gin maintains a separate radix tree
 		// per HTTP verb, and the existing trees use different wildcard names
@@ -84,6 +87,12 @@ func RegisterSessionRoutes(
 		// metadata; the actual bytes are streamed via /artifacts/:index/download
 		// so the storage URL never appears on the wire.
 		//
+		// sicau-v1 ticket 03: artifact routes sit on the Viewer+ sessions
+		// group but carry an extra Contributor+ guard - course students
+		// (viewers) are pure Q&A and must not fetch generated files. The
+		// frontend hides the download surface for viewers and shows a
+		// friendly notice if a stale client still hits a 403.
+		//
 		// NOTE: gin builds a separate radix tree per HTTP verb but every
 		// path in the same tree must share the same wildcard name. The GET
 		// tree already binds :id via /sessions/:id (GetSession); reusing
@@ -91,9 +100,9 @@ func RegisterSessionRoutes(
 		// "wildcard conflicts" panic at route registration. The handlers
 		// read the URL param via c.Param("session_id") with a fallback to
 		// c.Param("id") for exactly this reason.
-		sessions.GET("/:id/artifacts", handler.ListSessionArtifacts)
-		sessions.GET("/:id/messages/:message_id/artifacts", handler.ListMessageArtifacts)
-		sessions.GET("/:id/messages/:message_id/artifacts/:index/download", handler.DownloadMessageArtifact)
+		sessions.GET("/:id/artifacts", g.Contributor(), handler.ListSessionArtifacts)
+		sessions.GET("/:id/messages/:message_id/artifacts", g.Contributor(), handler.ListMessageArtifacts)
+		sessions.GET("/:id/messages/:message_id/artifacts/:index/download", g.Contributor(), handler.DownloadMessageArtifact)
 	}
 }
 

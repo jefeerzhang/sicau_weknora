@@ -381,8 +381,8 @@
                   :title="$t('agent.copy')">
                   <t-icon name="copy" />
                 </t-button>
-                <t-button size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge(event)"
-                  :title="$t('agent.addToKnowledgeBase')">
+                <t-button v-if="authStore.hasRole('contributor')" size="small" variant="outline" shape="round"
+                  @click.stop="handleAddToKnowledge(event)" :title="$t('agent.addToKnowledgeBase')">
                   <t-icon name="bookmark-add" />
                 </t-button>
                 <!-- Skill artifact download: only shown when the persisted

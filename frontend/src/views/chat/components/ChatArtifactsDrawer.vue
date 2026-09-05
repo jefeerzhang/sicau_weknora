@@ -66,6 +66,7 @@
                 </div>
                 <div class="artifact-drawer-header-title" :title="previewItem.file_name">{{ previewItem.file_name }}</div>
                 <t-button
+                    v-if="canDownloadFiles"
                     class="artifact-download"
                     variant="text"
                     shape="square"
@@ -136,6 +137,7 @@
                     </template>
                 </t-button>
                 <t-button
+                    v-if="canDownloadFiles"
                     class="artifact-download"
                     variant="text"
                     shape="square"
@@ -180,6 +182,9 @@ import { downloadArtifact, listMessageArtifacts, type ArtifactMeta } from '@/api
 import { getFileIcon } from '@/utils/files'
 import { resolveFilePreviewExt } from '@/utils/filePreview'
 import DocumentPreview from '@/components/document-preview.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const httpForbiddenStatus = 403
 
 const LIST_WIDTH = 440
 const PREVIEW_WIDTH_KEY = 'weknora-chat-artifact-preview-width'
@@ -204,6 +209,13 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const authStore = useAuthStore()
+// Artifact downloads are Contributor+ (backend enforces it); course students
+// get a read-only drawer, with a friendly notice if a stale client hits 403.
+const canDownloadFiles = computed(
+    () => authStore.canAccessAllTenants || authStore.hasRole('contributor'),
+)
 
 /** TDesign always follows @close with update:visible=false; swallow that when popping preview. */
 let suppressDrawerClose = false
@@ -413,6 +425,11 @@ async function handleDownload(item: ArtifactMeta) {
         setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err) {
         console.error('[ChatArtifactsDrawer] download failed:', err)
+        const status = (err as any)?.status ?? (err as any)?.response?.status
+        if (status === httpForbiddenStatus) {
+            MessagePlugin.warning(t('agent.artifactDrawer.downloadDisabled'))
+            return
+        }
         MessagePlugin.error(t('agent.artifactDrawer.downloadFailed'))
     } finally {
         downloading[item.index] = false

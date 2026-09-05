@@ -48,8 +48,9 @@
                     :title="$t('agent.copy')">
                     <t-icon name="copy" />
                 </t-button>
-                <t-button size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge"
-                    :title="$t('agent.addToKnowledgeBase')">
+                <!-- Students (viewer) lack KB write access; hide the entry. -->
+                <t-button v-if="authStore.hasRole('contributor')" size="small" variant="outline" shape="round"
+                    @click.stop="handleAddToKnowledge" :title="$t('agent.addToKnowledgeBase')">
                     <t-icon name="bookmark-add" />
                 </t-button>
                 <!-- Skill artifact download: only shown when this reply's
@@ -103,6 +104,7 @@
 </template>
 <script setup>
 import { onMounted, onBeforeUnmount, watch, computed, ref, reactive, nextTick, onUpdated } from 'vue';
+import { useAuthStore } from '@/stores/auth';
 import 'katex/dist/katex.min.css';
 import docInfo from './docInfo.vue';
 import deepThink from './deepThink.vue';
@@ -347,6 +349,7 @@ const getActualContent = () => {
 };
 
 // 复制回答内容
+const authStore = useAuthStore();
 const handleCopyAnswer = async () => {
     const content = getActualContent();
     if (!content) {
@@ -368,7 +371,6 @@ const handleAddToKnowledge = () => {
     const question = (props.userQuery || '').trim();
     const manualContent = buildManualMarkdown(question, content);
     const manualTitle = formatManualTitle(question);
-    ``
     uiStore.openManualEditor({
         mode: 'create',
         title: manualTitle,
