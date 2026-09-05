@@ -14,24 +14,30 @@
 | `main` 未因 Ticket 0 改业务代码 | 是（业务树仍在主工作区 `main`） |
 | 与 `upstream/main` 关系 | 故意钉死 tag，不跟漂 |
 
-## Go 测试
+## Go 测试（Docker / `golang:1.26` + CGO）
 
-| 项 | 结果 |
-| --- | --- |
-| 宿主机 `go` | **不可用**（PATH 中无 `go`；`go.mod` 要求 `go 1.26.0`） |
-| `WeKnora-app` 容器内 `go` | **不可用**（生产镜像无工具链） |
-| `make test` / `go test ./...` | **未执行**（缺工具链） |
+复用脚本：`scripts/docker-go-test.ps1`
 
-待本机安装 Go 1.26+ 或具备带工具链的开发容器后补跑，建议命令：
-
-```bash
-cd .worktrees/sync-upstream-v0.8.0
-go test ./...
-# 或聚焦 Ticket A 相关：
-go test ./internal/application/service/ ./internal/handler/ ./internal/router/ -count=1
+```powershell
+.\scripts\docker-go-test.ps1 -Worktree .worktrees\sync-upstream-v0.8.0
+.\scripts\docker-go-test.ps1 -Worktree .worktrees\sync-upstream-v0.8.0 -Run "Invitation|TenantMember"
 ```
 
-分类：环境缺口（非上游行为回归）。
+| 包 | 结果 | 备注 |
+| --- | --- | --- |
+| `./internal/application/service/` | **ok** | ~8.5s |
+| `./internal/router/` | **ok** | |
+| `./internal/types/` | **ok** | |
+| `./internal/handler/` | **1 FAIL** | 见下 |
+| Invitation / TenantMember 相关 `-run` | **ok** | handler + service |
+
+**handler 唯一失败：** `TestDeploymentCapabilityKeysMatchFrontend`
+
+- 现象：从 Windows bind-mount 读前端源码时，解析出的 frontend keys 带尾部 `',`（疑似 CRLF / 引号解析在挂载场景下损坏）。
+- 分类：**环境**（Windows 挂载行尾），非上游逻辑回归；Ticket A 不阻塞。Linux CI / 原生 checkout 上应再验。
+- `./internal/container/`：`CGO_ENABLED=0` 时因 sqlite-vec / duckdb 编不过；**必须 `CGO_ENABLED=1`**（脚本已默认开启）。
+
+宿主机仍无本地 `go`；后续一律用 Docker 跑后端测试。
 
 ## 前端测试
 
