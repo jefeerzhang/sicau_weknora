@@ -151,25 +151,3 @@ export async function removeMember(
 export async function leaveTenant(tenantId: number): Promise<SimpleResponse> {
   return (await post(`/api/v1/tenants/${tenantId}/leave`)) as unknown as SimpleResponse
 }
-
-/**
- * sicau-v1 ticket 05: per-member usage aggregates (question count +
- * last activity). Backend: GET /api/v1/tenants/:id/member-stats (Admin+,
- * same gate as the roster). Count granularity by design — no message
- * content is returned.
- */
-export interface MemberUsageStat {
-  user_id: string
-  question_count: number
-  last_active_at: string | null
-}
-
-export async function getMemberUsageStats(
-  tenantId: number,
-): Promise<{ success: boolean; data?: { stats: MemberUsageStat[] }; message?: string }> {
-  return (await get(`/api/v1/tenants/${tenantId}/member-stats`)) as unknown as {
-    success: boolean
-    data?: { stats: MemberUsageStat[] }
-    message?: string
-  }
-}

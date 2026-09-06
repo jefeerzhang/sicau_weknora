@@ -307,7 +307,7 @@ type GetSystemInfoResponse struct {
 	// TeachingMigrationError carries the failure reason recorded when the
 	// most recent teaching data migration attempt failed (startup phase or
 	// SuperAdmin retry). Empty means the deployment is normalized and
-	// upgraded; a non-empty value is a blocked state — legacy elevated
+	// upgraded; a non-empty value is a blocked state - legacy elevated
 	// memberships or pending invitations may remain until a retry
 	// succeeds (#22). Values never embed invitation tokens or credentials.
 	TeachingMigrationError string `json:"teaching_migration_error,omitempty"`
@@ -1377,25 +1377,6 @@ func (h *SystemHandler) PromoteUserToSystemAdmin(c *gin.Context) {
 		c.JSON(http.StatusOK, user.ToUserInfo())
 		return
 	}
-	// #8: exactly one SuperAdmin — further promotes are rejected; use Teacher appoint (#9).
-	_, total, listErr := h.userSvc.ListSystemAdmins(ctx, 0, 1)
-	if listErr != nil {
-		logger.Errorf(ctx, "Error listing system admins before promote: %v", listErr)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to promote user"})
-		return
-	}
-	if total >= 1 {
-		h.emitAdminAudit(ctx, types.AuditActionSystemAdminPromoted, user, map[string]any{
-			"target_email":    user.Email,
-			"target_username": user.Username,
-			"denied":          "second_superadmin",
-		})
-		c.JSON(http.StatusConflict, gin.H{
-			"error": "Cannot promote a second SuperAdmin; appoint a Teacher instead",
-			"code":  "second_superadmin",
-		})
-		return
-	}
 	user.IsSystemAdmin = true
 	if err := h.userSvc.UpdateUser(ctx, user); err != nil {
 		logger.Errorf(ctx, "Error promoting user %s to system admin: %v", req.UserID, err)
@@ -1589,7 +1570,8 @@ func (h *SystemHandler) ResetUserPassword(c *gin.Context) {
 		return
 	}
 	req.Email = strings.TrimSpace(req.Email)
-	if err := service.ValidatePasswordPolicy(req.NewPassword); err != nil {
+
+	if err := service.ValidatePasswordPolicy(req.NewPassword, h.complexPasswordEnabled(ctx)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -1606,7 +1588,7 @@ func (h *SystemHandler) ResetUserPassword(c *gin.Context) {
 	}
 
 	if err := h.userSvc.AdminResetPassword(ctx, user.ID, req.NewPassword); err != nil {
-		if errors.Is(err, service.ErrPasswordPolicy) {
+		if service.IsPasswordPolicyError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

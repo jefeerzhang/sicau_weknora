@@ -2,6 +2,8 @@
 
 > 目标：把本地 Docker 部署迁移到公网 Linux 服务器，先用 IP+端口访问（后续再上域名/HTTPS）。
 > 前置：① 已完成本机 `bash deploy-backup.sh` 生成 `backup/` ② 服务器是 Linux + 可 SSH ③ 会用 IP+端口（不做 HTTPS）
+>
+> **v0.8.0 / 教学默认：** 不要挂载 `docker.sock`、保持 `WEKNORA_SANDBOX_DOCKER_ENABLED=false`；不要开启长期记忆与复杂密码为课堂默认。详见 `docs/sandbox-docker-backend.md` 与 `docs/川农学生端封闭发布集成与沙箱密钥.md`。
 
 ## 0. 你已经在本地生成的产物
 

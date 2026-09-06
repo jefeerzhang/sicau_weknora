@@ -48,9 +48,6 @@ export interface ListInvitationsResponse {
   success: boolean
   data?: {
     invitations: TenantInvitation[]
-    // Returned independently of pagination so the share-link popup can
-    // always restore the tenant's reusable current link.
-    active_share_link?: TenantInvitation | null
     total: number
     page?: number
     page_size?: number
@@ -251,9 +248,11 @@ export interface CreateInviteLinkResponse {
 }
 
 /**
- * Get or create the tenant's multi-use share-link invitation. Repeated
- * calls return the current `invite_url`; a new link is created only after
- * expiry or revocation. Revoking uses the same DELETE as a per-user invite.
+ * Generate a multi-use share-link invitation for the tenant. The
+ * returned row carries `invite_url` (composed from the persisted
+ * plaintext token) which the SPA copies into clipboards. The link
+ * stays valid until expiry or revocation; revoking is the same DELETE
+ * as a per-user invitation.
  *
  * Backend: POST /api/v1/tenants/:id/invite-links (Owner+).
  */

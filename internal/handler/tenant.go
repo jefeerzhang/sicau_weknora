@@ -245,7 +245,7 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 	// restricted to joining existing workspaces by invitation. This check
 	// is authoritative; the frontend capability only improves UX and cannot
 	// bypass it. Effective-teacher identities (appointed Teachers and the
-	// composite SuperAdmin) and cross-tenant superusers always pass — the
+	// composite SuperAdmin) and cross-tenant superusers always pass - the
 	// flag only selects the refusal a non-teacher-capability caller gets
 	// (2005 "creation disabled" vs 403 "not a teacher"), never whether a
 	// teacher may create (#10/#13).
@@ -1747,25 +1747,6 @@ func (h *TenantHandler) updateTenantChatHistoryConfigInternal(c *gin.Context) {
 	})
 }
 
-// GetTenantRetrievalConfig returns the tenant's global retrieval configuration.
-func (h *TenantHandler) GetTenantRetrievalConfig(c *gin.Context) {
-	ctx := c.Request.Context()
-	tenant, _ := types.TenantInfoFromContext(ctx)
-	if tenant == nil {
-		logger.Error(ctx, "Workspace is empty")
-		c.Error(errors.NewBadRequestError("Workspace is empty"))
-		return
-	}
-	data := tenant.RetrievalConfig
-	if data == nil {
-		data = &types.RetrievalConfig{}
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    data,
-	})
-}
-
 // GetTenantDefaultAgent returns the workspace default agent id
 // (sicau-v1 ticket 04). Empty string means no default is set.
 func (h *TenantHandler) GetTenantDefaultAgent(c *gin.Context) {
@@ -1820,6 +1801,25 @@ func (h *TenantHandler) updateTenantDefaultAgentInternal(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    gin.H{"agent_id": req.AgentID},
+	})
+}
+
+// GetTenantRetrievalConfig returns the tenant's global retrieval configuration.
+func (h *TenantHandler) GetTenantRetrievalConfig(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenant, _ := types.TenantInfoFromContext(ctx)
+	if tenant == nil {
+		logger.Error(ctx, "Workspace is empty")
+		c.Error(errors.NewBadRequestError("Workspace is empty"))
+		return
+	}
+	data := tenant.RetrievalConfig
+	if data == nil {
+		data = &types.RetrievalConfig{}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    data,
 	})
 }
 

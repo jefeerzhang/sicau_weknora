@@ -106,20 +106,19 @@ export default {
       success: '邀请已撤销。'
     },
     shareLink: {
-      button: '共享邀请链接',
+      button: '生成共享链接',
       cellTitle: '通过链接邀请',
       cellAccepted: '已加入 {count} 人',
       cellEmpty: '尚无成员加入',
       dialogTitle: '生成共享邀请链接',
       description: '生成一条多人可用的注册链接，发到群里就行；谁打开都能用自己的邮箱注册并加入当前空间。链接 {days} 天后过期，或随时可在列表中撤销。',
       generate: '生成链接',
-      resultTitle: '当前邀请链接',
-      resultBody: '复制下方链接，通过任意私密渠道发给被邀请人。该链接会一直保留到过期或撤销，可随时回来重新复制。',
+      resultTitle: '邀请链接已生成',
+      resultBody: '复制下方链接，通过任意私密渠道发给被邀请人。链接也会保存在下方列表中，随时可以重新复制或撤销。',
       revokeConfirm: '撤销后，所有还未注册的人都无法再使用此链接；如需重发请生成新链接。'
     }
   },
   tenantMember: {
-    stats: { neverActive: '从未活跃' },
     title: '成员管理',
     sectionDescription: '邀请伙伴加入当前空间并分配角色。只有 Owner 可以新增或移除成员。',
     learnRbacGuide: '了解 RBAC',
@@ -208,25 +207,16 @@ export default {
       contributor: '编辑',
       viewer: '访客'
     },
-    teaching: {
-      lead: '空间负责人',
-      student: '学生',
-      legacyOwner: '历史负责人（待处理）',
-      unknown: '未知关系',
-      legacyWarning: '历史角色，不可在此修改；请等待平台迁移或联系超级管理员处理',
-    },
     columns: {
       member: '姓名与邮箱',
-      role: '空间关系',
+      role: '角色',
       joinedAt: '加入时间',
-      questionCount: '提问数',
-      lastActive: '最后活跃',
       operations: '操作'
     },
     permissions: {
-      title: '空间关系说明',
-      desc: '教学空间仅有「空间负责人」与「学生」两种关系。服务端强制执行，界面仅作展示。',
-      iconHint: '悬停查看空间关系说明',
+      title: '角色权限说明',
+      desc: '每个角色在当前空间内能做的事情。服务端强制执行，UI 控件仅作展示。',
+      iconHint: '悬停查看角色权限说明',
       manageMembers: '管理成员',
       manageTenantConfig: '修改空间配置',
       manageInfra: '配置模型 / 向量库 / IM 通道',
@@ -254,7 +244,7 @@ export default {
       currentPlaceholder: '请输入当前密码',
       currentRequired: '请输入当前密码',
       newLabel: '新密码',
-      newPlaceholder: '8-32 个字符，需包含字母和数字',
+      newPlaceholder: '请输入新密码',
       confirmLabel: '确认新密码',
       confirmPlaceholder: '再次输入新密码',
       submit: '更新密码',
@@ -1122,7 +1112,8 @@ export default {
       contextTemplate: '定义如何将检索到的内容格式化后传递给模型',
       model: '选择智能体使用的大语言模型',
       temperature: '控制输出的随机性，0 最确定，1 最随机',
-      maxTokens: '模型生成回复的最大Token数量',
+      maxTokens: '模型生成回复的最大 Token 数。选「默认」时为 2048；选「自定义」后按你填的数保存。',
+      maxTokensAgent: '每一轮推理的最大生成 Token（含工具调用 JSON）。选「默认」时，未绑沙箱为 4096，绑了沙箱（可写/改文件）为 24576。选「自定义」后按你填的数保存，不再自动改。',
       thinking: '启用模型的扩展思考能力（需要模型支持）',
       conversationSection: '配置多轮对话开关与问题改写开关（改写提示词见「提示词」）',
       conversationSectionAgent: '配置每轮携带多少历史对话。智能推理始终为多轮模式。',
@@ -1135,7 +1126,7 @@ export default {
       rewriteSystemPrompt: '用于问题改写的系统提示词（留空使用默认）',
       rewriteUserPrompt: '用于问题改写的用户提示词模板（留空使用默认）',
       selectTools: '选择 Agent 可以使用的工具',
-      maxIterations: 'Agent 执行任务时的最大推理步骤数',
+      maxIterations: '限制 Agent 单次任务的推理步数。选「不限制」时会一直跑到模型自然结束或你手动停止。',
       kbScope: '选择智能体可访问的知识库范围',
       webSearch: '启用后智能体可以搜索互联网获取信息',
       webSearchProvider: '为此智能体指定搜索引擎，留空则使用默认搜索引擎',
@@ -1332,6 +1323,8 @@ export default {
       executeSkillScript: '执行技能脚本',
       listSandboxFiles: '列出沙箱文件',
       readSandboxFile: '读取沙箱文件',
+      writeSandboxFile: '写入沙箱文件',
+      editSandboxFile: '编辑沙箱文件',
       shellExec: '执行沙箱命令',
       dataAnalysis: '数据分析',
       dataSchema: '数据结构',
@@ -1345,7 +1338,11 @@ export default {
     sandboxFiles: {
       found: '找到 {count} 个文件',
       empty: '暂无文件',
-      truncated: '列表已截断'
+      truncated: '列表已截断',
+      wrote: '已写入',
+      edited: '已编辑',
+      replacements: '替换 {count} 处',
+      moreLines: '另有 {count} 行'
     },
     shellExec: {
       workDir: '目录',
@@ -1992,6 +1989,29 @@ export default {
     copySuffix: ' 副本',
     builtinTag: '内置',
     confirmDelete: '确定删除模型「{name}」吗？',
+    usage: {
+      title: '模型无法删除',
+      description: '模型「{name}」仍被以下配置引用。请先打开对应配置并更换模型，再重新删除。',
+      knowledgeBases: '知识库（{count}）',
+      agents: '智能体（{count}）',
+      longTermMemory: '长期记忆',
+      openConfiguration: '打开配置',
+      truncated: '仅显示前 {shown} 个，共 {total} 个',
+      bindings: {
+        embedding_model: 'Embedding 模型',
+        summary_model: '摘要模型',
+        image_processing_model: '图片处理模型',
+        vlm_model: '视觉理解模型',
+        asr_model: '语音识别模型',
+        wiki_synthesis_model: 'Wiki 综合模型',
+        chat_model: '对话模型',
+        rerank_model: '重排序模型',
+        query_understand_model: '问题理解模型',
+        follow_up_model: '追问模型',
+        extract_model: '记忆提取模型',
+        unknown: '其他模型配置'
+      }
+    },
     debug: {
       title: '模型测试',
       description: '向已配置的模型发送真实请求，查看响应与耗时',
@@ -2209,7 +2229,7 @@ export default {
       desc: '用于 Agent 推理和规划的 LLM 模型'
     },
     maxIterations: {
-      desc: 'Agent 执行任务时的最大推理步骤数'
+      desc: '限制 Agent 单次任务的推理步数。选「不限制」时会一直跑到模型自然结束或你手动停止。'
     },
     modelRecommendation: {
       title: '模型推荐'
@@ -2291,11 +2311,6 @@ export default {
     loginFeature1: '真实资料',
     loginFeature2: '真实案例',
     loginFeature3: '多模态文档与 ReAct',
-    highlight: {
-      ragDesc: '混合检索 · 精准召回',
-      agentDesc: '多步推理 · 工具调用',
-      wikiDesc: '自动抽取 · 结构关联',
-    },
     description: 'RAG 检索、智能体推理、Wiki 知识库，让文档真正被理解和运用',
     rag: '检索增强问答',
     agent: '智能体推理',
@@ -2307,6 +2322,11 @@ export default {
     independentTenant: '独立空间',
     fullApiAccess: '完整 API 访问',
     knowledgeBaseManagement: '知识库管理',
+    highlight: {
+      ragDesc: '混合检索 · 精准召回',
+      agentDesc: '多步推理 · 工具调用',
+      wikiDesc: '自动抽取 · 结构关联',
+    },
     carousel: {
       agenticRagTitle: 'Agentic RAG',
       agenticRagDesc: 'ReAct 推理 + 工具调用 + 多步思考',
@@ -2428,6 +2448,11 @@ export default {
       dimensionOverrideDesc: '仅在确认该模型支持 dimensions 参数时开启；默认只使用检测到的实际维度。',
       supportsVisionLabel: '支持视觉/多模态',
       supportsVisionDesc: '模型是否支持图片等多模态输入',
+      contextWindowLabel: '上下文窗口',
+      contextWindowPlaceholder: '默认 {value}',
+      contextWindowDesc: '该模型一次请求能容纳的 token 数。智能体压缩对话历史会按此上限工作。留空则使用默认 200000（200K）。请按厂商文档填写真实值，填大会导致压缩不触发、上游直接拒绝请求。',
+      contextWindowDefaultHint: '未设置，使用默认 {value}',
+      contextWindowTokens: '{count} tokens',
       maxConcurrencyLabel: '后台并发上限',
       maxConcurrencyPlaceholder: '0 表示使用全局默认',
       maxConcurrencyDesc: '限制文档入库/富化等后台任务对该模型的并发调用数（按模型全副本共享）。0 或留空表示沿用全局默认；不影响交互式对话。',
@@ -2531,6 +2556,10 @@ export default {
         openrouter: {
           label: 'OpenRouter',
           description: 'openai/gpt-5.2-chat, google/gemini-3-flash-preview, etc.'
+        },
+        litellm: {
+          label: 'LiteLLM',
+          description: '自托管代理，统一接入 OpenAI、Anthropic、Gemini、Bedrock 等 100+ 厂商。请将占位 URL 换成可访问地址；localhost 需加入 SSRF_WHITELIST。'
         },
         zhipu: {
           label: '智谱 BigModel',
@@ -2802,22 +2831,12 @@ export default {
         emailLabel: '用户邮箱',
         emailPlaceholder: '输入需要重置密码的用户邮箱',
         newPasswordLabel: '新密码',
-        newPasswordPlaceholder: '8-32 个字符，包含字母和数字',
+        newPasswordPlaceholder: '请输入新密码',
         confirmPasswordLabel: '确认新密码',
         confirmPasswordPlaceholder: '再次输入新密码',
         confirmBtn: '确认重置',
         success: '密码已重置，该用户的现有会话已失效',
         failed: '重置密码失败',
-        validation: {
-          emailRequired: '请输入用户邮箱',
-          emailInvalid: '请输入有效的邮箱地址',
-          passwordRequired: '请输入新密码',
-          passwordLength: '密码长度必须为 8-32 个字符',
-          passwordLetter: '密码必须包含字母',
-          passwordNumber: '密码必须包含数字',
-          confirmRequired: '请再次输入新密码',
-          passwordMismatch: '两次输入的密码不一致'
-        }
       },
       admins: {
         label: '系统管理员',
@@ -2838,47 +2857,6 @@ export default {
             confirmBtn: '确认提升'
           }
         }
-      },
-      teachers: {
-        label: '教师',
-        description: '被任命的教师可创建教学工作空间。在右侧输入邮箱并回车即可任命；点击 × 即为撤销教师身份。',
-        placeholder: '输入用户邮箱并回车',
-        loadFailed: '加载教师列表失败',
-        saveSuccess: '已更新教师名单',
-        saveFailed: '更新教师名单失败',
-        systemAdmin: '系统管理员（继承教师能力，不可撤销）',
-        systemAdminHint: '这些账号为平台超级管理员，自动继承教师能力，无需任命，也无法在此撤销。',
-        identityLabel: '被管理账号的平台身份',
-        confirm: {
-          appoint: {
-            body: '确认任命 {email} 为教师？该用户将可以创建教学工作空间。',
-            confirmBtn: '确认任命'
-          },
-          revoke: {
-            body: '确认撤销 {email} 的教师身份？撤销后该用户将无法再创建教学工作空间。',
-            confirmBtn: '确认撤销'
-          }
-        }
-      },
-      ownershipAnomalies: {
-        label: '异常空间负责人',
-        description: '零 Owner 或多 Owner 的工作空间需由超级管理员显式指定唯一空间负责人；不会自动猜测。',
-        refresh: '刷新异常清单',
-        runMigration: '运行成员角色迁移',
-        empty: '当前没有待处理的异常空间',
-        tenant: '工作空间 #{id}',
-        ownerCount: '当前 Owner 数：{count}',
-        pickLead: '选择具备教师能力的成员',
-        resolve: '指定为空间负责人',
-        loadFailed: '加载异常清单失败',
-        migrationDone: '迁移完成：降级 {downgraded} 人，异常空间 {anomalies} 个',
-        migrationFailed: '运行迁移失败',
-        resolveSuccess: '已指定空间负责人',
-        resolveFailed: '指定空间负责人失败',
-        kind: {
-          zero_owner: '零 Owner',
-          multi_owner: '多 Owner',
-        },
       },
       reset: {
         label: '重置',
@@ -2913,7 +2891,8 @@ export default {
         confirmBtn: '确认保存',
         cancelBtn: '取消',
         emptyValue: '（空）',
-        bodyAuthRegistrationMode: '即将把「{label}」改为：{value}\n\n如果切到 self_serve，公网任何人都可以注册账号 — 务必确认是预期行为。'
+        bodyAuthRegistrationMode: '即将把「{label}」改为：{value}\n\n如果切到 self_serve，公网任何人都可以注册账号 — 务必确认是预期行为。',
+        bodySandboxDockerEnabled: '打开后，空间管理员可以把沙箱指到本机 Docker。本机 docker.sock 等同宿主机 root，只适合已挂载 daemon 或配了 TLS 远程 tcp:// 的私有化单机。'
       },
       enumLabels: {
         auth: {
@@ -2943,14 +2922,19 @@ export default {
           max_owned_per_user: '每个非超管用户通过自助创建可拥有的最大空间数。每次创建空间时实时读取，修改后立即生效。0 表示使用内置默认值 10；负数表示完全关闭限制（不建议在公开部署使用）。',
           self_service_creation_enabled: '是否允许非超管用户主动创建空间。关闭后，普通用户只能通过邀请加入已有空间；跨空间超管仍可创建。修改后立即生效。',
           default_storage_quota_gb: '新建空间时默认分配的存储配额（GB），包含向量、原文、文本、索引等。仅在创建时读取，修改后只对之后新建的空间生效，不会回写已存在的空间。0 或负数表示使用内置默认值 10GB。',
-          auto_create_api_key: '为新空间自动生成 full_access API Key，并在创建响应中返回明文 token。仅用于兼容依赖旧行为的集成；默认关闭，建议通过 API Key 管理显式创建。'
+          auto_create_api_key: '为新空间自动生成 full_access API Key，并在创建响应中返回明文 token。仅用于兼容依赖旧行为的集成；默认关闭，建议通过 API Key 管理显式创建。',
+          auto_accept_invitation: '开启后，空间管理员通过邮箱邀请已注册用户时，对方会立即成为成员，不再经过收件箱确认。关闭时保持「发出邀请 → 被邀请人确认」流程。修改后立即生效。'
         },
         ssrf: {
           whitelist: 'SSRF 防护白名单。可填入 example.com / *.foo.com / 10.0.0.0/8 / 2001:db8::1。修改后立即生效。SSRF_WHITELIST_EXTRA 环境变量仍由部署方维护，不在此处覆盖。'
         },
+        sandbox: {
+          docker_enabled: '是否允许 Docker 沙箱后端。本机 docker.sock 等同宿主机 root，默认关闭。仅系统管理员可打开；打开后立即生效，无需重启。私有化单机且已挂载 daemon socket，或配置了带 TLS 的远程 tcp:// 时再启用。'
+        },
         auth: {
           registration_mode: '自助注册模式。self_serve = 任何人可注册账号；invite_only = 关闭公网注册，仅 Owner/Admin 可邀请。修改后立即生效，但谨慎对待 self_serve（公网会接受 spam）。',
-          default_tenant_mode: '公开注册后的空间初始化策略。create_personal 会自动创建个人空间并授予 Owner；tenantless 仅创建账户，用户需要接受邀请或主动创建空间。只影响之后注册的用户。'
+          default_tenant_mode: '公开注册后的空间初始化策略。create_personal 会自动创建个人空间并授予 Owner；tenantless 仅创建账户，用户需要接受邀请或主动创建空间。只影响之后注册的用户。',
+          complex_password_enabled: '是否启用复杂密码。开启后密码必须包含大小写字母、数字和特殊字符。修改后立即生效，只影响新注册用户或新密码修改/重置操作。特殊字符包含：{specialChars}'
         }
       },
       keyLabels: {
@@ -2969,14 +2953,19 @@ export default {
           max_owned_per_user: '每用户最大空间数',
           self_service_creation_enabled: '允许用户自助创建空间',
           default_storage_quota_gb: '新空间默认存储配额 (GB)',
-          auto_create_api_key: '创建空间时自动生成 API Key'
+          auto_create_api_key: '创建空间时自动生成 API Key',
+          auto_accept_invitation: '邀请已注册用户时自动加入'
         },
         ssrf: {
           whitelist: 'SSRF 防护白名单'
         },
+        sandbox: {
+          docker_enabled: '启用 Docker 沙箱'
+        },
         auth: {
           registration_mode: '自助注册模式',
-          default_tenant_mode: '注册默认空间策略'
+          default_tenant_mode: '注册默认空间策略',
+          complex_password_enabled: '启用复杂密码'
         }
       },
       runtime: {
@@ -3199,7 +3188,7 @@ export default {
         security: {
           tab: '网络安全 {count}',
           title: '网络安全',
-          description: '管理可绕过 SSRF 防护的受信主机、IP 与网段。'
+          description: '管理 SSRF 白名单，以及是否允许 Docker 沙箱（本机 docker.sock 等同宿主机 root）。'
         },
         runtime: {
           tab: '运行与并发 {count}',
@@ -4588,6 +4577,7 @@ export default {
     all: '全部',
     clear: '清空',
     website: '官方网站',
+    teacherHome: '教师主页',
     clawhubSkill: 'Claw Skill',
     github: 'GitHub',
     githubStarTip: '在 GitHub 打开仓库，若觉得有用欢迎点个 Star',
@@ -4642,13 +4632,13 @@ export default {
     haveAccount: '已有账户？',
     backToLogin: '返回登录',
     loginHint: '登录以继续使用；首次使用请在下方创建账户。',
-    firstTime: '首次使用？',
+    firstTime: '首次使用 WeKnora？',
     registerSuccess: '注册成功，请登录',
     registerFailed: '注册失败',
     subtitle: 'RAG 问答、ReAct 智能体与 Wiki 知识库，大模型驱动的企业级知识框架',
     registerSubtitle: '创建账户并开始使用 WeKnora',
     emailPlaceholder: '输入邮箱地址',
-    passwordPlaceholder: '输入密码（8-32个字符，包含字母和数字）',
+    passwordPlaceholder: '输入密码',
     confirmPasswordPlaceholder: '再次输入密码',
     usernamePlaceholder: '输入用户名',
     emailRequired: '请输入邮箱地址',
@@ -4657,7 +4647,10 @@ export default {
     passwordMinLength: '密码至少8个字符',
     passwordMaxLength: '密码不能超过32个字符',
     passwordMustContainLetter: '密码必须包含字母',
+    passwordMustContainLowercaseLetter: '密码必须包含小写字母',
+    passwordMustContainUppercaseLetter: '密码必须包含大写字母',
     passwordMustContainNumber: '密码必须包含数字',
+    passwordMustContainSpecialChar: '密码必须包含特殊字符：{specialChars}',
     usernameRequired: '请输入用户名',
     usernameMinLength: '用户名至少2个字符',
     usernameMaxLength: '用户名不能超过20个字符',
@@ -4680,12 +4673,6 @@ export default {
       inviteOnlyNotice: '此账户只能通过邀请加入已有空间',
       help: '你现在可以创建空间，也可以稍后回来接受邀请。',
       inviteOnlyHelp: '还没有邀请？请把你的注册邮箱提供给空间管理员，由管理员向你发送邀请。'
-    },
-    forceChangePassword: {
-      title: '请修改初始密码',
-      description: '出于安全考虑，首次登录需要设置新密码后才能继续使用。',
-      submit: '确认修改',
-      success: '密码已更新，请使用新密码重新登录。'
     }
   },
   inviteRegister: {
@@ -5112,10 +5099,10 @@ export default {
     parserEngine: '解析引擎',
     storageEngine: '存储引擎',
     sandbox: {
-      title: '沙箱',
+      title: '沙箱配置',
       description: '配置智能体运行技能脚本的隔离环境。每个智能体选择一份配置。',
       pageHintTitle: '什么是沙箱？',
-      pageHint: '沙箱是智能体执行技能脚本的隔离环境。一个空间可以添加多份配置（Docker、E2B、CubeSandbox），每个智能体选择一份。技能安装在「技能」页，写入所选配置的镜像；未选择沙箱时不会执行技能脚本。',
+      pageHint: '沙箱是智能体执行技能脚本的隔离环境。一个空间可以添加多份配置（Docker、E2B、CubeSandbox），每个智能体选择一份。技能安装在「技能管理」页，写入所选配置的镜像；未选择沙箱时不会执行技能脚本。',
       editorDescription: '配置空间运行环境，Docker、CubeSandbox 和 E2B 使用同一套管理流程。',
       stepConnection: '连接',
       stepTemplate: '模板',
@@ -5143,6 +5130,10 @@ export default {
         e2b: 'E2B 托管服务或兼容 E2B 的集群',
         docker: '在本机 Docker 上为每个会话保留一个长驻容器，脚本和文件都落在同一容器里',
       },
+      dockerDisabledAlert: '当前部署未启用 Docker 沙箱',
+      dockerDisabledHint: '本机 docker.sock 等同宿主机 root。仅私有化单机需要时，由系统管理员在「设置 → 系统设置 → 网络安全」中打开。',
+      dockerDisabledCard: '部署未启用 Docker 沙箱，此配置不会再创建容器',
+      dockerHostRisk: '留空或 unix:// 会使用 WeKnora 所在机器的 Docker 守护进程，权限等同该机 root，只适合私有化单机。多套空间共用同一主机时请改用 Cube 或 E2B。远程 tcp:// 必须填写 TLS 证书目录。',
       addConfig: '添加沙箱',
       viewClusterGuide: '集群搭建指南',
       configName: '配置名称',
@@ -5157,7 +5148,46 @@ export default {
       sectionRuntimeEnvironment: '运行环境',
       sectionTemplate: '运行模板',
       sectionRuntime: '执行设置',
+      sectionNetwork: '网络策略',
       sectionEnvironment: '环境变量',
+      networkHint: '控制该配置下所有沙箱的出网。改动只影响之后新建的沙箱，已有沙箱按原策略运行到回收。',
+      egressDefault: '出站默认',
+      egressAllowAll: '允许公网（默认）',
+      egressDenyAll: '默认拒绝',
+      egressPrecedence: '判定顺序：放行 → 拒绝 → 默认值。放行优先于拒绝。',
+      allowOut: '放行目标',
+      allowOutPlaceholder: '域名 / IP / CIDR，例如 *.example.com',
+      allowOutHelp: '支持 IPv4、CIDR、域名和单层通配 *.example.com（通配不匹配主域）。',
+      denyOut: '拒绝目标',
+      denyOutPlaceholder: '仅支持 IP / CIDR，例如 169.254.169.254/32',
+      denyOutHelp: '拒绝只按目的 IP 匹配，因此不支持域名。',
+      domainAllowNeedsDenyAll: '放行目标里有域名时，必须同时选择「默认拒绝」或在拒绝目标中加入 0.0.0.0/0，否则白名单不生效。',
+      cubeL7Rules: 'HTTP 访问规则（L7）',
+      cubeL7RulesHelp: '每条规则必须填 host 或 sni，网络层只从这两个字段提取放行目标。字段之间是 AND，method 列表内部是 OR。仅 HTTP 80 / HTTPS 443 生效。规则从上到下先匹配先生效。',
+      e2bHostRules: 'Host 请求变换',
+      e2bHostRulesHelp: '按 host 注入 header。规则本身不授权出网，host 必须同时出现在放行目标里。',
+      ruleUntitled: '未命名规则',
+      expandRule: '展开规则',
+      collapseRule: '收起规则',
+      moveRuleUp: '上移规则',
+      moveRuleDown: '下移规则',
+      ruleName: '规则名',
+      ruleScheme: '协议',
+      ruleSni: 'SNI',
+      ruleHost: 'Host',
+      ruleMethods: 'HTTP 方法',
+      rulePath: '路径',
+      ruleAction: '动作',
+      ruleAllow: '放行',
+      ruleDeny: '拒绝',
+      ruleAudit: '审计级别',
+      ruleInject: '注入 Header',
+      headerName: 'Header 名称',
+      headerValue: 'Header 值',
+      addTarget: '添加目标',
+      addRule: '添加规则',
+      addHeader: '添加 Header',
+      removeRule: '删除该规则',
       noConfigs: '还没有沙箱配置。智能体未选择空间配置时不会执行技能脚本。',
       identityFieldHint: '该配置下有沙箱运行时，以下项无法修改：后端类型、API 端点、API Key、沙箱域名、Proxy 端点。',
       connectionLockedBySkills: '该沙箱已安装 Skill。连接地址、凭据和 DNS 会改变技能快照所属环境，且 DNS 需重建模板才能生效；请新建一份沙箱。',
@@ -5287,7 +5317,7 @@ export default {
       httpTimeout: 'HTTP 超时（秒）',
       httpTimeoutHelp: '调用沙箱管理接口的等待上限，超过即视为端点不可用。留空按 30 秒。',
       sandboxTtl: '沙箱 TTL（秒）',
-      sandboxTtlHelp: '沙箱空闲多久后被远端回收。设得太短，会话继续时要重建沙箱；设得太长，闲置实例会一直计费。留空按后端默认值。',
+      sandboxTtlHelp: '沙箱多久之后会暂停',
       dockerImage: 'Docker 镜像',
       dockerHost: 'Docker 守护进程地址',
       dockerHostHelp: '留空跟随本机 docker CLI（DOCKER_HOST 或当前 docker context），不必手填 /var/run/docker.sock。远程守护进程填 tcp://host:2376，必须同时填写 TLS 证书目录，私网地址还要开启「允许访问私网地址」。',
@@ -5296,9 +5326,11 @@ export default {
       dockerIdleTtl: '空闲回收（秒）',
       dockerIdleTtlHelp: 'Docker 守护进程本身没有空闲超时。容器多久没有执行任何命令就会被 WeKnora 回收，会话继续时重建。留空按 1800 秒。',
       dockerCpuLimit: 'CPU 核数上限',
+      dockerCpuLimitHelp: '单个沙箱可用的 CPU 核数，0 使用内置默认。',
       dockerMemoryLimit: '内存上限（MB）',
+      dockerMemoryLimitHelp: '单个沙箱的内存上限（MB），0 使用内置默认。',
       dockerPidsLimit: '进程数上限',
-      dockerResourceHelp: '单个沙箱容器的资源上限。留空按 2 核 / 2048 MB / 512 进程。',
+      dockerPidsLimitHelp: '单个沙箱可创建的进程数上限，0 使用内置默认。',
       dockerNetworkMode: '网络模式',
       dockerNetworkModeHelp: '默认 bridge，技能安装依赖需要出网。选择 none 表示完全禁止出网。Docker 只能按网络隔离，无法按域名放行。',
       dockerNetworkBridge: 'bridge（允许出网）',
@@ -5324,13 +5356,14 @@ export default {
       checkFailed: '检测未通过',
       checkScopeConnection: '本次只验证了控制面：端点可达且凭据有效。是否真的能跑起脚本还没有验证。',
       checkScopeFull: '端点、凭据、模板、沙箱内执行与出网均已真实验证。',
+      checkScopePolicyRestricted: '出网按策略受限，未做真实出网探测；端点、凭据、模板与沙箱内执行已验证。',
       checkPendingHint: '{names} 需要「完整验证」才能确认：会真实创建一个临时沙箱、执行一次脚本再销毁。',
-      noVolumeSupport: '该后端不支持挂载卷，依赖共享卷的技能将不可用。',
       skipReasons: {
         needs_deep_check: '需完整验证',
         control_plane_unreachable: '控制面不可达，已跳过',
         sandbox_not_created: '沙箱未创建，已跳过',
         sandbox_exec_failed: '沙箱内执行失败，已跳过',
+        egress_restricted_by_policy: '按网络策略受限（该配置默认拒绝出网）',
       },
       checks: {
         client_build: '客户端构建',
@@ -5359,14 +5392,17 @@ export default {
       skillUploadHint: '安装会在当前镜像上生成新快照，可能需要数分钟。当前这一轮对话不会中断；下一轮提问时才会按新镜像重建沙箱，会话工作区草稿会在那时清空。',
       skillUploadHintNewSession: '安装会在当前镜像上生成新快照，可能需要数分钟。已打开的会话继续使用原沙箱，直到该会话结束；只有新打开的会话才会带上这次安装的技能。',
       skillSourceSection: '从来源安装',
-      skillSourceSectionHint: '粘贴 ClawHub、GitHub 或 SkillHub 链接，或 {\'@\'}owner/slug。',
+      skillSourceSectionHint: '粘贴 ClawHub、GitHub 或 SkillHub 链接，或 {\'@\'}owner/slug。压缩包不超过 {size} MB。',
       skillUploadSection: '上传本地压缩包',
-      skillUploadSectionHint: '把包含 SKILL.md 的 zip 拖到下方，或点击选择文件。',
+      skillUploadSectionHint: '把包含 SKILL.md 的 zip 拖到下方，或点击选择文件。压缩包不超过 {size} MB。',
       skillSourcePlaceholder: 'ClawHub 用 {\'@\'}owner/slug，GitHub / SkillHub 请粘贴完整链接',
       skillSourceInstall: '安装',
       skillInstallOr: '或',
       skillSourceFailed: '从托管平台安装技能失败',
       skillUploadFailed: '技能上传失败',
+      skillBundleTooLarge: '技能压缩包不能超过 {size} MB。',
+      skillBundleTooManyFiles: '技能目录里的文件不能超过 {count} 个。',
+      skillBundleTooManyZipEntries: '压缩包条目不能超过 {count} 个。',
       skillUploading: '正在上传 {percent}%',
       skillUploadAccepted: '已开始安装技能',
       skillStatusInstalling: '安装中',
@@ -5377,6 +5413,16 @@ export default {
       skillDisableHint: '禁用后该技能对智能体不可见，文件仍保留在镜像中。变更将在会话下一次执行时生效。',
       skillDeleteHint: '删除会从镜像中移除该技能目录并生成新快照。当前这一轮对话不会中断；下一轮提问时才会按新镜像重建沙箱，会话工作区草稿会在那时清空。',
       skillDeleteHintNewSession: '删除会从镜像中移除该技能目录并生成新快照。已打开的会话继续使用原沙箱，直到该会话结束；只有新打开的会话才会去掉该技能。',
+      skillRemoveInProgress: '正在卸载',
+      skillRemoveWaiting: '已开始从镜像卸载，正在等待进度…',
+      skillRemoveDone: '已从沙箱卸载「{name}」。技能仍在目录里，可以稍后再装回去。',
+      skillRemoveStage: {
+        accepted: '已接受卸载请求',
+        sandbox_ready: '正在打开维护沙箱',
+        removed: '文件已删除，正在生成新镜像',
+        done: '卸载完成',
+        failed: '卸载失败',
+      },
       imageInfoTitle: '当前镜像',
       imageInfoSnapshot: '快照 ID',
       imageInfoGeneration: '版本',
@@ -5410,6 +5456,10 @@ export default {
       skillRetryHint: '用已保存的安装包重试，无需重新上传',
       skillRetryAccepted: '已开始重新安装',
       skillRetryFailed: '重新安装失败',
+      skillStop: '停止安装',
+      skillStopHint: '中止当前安装，之后可以重试或卸载',
+      skillStopAccepted: '已停止',
+      skillStopFailed: '停止失败',
       skillEmpty: '尚未安装技能。粘贴托管平台链接，或上传 zip。',
       skillVersion: '版本',
       skillVersionEmpty: '未填写',
@@ -5437,7 +5487,7 @@ export default {
       },
     },
     skills: {
-      title: '技能',
+      title: '技能管理',
       description: '技能属于空间目录，可以只登记，也可以装到一份或多份沙箱。智能体只能启用当前沙箱里已就绪的技能。',
       helpTooltip: '目录里的技能可以不装任何沙箱。脚本要跑起来，必须装进智能体所用的那份沙箱镜像。Docker、Cube、E2B 互不通用，装到几份就要装几次。',
       goSandboxSettings: '去配置沙箱',
@@ -5464,10 +5514,16 @@ export default {
       noSandboxToInstall: '没有可写入的沙箱。',
       noInstalls: '尚未装到任何沙箱',
       installedOn: '已安装到',
+      installedOnName: '已安装到 {name}',
+      installedCount: '已安装到 {count} 个沙箱',
+      installPanelGroup: '已安装',
+      installPanelAvailable: '未安装',
+      viewInstallProgress: '查看进度',
       manageOnSandbox: '管理沙箱「{name}」上的安装',
       manageDrawerDesc: '在沙箱「{name}」上管理启用、变量和卸载。',
       manageEnable: '启用',
       manageUninstall: '从沙箱卸载',
+      manageUninstallConfirm: '确定从该沙箱卸载「{name}」？',
       deleteCatalog: '从目录删除',
       deleteCatalogConfirm: '确定从目录删除「{name}」？请先从所有沙箱卸载。',
       deleteCatalogBlocked: '请先从所有沙箱卸载此技能。',
@@ -5719,12 +5775,12 @@ export default {
     }
   },
   agent: {
-  setAsDefault: '设为空间默认',
-  unsetAsDefault: '取消空间默认',
-  defaultBadge: '默认',
-  defaultAgentSet: '已设为空间默认',
-  defaultAgentCleared: '已取消空间默认',
-  defaultAgentSetFailed: '设置默认智能体失败',
+    setAsDefault: '设为空间默认',
+    unsetAsDefault: '取消空间默认',
+    defaultBadge: '默认',
+    defaultAgentSet: '已设为空间默认',
+    defaultAgentCleared: '已取消空间默认',
+    defaultAgentSetFailed: '设置默认智能体失败',
     taskLabel: '任务:',
     think: '思考',
     copy: '复制',
@@ -5738,7 +5794,7 @@ export default {
       collecting: '正在保存生成的文件…',
       download: '下载',
       downloadFailed: '下载失败，请稍后重试',
-      downloadDisabled: '当前版本不支持文件下载',
+      downloadDisabled: '当前角色不支持文件下载',
       inlinePreviewHint: '点击预览',
       inlineMissing: '文件不可用',
     },
@@ -5750,6 +5806,9 @@ export default {
     toolCalls: '调用 <strong>{tools}</strong> 次工具',
     durationSuffix: '耗时 <strong>{duration}</strong>',
     stepSummarySeparator: ' · ',
+    contextCompacted: '压缩上下文',
+    contextCompactedSummary: '{before} → {after} tokens',
+    contextCompactedDegraded: '摘要不可用，已保留原始记录',
     title: '智能体',
     subtitle: '配置和管理您的智能体，自定义对话行为和能力',
     createAgent: '创建智能体',
@@ -5849,6 +5908,8 @@ export default {
       rerankModelPlaceholder: '请选择 ReRank 模型',
       rerankModelOptionalHint: '当前作用域内暂无 RAG 类型知识库，可不填；后续若加入 RAG 知识库，将自动使用空间默认重排模型，仍建议显式配置。',
       maxIterations: '最大迭代次数',
+      maxIterationsLimit: '限制',
+      maxIterationsUnlimited: '不限制',
       allowedTools: '允许的工具',
       multiTurn: '多轮对话',
       historyTurns: '保留轮数',
@@ -5872,30 +5933,33 @@ export default {
       rewritePromptUser: '改写用户提示词',
       rewritePromptUserPlaceholder: '留空使用系统默认提示词',
       maxCompletionTokens: '最大生成Token数',
+      maxCompletionTokensDefault: '默认',
+      maxCompletionTokensCustom: '自定义',
       fallbackStrategy: '兜底策略',
       fallbackResponse: '固定回复内容',
       fallbackResponsePlaceholder: '抱歉，我无法回答这个问题。',
       fallbackPrompt: '兜底提示词',
       fallbackPromptPlaceholder: '留空使用系统默认提示词',
       skillsConfig: '技能',
-      skillsConfigDesc: '先选择运行沙箱，再从空间目录中选用。未装到该沙箱的技能可以看见，但要先安装才能勾选。',
-      skillsSelection: '可用技能',
-      skillsSelectionDesc: '列表来自空间技能目录。只能启用当前沙箱上已就绪的技能。',
+      skillsConfigDesc: '先选择运行沙箱，再从下面列表选用技能。没装到该沙箱的会显示「安装」，装好后才能勾选。',
+      skillsSelection: '技能列表',
+      skillsSelectionDesc: '这里列出空间目录中的技能。已装到当前沙箱的可以直接用；没装的请先点「安装」。',
       skillsAll: '全部',
       skillsSelected: '指定',
       skillsNone: '禁用',
       selectSkills: '选择技能',
-      selectSkillsDesc: '勾选要启用的技能。未安装或未就绪的不能勾选。',
-      skillsAllListHint: '将启用此沙箱上已就绪的技能。未安装的不会自动带上，装好后才会纳入「全部」。',
-      skillsListSummary: '{ready} 个已就绪，{pending} 个尚未可在此沙箱启用',
-      skillsListSummaryReadyOnly: '{ready} 个已就绪',
+      selectSkillsDesc: '勾选要给这个智能体用的技能。没装到当前沙箱的不能勾选，请先点右侧「安装」。',
+      skillsAllListHint: '「全部」只包含已装到此沙箱的技能。没装的不会自动带上，点「安装」装好后才会算进去。',
+      skillsGroupAvailable: '可用',
+      skillsGroupUnavailable: '不可用',
       noSkillsAvailable: '空间目录里还没有技能。',
       skillsNeedSandbox: '请先选择运行沙箱。',
       goSandboxSettings: '管理沙箱',
       goSkillSettings: '管理技能',
       installToThisSandbox: '安装到此沙箱',
       installShort: '安装',
-      skillNotInstalled: '未安装到当前沙箱',
+      viewInstallProgress: '查看进度',
+      skillNotInstalled: '未安装',
       skillNotReady: '尚未就绪',
       skillDisabledOnSandbox: '已在沙箱中停用',
       sandboxBackend: '运行沙箱',

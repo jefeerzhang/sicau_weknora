@@ -20,6 +20,7 @@ const (
 	errPDFNoModel    = C.ERR_PDF_NO_MODEL
 	errInvalidArg    = C.ERR_INVALID_ARG
 	errUnknownFormat = C.ERR_UNKNOWN_FORMAT
+	errNeedsOCR      = C.ERR_NEEDS_OCR
 )
 
 // ConvertError is the typed error every conversion function returns. It
@@ -29,7 +30,7 @@ const (
 type ConvertError struct {
 	// Kind is the lowercase variant name, matching the Node and Python
 	// bindings: "unsupported", "malformed", "encrypted", "resource_limit",
-	// "missing_part", "io", "pdf_no_model". Go also reports
+	// "missing_part", "io", "pdf_no_model", "needs_ocr". Go also reports
 	// "unknown_format" for an invalid explicit Format.
 	Kind string
 	// Detail is the crate's Display output for the error.
@@ -77,6 +78,8 @@ func errorKind(code C.int) string {
 		return "invalid_argument"
 	case errUnknownFormat:
 		return "unknown_format"
+	case errNeedsOCR:
+		return "needs_ocr"
 	default:
 		return fmt.Sprintf("unknown_error(%d)", int(code))
 	}

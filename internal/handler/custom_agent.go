@@ -237,7 +237,7 @@ func (h *CustomAgentHandler) ListAgents(c *gin.Context) {
 	}
 
 	// sicau-v1: course workspaces pin students (viewers) to the workspace
-	// default agent — a viewer's agent list is exactly that one agent.
+	// default agent - a viewer's agent list is exactly that one agent.
 	// Workspaces without a default (or Admin+ callers) keep the full list.
 	// Applies after the creator filter so both compose.
 	if tenant, _ := types.TenantInfoFromContext(ctx); tenant != nil &&

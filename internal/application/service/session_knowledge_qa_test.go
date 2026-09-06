@@ -48,9 +48,9 @@ func (m *captureChatModel) GetModelName() string { return "capture" }
 func (m *captureChatModel) GetModelID() string   { return "capture" }
 
 type stubModelService struct {
-	chatModel  chat.Chat
-	modelsByID map[string]*types.Model
-	models     []*types.Model
+	chatModel       chat.Chat
+	modelsByID      map[string]*types.Model
+	availableModels []*types.Model
 }
 
 func TestEmitKnowledgeReferencesEventIgnoresCitationOutputSetting(t *testing.T) {
@@ -90,10 +90,7 @@ func (s *stubModelService) GetModelByID(_ context.Context, id string) (*types.Mo
 }
 
 func (s *stubModelService) ListModels(context.Context) ([]*types.Model, error) {
-	if s.models != nil {
-		return s.models, nil
-	}
-	return nil, nil
+	return s.availableModels, nil
 }
 
 func (s *stubModelService) UpdateModel(context.Context, *types.Model) error {

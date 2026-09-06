@@ -57,8 +57,7 @@ func main() {
 	// Build dependency injection container
 	c := container.BuildContainer(runtime.GetContainer())
 
-	// One-shot bootstrap hooks (e.g. unique SuperAdmin create). Fail-closed
-	// for SuperAdmin invariant — see bootstrap.go / internal/bootstrap.
+	// One-shot bootstrap hooks. SuperAdmin ensure is fail-closed.
 	if err := runStartupBootstrap(c); err != nil {
 		logger.Fatalf(context.Background(), "startup bootstrap failed: %v", err)
 	}
@@ -70,12 +69,6 @@ func main() {
 		resourceCleaner interfaces.ResourceCleaner,
 		systemSettingSvc interfaces.SystemSettingService,
 	) error {
-		if cfg.Tenant != nil && !cfg.Tenant.IsRBACEnforced() {
-			logger.Errorf(context.Background(),
-				"[security] tenant RBAC enforcement is DISABLED (enable_rbac=false); "+
-					"teaching production must keep WEKNORA_TENANT_ENABLE_RBAC=true / enable_rbac: true")
-		}
-
 		// Create HTTP server
 		server := &http.Server{
 			Handler: router,

@@ -103,10 +103,10 @@ func RegisterTenantRoutes(
 			tenantByID.POST("/api-principal-test-token", g.Owner(), handler.CreateAPIPrincipalTestToken)
 
 			// Tenant member management (PR 3 of #1303). sicau-v1 ticket 01:
-			// listing the roster is Admin+ — students (viewers) must never
+			// listing the roster is Admin+ - students (viewers) must never
 			// see who else is in the course workspace. Mutation stays
 			// Owner+ because membership changes are the highest-impact
-			// tenant op. /:id/leave is Viewer+ — any member can quit on
+			// tenant op. /:id/leave is Viewer+ - any member can quit on
 			// their own; the service still rejects when it would leave
 			// the tenant without an Owner.
 			if memberHandler != nil {
@@ -207,7 +207,7 @@ func RegisterMyEnvVarRoutes(r *gin.RouterGroup, h *handler.MeEnvVarHandler, g *r
 }
 
 // RegisterMyNoteRoutes registers the per-user notes CRUD surface
-// (sicau-v1 notes, /me/notes). Web JWT path ONLY — see notes design §7:
+// (sicau-v1 notes, /me/notes). Web JWT path ONLY - see notes design §7:
 // IM synthetic accounts share a user_id, so this must never hang off IM
 // auth. No role gate: every authenticated member manages their own notes;
 // isolation is structural (owner-scoped queries, no cross-user endpoint).
@@ -230,7 +230,7 @@ func RegisterMyNoteRoutes(r *gin.RouterGroup, h *handler.MeNoteHandler) {
 
 // RegisterAnnouncementRoutes registers the course announcement board
 // (sicau-v1). Reads Viewer+; posting Contributor+; deletes author-or-admin
-// (service-enforced). Web JWT path only — notes design §7 applies.
+// (service-enforced). Web JWT path only - notes design §7 applies.
 func RegisterAnnouncementRoutes(r *gin.RouterGroup, h *handler.MeAnnouncementHandler, g *rbacGuards) {
 	if h == nil {
 		return

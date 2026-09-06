@@ -106,20 +106,19 @@ export default {
       success: '초대가 취소되었습니다.'
     },
     shareLink: {
-      button: '공유 초대 링크',
+      button: '공유 링크 생성',
       cellTitle: '링크로 초대',
       cellAccepted: '{count}명 가입함',
       cellEmpty: '아직 가입한 사람이 없습니다',
       dialogTitle: '공유 초대 링크 생성',
       description: '여러 명이 사용할 수 있는 가입 링크를 생성합니다. 받은 사람이 자신의 이메일로 가입하고 이 워크스페이스에 합류합니다. {days}일 후 만료되며, 목록에서 언제든지 취소할 수 있습니다.',
       generate: '링크 생성',
-      resultTitle: '현재 초대 링크',
-      resultBody: '아래 링크를 복사해 비공개 채널로 전달하세요. 만료되거나 취소될 때까지 여기에서 다시 복사할 수 있습니다.',
+      resultTitle: '초대 링크가 생성되었습니다',
+      resultBody: '아래 링크를 복사해 비공개 채널로 전달하세요. 목록에도 저장되어 다시 복사하거나 취소할 수 있습니다.',
       revokeConfirm: '취소 후에는 미가입자가 이 링크를 사용할 수 없습니다. 다시 발급하려면 새 링크를 생성하세요.'
     }
   },
   tenantMember: {
-    stats: { neverActive: '활동 없음' },
     title: '멤버 관리',
     sectionDescription: '워크스페이스에 동료를 초대하고 역할을 관리합니다. 소유자만 멤버를 추가하거나 제거할 수 있습니다.',
     learnRbacGuide: 'RBAC 알아보기',
@@ -208,25 +207,16 @@ export default {
       contributor: '기여자',
       viewer: '뷰어'
     },
-    teaching: {
-      lead: '공간 책임자',
-      student: '학생',
-      legacyOwner: '이전 책임자 (처리 대기)',
-      unknown: '알 수 없는 관계',
-      legacyWarning: '이전 역할 — 여기서 수정할 수 없습니다. 플랫폼 마이그레이션을 기다리거나 슈퍼관리자에게 문의하세요',
-    },
     columns: {
       member: '이름 · 이메일',
-      role: '공간 관계',
+      role: '역할',
       joinedAt: '가입일',
-      questionCount: '질문 수',
-      lastActive: '마지막 활동',
       operations: '작업'
     },
     permissions: {
-      title: '공간 관계 안내',
-      desc: '교육용 공간에는 「공간 책임자」와 「학생」만 있습니다. 서버에서 적용되며 UI는 표시만 합니다.',
-      iconHint: '공간 관계 안내를 보려면 마우스를 올리세요',
+      title: '역할 권한',
+      desc: '각 역할이 이 워크스페이스에서 할 수 있는 작업입니다. 서버에서 적용되며 UI 컨트롤은 표시만 합니다.',
+      iconHint: '역할 권한 안내를 보려면 마우스를 올리세요',
       manageMembers: '멤버 관리',
       manageTenantConfig: '워크스페이스 설정 변경',
       manageInfra: '모델 / 벡터 저장소 / IM 채널 구성',
@@ -237,16 +227,6 @@ export default {
   userProfile: {
     title: '사용자 정보',
     description: '계정 기본 정보(사용자 ID, 사용자 이름, 이메일, 가입 시각)를 확인하고 비밀번호를 변경할 수 있습니다.',
-    platformIdentity: {
-      label: '플랫폼 신원',
-      description: '플랫폼 수준 신원 분류(사용자 신원 라벨)로, 활성 워크스페이스에 따라 바뀌지 않으며 공간 내 Owner/Admin/Contributor/Viewer 역할과 분리됩니다.',
-      values: {
-        superadmin: '슈퍼 관리자 (교사 능력 포함)',
-        teacher: '교사',
-        student: '학생',
-        unset: '신원 미설정',
-      },
-    },
     changePassword: {
       label: '비밀번호 변경',
       description: '현재 비밀번호를 확인한 뒤 새 비밀번호를 설정합니다. 성공 시 모든 세션이 만료되어 다시 로그인해야 합니다.',
@@ -254,7 +234,7 @@ export default {
       currentPlaceholder: '현재 비밀번호를 입력하세요',
       currentRequired: '현재 비밀번호를 입력하세요',
       newLabel: '새 비밀번호',
-      newPlaceholder: '8-32자, 문자와 숫자 포함',
+      newPlaceholder: '새 비밀번호 입력',
       confirmLabel: '새 비밀번호 확인',
       confirmPlaceholder: '새 비밀번호를 다시 입력하세요',
       submit: '비밀번호 업데이트',
@@ -1120,7 +1100,8 @@ export default {
       contextTemplate: '검색된 콘텐츠를 모델에 전달하기 전에 형식을 정의합니다',
       model: '에이전트가 사용할 대규모 언어 모델을 선택하세요',
       temperature: '출력의 무작위성을 제어합니다. 0이 가장 확정적, 1이 가장 무작위',
-      maxTokens: '모델이 생성하는 응답의 최대 토큰 수',
+      maxTokens: '모델 응답의 최대 토큰 수. 「기본값」은 2048입니다. 「사용자 지정」은 입력한 값을 그대로 저장합니다.',
+      maxTokensAgent: '각 추론 라운드에서 생성할 최대 토큰 수(도구 호출 JSON 포함). 「기본값」은 샌드박스 없으면 4096, 파일 쓰기/편집이 가능하면 24576입니다. 「사용자 지정」은 입력한 값을 그대로 저장합니다.',
       thinking: '모델의 확장 사고 기능 활성화 (모델 지원 필요)',
       conversationSection: '다중 턴 대화 및 질문 재작성 관련 매개변수 설정',
       conversationSectionAgent: '매 턴에 실어 보낼 이전 대화 분량 설정 (스마트 추론은 항상 다중 턴)',
@@ -1133,7 +1114,7 @@ export default {
       rewriteSystemPrompt: '질문 재작성용 시스템 프롬프트 (비워두면 기본값 사용)',
       rewriteUserPrompt: '질문 재작성용 사용자 프롬프트 템플릿 (비워두면 기본값 사용)',
       selectTools: 'Agent가 사용할 수 있는 도구를 선택하세요',
-      maxIterations: 'Agent가 작업 수행 시 최대 추론 단계 수',
+      maxIterations: 'Agent가 한 작업에서 수행할 최대 추론 단계 수입니다. 「제한 없음」을 선택하면 모델이 스스로 끝나거나 직접 중지할 때까지 계속 실행됩니다.',
       kbScope: '에이전트가 접근할 수 있는 지식베이스 범위를 선택하세요',
       webSearch: '활성화하면 에이전트가 인터넷에서 정보를 검색할 수 있습니다',
       webSearchProvider: '이 에이전트의 검색 엔진을 지정합니다. 비워두면 기본 검색 엔진을 사용합니다',
@@ -1330,6 +1311,8 @@ export default {
       executeSkillScript: '스킬 스크립트 실행',
       listSandboxFiles: '샌드박스 파일 목록',
       readSandboxFile: '샌드박스 파일 읽기',
+      writeSandboxFile: '샌드박스 파일 쓰기',
+      editSandboxFile: '샌드박스 파일 편집',
       shellExec: '샌드박스 명령 실행',
       dataAnalysis: '데이터 분석',
       dataSchema: '데이터 구조',
@@ -1343,7 +1326,11 @@ export default {
     sandboxFiles: {
       found: '파일 {count}개 발견',
       empty: '파일 없음',
-      truncated: '목록이 잘림'
+      truncated: '목록이 잘림',
+      wrote: '씀',
+      edited: '편집함',
+      replacements: '{count}곳 치환',
+      moreLines: '{count}줄 더'
     },
     shellExec: {
       workDir: '디렉터리',
@@ -1990,6 +1977,29 @@ export default {
     copySuffix: ' 사본',
     builtinTag: '기본제공',
     confirmDelete: '모델 "{name}"을(를) 삭제하시겠습니까?',
+    usage: {
+      title: '모델을 삭제할 수 없습니다',
+      description: '모델 "{name}"이(가) 다음 설정에서 사용 중입니다. 각 설정을 열어 다른 모델로 변경한 후 다시 삭제하세요.',
+      knowledgeBases: '지식 베이스 ({count})',
+      agents: '에이전트 ({count})',
+      longTermMemory: '장기 메모리',
+      openConfiguration: '설정 열기',
+      truncated: '전체 {total}개 중 앞 {shown}개만 표시합니다',
+      bindings: {
+        embedding_model: 'Embedding 모델',
+        summary_model: '요약 모델',
+        image_processing_model: '이미지 처리 모델',
+        vlm_model: '비전 모델',
+        asr_model: '음성 인식 모델',
+        wiki_synthesis_model: 'Wiki 종합 모델',
+        chat_model: '대화 모델',
+        rerank_model: '재정렬 모델',
+        query_understand_model: '질의 이해 모델',
+        follow_up_model: '후속 질문 모델',
+        extract_model: '메모리 추출 모델',
+        unknown: '기타 모델 설정'
+      }
+    },
     debug: {
       title: '모델 테스트',
       description: '구성된 모델에 실제 요청을 보내고 응답과 소요 시간을 확인합니다',
@@ -2207,7 +2217,7 @@ export default {
       desc: 'Agent 추론 및 계획을 위한 LLM 모델'
     },
     maxIterations: {
-      desc: 'Agent가 작업을 실행할 때의 최대 추론 단계 수'
+      desc: 'Agent가 한 작업에서 수행할 최대 추론 단계 수입니다. 「제한 없음」을 선택하면 모델이 스스로 끝나거나 직접 중지할 때까지 계속 실행됩니다.'
     },
     modelRecommendation: {
       title: '모델 추천'
@@ -2228,72 +2238,8 @@ export default {
     earlier: '이전',
     pinned: '고정됨'
   },
-  notes: {
-    insertImage: '이미지 삽입',
-    imageInserted: '이미지가 삽입되었습니다',
-    imageUploadFailed: '이미지 업로드에 실패했습니다',
-    imageLoadFailed: '이미지를 불러오지 못했습니다',
-    imageQuotaExceeded: '이미지 저장 공간이 가득 찼습니다 (사용자당 100MB) — 일부 이미지를 삭제한 후 다시 시도하세요',
-    title: '내 노트',
-    newNote: '새 노트',
-    untitled: '제목 없음',
-    loading: '불러오는 중…',
-    empty: '아직 노트가 없습니다. 오른쪽 위에서 만들어 보세요',
-    selectHint: '왼쪽에서 노트를 선택하거나 새로 만드세요',
-    edit: '편집',
-    preview: '미리보기',
-    save: '저장',
-    saved: '저장됨',
-    unsaved: '저장되지 않은 변경 사항',
-    savingNow: '저장 중…',
-    autoSaveRetry: '자동 저장 실패 — 입력하면 자동으로 재시도합니다',
-    draft: '초안',
-    saveFailed: '저장에 실패했습니다',
-    createFailed: '노트 생성에 실패했습니다',
-    delete: '삭제',
-    deleteFailed: '삭제에 실패했습니다',
-    deleteConfirm: '이 노트를 삭제할까요?',
-    loadFailed: '노트를 불러오지 못했습니다',
-    leaveConfirm: '저장되지 않은 변경 사항이 있습니다. 떠나시겠습니까?',
-    placeholder: 'Markdown로 기록하세요 — 첫 줄이 제목이 됩니다…',
-  },
-
-  announcements: {
-    titlePlaceholder: '공지 제목',
-    contentPlaceholder: '본문(Markdown 지원)…',
-    addFiles: '첨부 파일 추가',
-    publish: '게시',
-    loading: '불러오는 중…',
-    empty: '아직 공지가 없습니다',
-    postFailed: '게시에 실패했습니다',
-    posted: '공지가 게시되었습니다',
-    titleRequired: '제목을 입력하세요',
-    fileTooLarge: '파일이 50MB를 초과합니다: {name}',
-    tooManyFiles: '첨부 파일은 최대 5개입니다',
-    deleteFailed: '삭제에 실패했습니다',
-    deleteConfirm: '이 공지를 삭제할까요? 첨부 파일과 댓글도 함께 삭제됩니다',
-    downloadFailed: '첨부 파일 다운로드에 실패했습니다',
-    comments: '댓글',
-    noComments: '아직 댓글이 없습니다',
-    commentPlaceholder: '댓글을 입력하세요…',
-    send: '보내기',
-    commentFailed: '댓글 작성에 실패했습니다',
-    commentDeleteFailed: '댓글 삭제에 실패했습니다',
-    unknownAuthor: '알 수 없음',
-  },
-
   platform: {
-    subtitle: '대규모 언어 모델 기반 지식베이스',
-    note: '본 시스템은 오픈소스 프로젝트 ',
-    noteSuffix: ' 을(를) 기반으로 구축되어 사천농업대학교의 교육·연구 문서 검색에 맞춰 커스터마이징되었습니다.',
-    loginFeature1: '실제 자료',
-    loginFeature2: '실제 사례',
-    loginFeature3: '멀티모달 문서 & ReAct',
-    highlight: {
-      ragDesc: '하이브리드 검색 · 정밀 리콜',
-      agentDesc: '다단계 추론 · 도구 호출',
-      wikiDesc: '자동 추출 · 구조 연결',
-    },
+    subtitle: '대규모 언어 모델 기반 엔터프라이즈 지식 프레임워크',
     description: 'RAG 검색, 에이전트 추론, Wiki 지식베이스로 문서를 진정으로 이해하고 활용합니다',
     rag: 'RAG 강화 생성',
     agent: 'ReAct 에이전트',
@@ -2426,6 +2372,11 @@ export default {
       dimensionOverrideDesc: '제공자 문서에서 이 모델이 dimensions 매개변수를 지원한다고 확인한 경우에만 켜세요.',
       supportsVisionLabel: '비전/멀티모달 지원',
       supportsVisionDesc: '모델의 이미지 등 멀티모달 입력 지원 여부',
+      contextWindowLabel: '컨텍스트 창',
+      contextWindowPlaceholder: '기본값 {value}',
+      contextWindowDesc: '모델이 한 요청에 수용할 수 있는 토큰 수입니다. 에이전트 대화 압축이 이 한도를 사용합니다. 비워 두면 기본값 200000(200K)을 사용합니다. 공급자 문서의 실제 값을 입력하세요. 더 크게 설정하면 압축이 발생하지 않고 요청이 거부될 수 있습니다.',
+      contextWindowDefaultHint: '설정되지 않음, 기본값 {value} 사용',
+      contextWindowTokens: '{count} 토큰',
       maxConcurrencyLabel: '백그라운드 동시 실행 상한',
       maxConcurrencyPlaceholder: '0이면 전역 기본값 사용',
       maxConcurrencyDesc: '문서 인덱싱/보강 등 백그라운드 작업이 이 모델을 호출하는 동시 실행 수를 제한합니다(모델별로 모든 복제본이 공유). 0 또는 비워 두면 전역 기본값을 사용하며, 대화형 채팅에는 영향을 주지 않습니다.',
@@ -2529,6 +2480,10 @@ export default {
         openrouter: {
           label: 'OpenRouter',
           description: 'openai/gpt-5.2-chat, google/gemini-3-flash-preview 등'
+        },
+        litellm: {
+          label: 'LiteLLM',
+          description: '자체 호스팅 프록시로 OpenAI, Anthropic, Gemini, Bedrock 등 100+ 공급자를 연결합니다. 플레이스홀더 URL을 실제 주소로 바꾸세요. localhost는 SSRF_WHITELIST에 추가해야 합니다.'
         },
         zhipu: {
           label: 'Zhipu BigModel',
@@ -2800,22 +2755,12 @@ export default {
         emailLabel: '사용자 이메일',
         emailPlaceholder: '비밀번호를 재설정할 사용자의 이메일 입력',
         newPasswordLabel: '새 비밀번호',
-        newPasswordPlaceholder: '8~32자, 문자와 숫자 포함',
+        newPasswordPlaceholder: '새 비밀번호 입력',
         confirmPasswordLabel: '새 비밀번호 확인',
         confirmPasswordPlaceholder: '새 비밀번호를 다시 입력',
         confirmBtn: '재설정 확인',
         success: '비밀번호가 재설정되고 기존 세션이 만료되었습니다',
         failed: '비밀번호 재설정 실패',
-        validation: {
-          emailRequired: '사용자 이메일을 입력하세요',
-          emailInvalid: '올바른 이메일 주소를 입력하세요',
-          passwordRequired: '새 비밀번호를 입력하세요',
-          passwordLength: '비밀번호는 8~32자여야 합니다',
-          passwordLetter: '비밀번호에 문자가 포함되어야 합니다',
-          passwordNumber: '비밀번호에 숫자가 포함되어야 합니다',
-          confirmRequired: '새 비밀번호를 다시 입력하세요',
-          passwordMismatch: '비밀번호가 일치하지 않습니다'
-        }
       },
       admins: {
         label: '시스템 관리자',
@@ -2836,47 +2781,6 @@ export default {
             confirmBtn: '승격 확인'
           }
         }
-      },
-      teachers: {
-        label: '교사',
-        description: '임명된 교사는 교수용 워크스페이스를 만들 수 있습니다. 오른쪽에 이메일을 입력하고 Enter를 누르면 임명하고, 태그의 ×를 누르면 교사 자격을 회수합니다.',
-        placeholder: '사용자 이메일을 입력하고 Enter를 누르세요',
-        loadFailed: '교사 목록을 불러오지 못했습니다',
-        saveSuccess: '교사 명단이 업데이트되었습니다',
-        saveFailed: '교사 명단 업데이트 실패',
-        systemAdmin: '시스템 관리자 (교사 능력 상속, 회수 불가)',
-        systemAdminHint: '이 계정은 플랫폼 슈퍼 관리자로, 교사 능력을 자동 상속하므로 별도 임명이 필요하지 않으며 여기서 회수할 수도 없습니다.',
-        identityLabel: '관리 대상 계정의 플랫폼 신원',
-        confirm: {
-          appoint: {
-            body: '{email} 사용자를 교사로 임명하시겠습니까? 이 사용자는 교수용 워크스페이스를 만들 수 있습니다.',
-            confirmBtn: '임명 확인'
-          },
-          revoke: {
-            body: '{email} 사용자의 교사 자격을 회수하시겠습니까? 회수 후에는 더 이상 교수용 워크스페이스를 만들 수 없습니다.',
-            confirmBtn: '회수 확인'
-          }
-        }
-      },
-      ownershipAnomalies: {
-        label: '공간 책임자 이상',
-        description: 'Owner가 없거나 여러 명인 워크스페이스는 슈퍼 관리자가 명시적으로 책임자를 지정해야 하며, 시스템이 자동 선택하지 않습니다.',
-        refresh: '목록 새로고침',
-        runMigration: '멤버 역할 마이그레이션 실행',
-        empty: '처리할 이상이 없습니다',
-        tenant: '워크스페이스 #{id}',
-        ownerCount: 'Owner 수: {count}',
-        pickLead: '교사 능력이 있는 멤버 선택',
-        resolve: '공간 책임자로 지정',
-        loadFailed: '이상 목록을 불러오지 못했습니다',
-        migrationDone: '마이그레이션 완료: 강등 {downgraded}명, 이상 공간 {anomalies}개',
-        migrationFailed: '마이그레이션 실패',
-        resolveSuccess: '공간 책임자를 지정했습니다',
-        resolveFailed: '공간 책임자 지정 실패',
-        kind: {
-          zero_owner: 'Owner 없음',
-          multi_owner: 'Owner 다수',
-        },
       },
       reset: {
         label: '초기화',
@@ -2911,7 +2815,8 @@ export default {
         confirmBtn: '저장 확인',
         cancelBtn: '취소',
         emptyValue: '(비어 있음)',
-        bodyAuthRegistrationMode: '「{label}」을(를) {value}(으)로 변경하려고 합니다.\n\nself_serve로 전환하면 인터넷의 누구나 계정을 만들 수 있습니다. 의도된 동작인지 확인해 주세요.'
+        bodyAuthRegistrationMode: '「{label}」을(를) {value}(으)로 변경하려고 합니다.\n\nself_serve로 전환하면 인터넷의 누구나 계정을 만들 수 있습니다. 의도된 동작인지 확인해 주세요.',
+        bodySandboxDockerEnabled: '켜면 워크스페이스 관리자가 로컬 Docker 데몬을 샌드박스로 지정할 수 있습니다. 로컬 docker.sock은 호스트 root와 같습니다. 데몬을 마운트했거나 TLS가 있는 원격 tcp:// 를 쓰는 프라이빗 단일 노드에서만 사용하세요.'
       },
       enumLabels: {
         auth: {
@@ -2941,14 +2846,19 @@ export default {
           max_owned_per_user: '슈퍼유저가 아닌 사용자가 셀프 서비스로 소유할 수 있는 최대 워크스페이스 수입니다. 워크스페이스 생성 시마다 읽으며 저장 즉시 적용됩니다. 0은 내장 기본값 10을 사용하고, 음수는 제한을 완전히 해제합니다(공개 배포에는 권장하지 않음).',
           self_service_creation_enabled: '비슈퍼유저가 공간을 직접 만들 수 있는지 설정합니다. 비활성화하면 일반 사용자는 초대로만 기존 공간에 참여할 수 있으며, 크로스 워크스페이스 슈퍼유저는 계속 만들 수 있습니다.',
           default_storage_quota_gb: '신규 워크스페이스 생성 시 기본으로 할당되는 저장 용량(GB)으로, 벡터·원본·텍스트·인덱스 등을 포함합니다. 생성 시에만 읽으며, 변경은 이후 생성되는 워크스페이스에만 적용되고 기존 워크스페이스에는 소급되지 않습니다. 0 또는 음수는 내장 기본값 10GB를 사용합니다.',
-          auto_create_api_key: '신규 워크스페이스에 full_access API Key를 자동 생성하고 생성 응답에 평문 token을 반환합니다. 기존 동작에 의존하는 연동에만 사용하세요. 기본값은 비활성화입니다.'
+          auto_create_api_key: '신규 워크스페이스에 full_access API Key를 자동 생성하고 생성 응답에 평문 token을 반환합니다. 기존 동작에 의존하는 연동에만 사용하세요. 기본값은 비활성화입니다.',
+          auto_accept_invitation: '켜면 워크스페이스 관리자가 이메일로 가입된 사용자를 초대할 때 상대가 바로 멤버가 되며, 받은편지함에서 수락할 필요가 없습니다. 끄면 「초대 발송 → 상대가 수락」 흐름을 유지합니다. 저장 즉시 적용됩니다.'
         },
         ssrf: {
           whitelist: 'SSRF 보호 허용 목록입니다. example.com / *.foo.com / 10.0.0.0/8 / 2001:db8::1 형식을 입력할 수 있습니다. 저장 즉시 적용됩니다. SSRF_WHITELIST_EXTRA 환경 변수는 배포자가 관리하며 여기서 덮어쓰지 않습니다.'
         },
+        sandbox: {
+          docker_enabled: 'Docker 샌드박스 백엔드를 허용할지 설정합니다. 로컬 docker.sock은 호스트 root와 같으므로 기본값은 꺼짐입니다. 시스템 관리자만 켤 수 있으며 저장 즉시 적용됩니다. 데몬 소켓을 마운트했거나 TLS가 있는 원격 tcp:// 를 쓰는 프라이빗 단일 노드에서만 켜세요.'
+        },
         auth: {
           registration_mode: '셀프 가입 모드입니다. self_serve = 누구나 계정을 만들 수 있음; invite_only = 공개 가입을 끄고 Owner/Admin만 초대 가능. 저장 즉시 적용되며, self_serve는 스팸 가입이 들어올 수 있으니 신중히 사용하세요.',
-          default_tenant_mode: '공개 가입 후 공간 초기화 정책입니다. create_personal은 개인 공간을 만들고 Owner를 부여하며, tenantless는 초대 수락 또는 직접 공간 생성 전까지 계정만 만듭니다.'
+          default_tenant_mode: '공개 가입 후 공간 초기화 정책입니다. create_personal은 개인 공간을 만들고 Owner를 부여하며, tenantless는 초대 수락 또는 직접 공간 생성 전까지 계정만 만듭니다.',
+          complex_password_enabled: '복잡한 비밀번호를 사용할지 여부입니다. 활성화하면 비밀번호에 대문자, 소문자, 숫자 및 특수 문자가 포함되어야 합니다. 변경 사항은 즉시 적용되며, 새로 가입하는 사용자 또는 비밀번호를 새로 변경하거나 재설정하는 경우에만 적용됩니다. 특수 문자는 다음을 포함합니다: {specialChars}'
         }
       },
       keyLabels: {
@@ -2967,14 +2877,19 @@ export default {
           max_owned_per_user: '사용자당 최대 워크스페이스 수',
           self_service_creation_enabled: '사용자 공간 직접 생성 허용',
           default_storage_quota_gb: '신규 워크스페이스 기본 저장 용량 (GB)',
-          auto_create_api_key: '신규 워크스페이스 API Key 자동 생성'
+          auto_create_api_key: '신규 워크스페이스 API Key 자동 생성',
+          auto_accept_invitation: '등록된 사용자 초대 시 자동 가입'
         },
         ssrf: {
           whitelist: 'SSRF 보호 허용 목록'
         },
+        sandbox: {
+          docker_enabled: 'Docker 샌드박스 사용'
+        },
         auth: {
           registration_mode: '셀프 가입 모드',
-          default_tenant_mode: '기본 공간 프로비저닝'
+          default_tenant_mode: '기본 공간 프로비저닝',
+          complex_password_enabled: '복잡한 비밀번호 사용'
         }
       },
       runtime: {
@@ -3197,7 +3112,7 @@ export default {
         security: {
           tab: '네트워크 보안 {count}',
           title: '네트워크 보안',
-          description: 'SSRF 보호를 우회할 수 있는 신뢰 호스트, IP, 네트워크를 관리합니다.'
+          description: 'SSRF 허용 목록과 Docker 샌드박스 허용 여부(로컬 docker.sock은 호스트 root와 같음)를 관리합니다.'
         },
         runtime: {
           tab: '런타임 및 동시성 {count}',
@@ -4646,7 +4561,7 @@ export default {
     subtitle: 'RAG Q&A, ReAct 에이전트, Wiki 지식베이스 — 대규모 언어 모델 기반 엔터프라이즈 지식 프레임워크',
     registerSubtitle: '계정을 만들고 WeKnora를 시작하세요',
     emailPlaceholder: '이메일 주소 입력',
-    passwordPlaceholder: '비밀번호 입력 (8-32자, 문자와 숫자 포함)',
+    passwordPlaceholder: '비밀번호 입력',
     confirmPasswordPlaceholder: '비밀번호 다시 입력',
     usernamePlaceholder: '사용자명 입력',
     emailRequired: '이메일 주소를 입력해주세요',
@@ -4655,7 +4570,10 @@ export default {
     passwordMinLength: '비밀번호는 최소 8자여야 합니다',
     passwordMaxLength: '비밀번호는 32자를 초과할 수 없습니다',
     passwordMustContainLetter: '비밀번호에 문자가 포함되어야 합니다',
+    passwordMustContainLowercaseLetter: '비밀번호에는 소문자가 포함되어야 합니다',
+    passwordMustContainUppercaseLetter: '비밀번호에는 대문자가 포함되어야 합니다',
     passwordMustContainNumber: '비밀번호에 숫자가 포함되어야 합니다',
+    passwordMustContainSpecialChar: '비밀번호에는 특수문자가 포함되어야 합니다: {specialChars}',
     usernameRequired: '사용자명을 입력해주세요',
     usernameMinLength: '사용자명은 최소 2자여야 합니다',
     usernameMaxLength: '사용자명은 20자를 초과할 수 없습니다',
@@ -4678,12 +4596,6 @@ export default {
       inviteOnlyNotice: '이 계정은 초대를 통해서만 기존 공간에 참여할 수 있습니다',
       help: '지금 작업 공간을 만들거나 나중에 돌아와 초대를 수락할 수 있습니다.',
       inviteOnlyHelp: '초대가 없다면 등록 이메일을 공간 관리자에게 전달하고 초대를 요청하세요.'
-    },
-    forceChangePassword: {
-      title: '초기 비밀번호 변경',
-      description: '보안을 위해 계속하기 전에 새 비밀번호를 설정해야 합니다.',
-      submit: '비밀번호 업데이트',
-      success: '비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해 주세요.'
     }
   },
   inviteRegister: {
@@ -5110,10 +5022,10 @@ export default {
     parserEngine: '파싱 엔진',
     storageEngine: '스토리지 엔진',
     sandbox: {
-      title: '샌드박스',
+      title: '샌드박스 설정',
       description: '에이전트 스킬 스크립트의 격리 실행 환경을 구성합니다. 각 에이전트는 설정을 하나 선택합니다.',
       pageHintTitle: '샌드박스란?',
-      pageHint: '샌드박스는 에이전트 스킬 스크립트가 실행되는 격리 환경입니다. 워크스페이스에 Docker, E2B, CubeSandbox 설정을 여러 개 둘 수 있고, 각 에이전트가 하나를 선택합니다. 스킬은 「스킬」 페이지에서 선택한 설정의 이미지에 설치됩니다. 선택하지 않으면 스크립트는 실행되지 않습니다.',
+      pageHint: '샌드박스는 에이전트 스킬 스크립트가 실행되는 격리 환경입니다. 워크스페이스에 Docker, E2B, CubeSandbox 설정을 여러 개 둘 수 있고, 각 에이전트가 하나를 선택합니다. 스킬은 「스킬 관리」 페이지에서 선택한 설정의 이미지에 설치됩니다. 선택하지 않으면 스크립트는 실행되지 않습니다.',
       editorDescription: 'Configure a workspace runtime. Docker, CubeSandbox, and E2B use the same management flow.',
       stepConnection: 'Connect',
       stepTemplate: 'Template',
@@ -5141,6 +5053,10 @@ export default {
         e2b: 'Managed MicroVM service or an E2B-compatible deployment',
         docker: '이 WeKnora 호스트의 Docker에서 세션마다 장수명 컨테이너를 유지합니다. 스크립트와 파일이 같은 컨테이너에 남습니다',
       },
+      dockerDisabledAlert: '이 배포에서는 Docker 샌드박스가 켜져 있지 않습니다',
+      dockerDisabledHint: '로컬 docker.sock은 호스트 root와 같습니다. 단일 머신 프라이빗 설치에서는 시스템 관리자가 설정 → 시스템 설정 → 네트워크 보안에서 켤 수 있습니다.',
+      dockerDisabledCard: '이 배포에서 Docker 샌드박스가 꺼져 있어 이 구성은 컨테이너를 만들지 않습니다',
+      dockerHostRisk: '비우거나 unix:// 를 쓰면 WeKnora가 있는 머신의 Docker 데몬을 사용하며, 그 권한은 해당 머신의 root와 같습니다. 프라이빗 단일 노드에만 쓰세요. 여러 워크스페이스가 같은 호스트를 쓰는 경우에는 Cube 또는 E2B를 쓰세요. 원격 tcp:// 는 TLS 인증서 디렉터리가 필요합니다.',
       addConfig: '샌드박스 추가',
       viewClusterGuide: 'Cluster setup guide',
       configName: 'Config name',
@@ -5155,7 +5071,46 @@ export default {
       sectionRuntimeEnvironment: 'Runtime environment',
       sectionTemplate: 'Runtime template',
       sectionRuntime: 'Execution settings',
+      sectionNetwork: 'Network policy',
       sectionEnvironment: 'Environment variables',
+      networkHint: 'Controls outbound networking for every sandbox using this configuration. Changes affect only newly created sandboxes; existing sandboxes keep their policy until reclaimed.',
+      egressDefault: 'Default egress',
+      egressAllowAll: 'Allow public network (default)',
+      egressDenyAll: 'Deny by default',
+      egressPrecedence: 'Evaluation order: allow, deny, then the default. Allow rules take precedence over deny rules.',
+      allowOut: 'Allowed destinations',
+      allowOutPlaceholder: 'Domain / IP / CIDR, for example *.example.com',
+      allowOutHelp: 'Supports IPv4, CIDR, domains, and single-label wildcards such as *.example.com (which do not match the root domain).',
+      denyOut: 'Denied destinations',
+      denyOutPlaceholder: 'IP / CIDR only, for example 169.254.169.254/32',
+      denyOutHelp: 'Deny rules match destination IP only, so domains are not supported.',
+      domainAllowNeedsDenyAll: 'When allowed destinations contain a domain, also choose “Deny by default” or add 0.0.0.0/0 to denied destinations; otherwise the allowlist is ineffective.',
+      cubeL7Rules: 'HTTP access rules (L7)',
+      cubeL7RulesHelp: 'Every rule requires host or sni; the network layer derives allowed targets only from those fields. Fields are AND-ed and methods are OR-ed. Applies only to HTTP 80 / HTTPS 443. Rules are first-match-wins from top to bottom.',
+      e2bHostRules: 'Host request transforms',
+      e2bHostRulesHelp: 'Inject headers by host. A rule does not authorize egress; its host must also appear in allowed destinations.',
+      ruleUntitled: 'Untitled rule',
+      expandRule: 'Expand rule',
+      collapseRule: 'Collapse rule',
+      moveRuleUp: 'Move rule up',
+      moveRuleDown: 'Move rule down',
+      ruleName: 'Rule name',
+      ruleScheme: 'Scheme',
+      ruleSni: 'SNI',
+      ruleHost: 'Host',
+      ruleMethods: 'HTTP methods',
+      rulePath: 'Path',
+      ruleAction: 'Action',
+      ruleAllow: 'Allow',
+      ruleDeny: 'Deny',
+      ruleAudit: 'Audit level',
+      ruleInject: 'Inject headers',
+      headerName: 'Header name',
+      headerValue: 'Header value',
+      addTarget: 'Add destination',
+      addRule: 'Add rule',
+      addHeader: 'Add header',
+      removeRule: 'Remove rule',
       noConfigs: '아직 샌드박스가 없습니다. 워크스페이스 설정을 선택하지 않은 에이전트는 스킬 스크립트를 실행하지 않습니다.',
       identityFieldHint: 'While this config owns sandboxes, these cannot be changed: backend type, API endpoint, API key, sandbox domain, proxy endpoint.',
       connectionLockedBySkills: '이 샌드박스에는 이미 Skill이 있습니다. 연결, 자격 증명, DNS를 바꾸면 스킬 스냅샷의 환경이 달라지고, DNS는 템플릿을 재구축해야 적용됩니다. 새 샌드박스를 만드세요.',
@@ -5285,7 +5240,7 @@ export default {
       httpTimeout: 'HTTP timeout (s)',
       httpTimeoutHelp: '백엔드 관리 API 호출을 기다리는 상한입니다. 초과하면 엔드포인트를 사용할 수 없는 것으로 간주합니다. 비워 두면 30초입니다.',
       sandboxTtl: 'Sandbox TTL (s)',
-      sandboxTtlHelp: '유휴 샌드박스가 회수되기까지의 시간입니다. 너무 짧으면 세션을 이어갈 때 다시 만들어야 하고, 너무 길면 유휴 인스턴스에 계속 요금이 발생합니다. 비워 두면 백엔드 기본값을 사용합니다.',
+      sandboxTtlHelp: '샌드박스가 일시 중지되기까지의 시간',
       dockerImage: 'Docker image',
       dockerHost: 'Docker daemon endpoint',
       dockerHostHelp: 'Empty follows the local docker CLI (DOCKER_HOST or the current docker context), so you do not have to type /var/run/docker.sock. For a remote daemon use tcp://host:2376, fill in the TLS certificate directory, and turn on "allow private endpoints" for RFC1918 addresses.',
@@ -5294,9 +5249,11 @@ export default {
       dockerIdleTtl: 'Idle reclaim (seconds)',
       dockerIdleTtlHelp: 'The Docker daemon has no idle timeout of its own. A container that runs no command for this long is reclaimed by WeKnora and rebuilt when the session continues. Empty means 1800 seconds.',
       dockerCpuLimit: 'CPU cores',
+      dockerCpuLimitHelp: 'CPU cores available to one sandbox; 0 uses the built-in default.',
       dockerMemoryLimit: 'Memory limit (MB)',
+      dockerMemoryLimitHelp: 'Memory limit in MB for one sandbox; 0 uses the built-in default.',
       dockerPidsLimit: 'Process limit',
-      dockerResourceHelp: 'Caps for one sandbox container. Empty means 2 cores / 2048 MB / 512 processes.',
+      dockerPidsLimitHelp: 'Maximum processes one sandbox can create; 0 uses the built-in default.',
       dockerNetworkMode: 'Network mode',
       dockerNetworkModeHelp: 'Defaults to bridge, which skills need to install packages. Choose none for no egress at all. Docker filters by network only; per-domain rules are not possible here.',
       dockerNetworkBridge: 'bridge (egress allowed)',
@@ -5322,14 +5279,15 @@ export default {
       checkFailed: 'Some checks failed',
       checkScopeConnection: '이번에는 컨트롤 플레인만 확인했습니다. 엔드포인트는 응답하고 자격 증명도 유효하지만, 스크립트가 실제로 실행되는지는 아직 확인되지 않았습니다.',
       checkScopeFull: '엔드포인트, 자격 증명, 템플릿, 샌드박스 내 실행, 외부 통신까지 모두 실제로 검증했습니다.',
+      checkScopePolicyRestricted: '네트워크 정책으로 외부 통신이 제한되어 외부 연결은 실제로 확인하지 않았습니다. 엔드포인트, 자격 증명, 템플릿, 샌드박스 내 실행은 검증했습니다.',
       checkPendingHint: '{names}은(는) 전체 검증으로만 확인할 수 있습니다. 임시 샌드박스를 실제로 만들어 스크립트를 한 번 실행한 뒤 삭제합니다.',
       skipReasons: {
         needs_deep_check: '전체 검증 필요',
         control_plane_unreachable: '컨트롤 플레인에 연결할 수 없어 건너뜀',
         sandbox_not_created: '샌드박스가 생성되지 않아 건너뜀',
         sandbox_exec_failed: '샌드박스 내 실행 실패로 건너뜀',
+        egress_restricted_by_policy: '네트워크 정책에 의해 제한됨(이 구성은 기본적으로 외부 통신을 차단함)',
       },
-      noVolumeSupport: 'This backend does not support volume mounts; skills relying on a shared volume will be unavailable.',
       checks: {
         client_build: 'Client construction',
         api_url_reachable: 'Endpoint reachability',
@@ -5357,14 +5315,17 @@ export default {
       skillUploadHint: '설치하면 현재 이미지에 스킬을 쓰고 새 스냅샷을 만듭니다. 몇 분이 걸릴 수 있습니다. 현재 대화 턴은 중단되지 않으며, 이미 열린 세션은 다음 턴에서 새 이미지로 샌드박스를 다시 만들고 그때 세션 작업 공간 초안이 지워집니다.',
       skillUploadHintNewSession: '설치하면 현재 이미지에 스킬을 쓰고 새 스냅샷을 만듭니다. 몇 분이 걸릴 수 있습니다. 이미 열린 세션은 세션이 끝날 때까지 기존 샌드박스를 유지하며, 이번에 설치한 스킬은 새로 시작한 세션에만 적용됩니다.',
       skillSourceSection: '소스에서 설치',
-      skillSourceSectionHint: 'ClawHub, GitHub 또는 SkillHub 링크, 혹은 {\'@\'}owner/slug를 붙여넣으세요.',
+      skillSourceSectionHint: 'ClawHub, GitHub 또는 SkillHub 링크, 혹은 {\'@\'}owner/slug를 붙여넣으세요. 압축 파일은 {size} MB를 넘을 수 없습니다.',
       skillUploadSection: '로컬 번들 업로드',
-      skillUploadSectionHint: 'SKILL.md가 포함된 zip을 아래로 끌어다 놓거나 클릭해서 선택하세요.',
+      skillUploadSectionHint: 'SKILL.md가 포함된 zip을 아래로 끌어다 놓거나 클릭해서 선택하세요. 압축 파일은 {size} MB를 넘을 수 없습니다.',
       skillSourcePlaceholder: 'ClawHub는 {\'@\'}owner/slug, GitHub/SkillHub는 전체 URL을 붙여넣으세요',
       skillSourceInstall: '설치',
       skillInstallOr: '또는',
       skillSourceFailed: '레지스트리에서 스킬을 설치하지 못했습니다',
       skillUploadFailed: 'Failed to upload the skill',
+      skillBundleTooLarge: '스킬 압축 파일은 {size} MB를 넘을 수 없습니다.',
+      skillBundleTooManyFiles: '스킬 디렉터리의 파일은 {count}개를 넘을 수 없습니다.',
+      skillBundleTooManyZipEntries: '압축 파일 항목은 {count}개를 넘을 수 없습니다.',
       skillUploading: 'Uploading {percent}%',
       skillUploadAccepted: 'Skill install started',
       skillStatusInstalling: 'Installing',
@@ -5375,6 +5336,16 @@ export default {
       skillDisableHint: 'Disable = the skill is invisible to the agent, files stay in the image. Changes take effect on the session\'s next execution.',
       skillDeleteHint: '삭제하면 이미지에서 스킬 디렉터리를 제거하고 새 스냅샷을 만듭니다. 현재 대화 턴은 중단되지 않으며, 이미 열린 세션은 다음 턴에서 새 이미지로 샌드박스를 다시 만들고 그때 세션 작업 공간 초안이 지워집니다.',
       skillDeleteHintNewSession: '삭제하면 이미지에서 스킬 디렉터리를 제거하고 새 스냅샷을 만듭니다. 이미 열린 세션은 세션이 끝날 때까지 기존 샌드박스를 유지하며, 이 스킬은 새로 시작한 세션에서만 빠집니다.',
+      skillRemoveInProgress: '제거 중',
+      skillRemoveWaiting: '이미지에서 제거를 시작했습니다. 진행 상황을 기다리는 중…',
+      skillRemoveDone: '샌드박스에서 「{name}」을(를) 제거했습니다. 스킬은 카탈로그에 남아 있으니 나중에 다시 설치할 수 있습니다.',
+      skillRemoveStage: {
+        accepted: '제거 요청을 수락했습니다',
+        sandbox_ready: '유지보수 샌드박스를 여는 중',
+        removed: '파일을 삭제했고 새 이미지를 생성하는 중',
+        done: '제거 완료',
+        failed: '제거 실패',
+      },
       imageInfoTitle: 'Current image',
       imageInfoSnapshot: 'Snapshot ID',
       imageInfoGeneration: 'Version',
@@ -5408,6 +5379,10 @@ export default {
       skillRetryHint: '저장된 번들로 재시도합니다. 다시 업로드할 필요가 없습니다',
       skillRetryAccepted: '재설치를 시작했습니다',
       skillRetryFailed: '재설치를 시작하지 못했습니다',
+      skillStop: '설치 중지',
+      skillStopHint: '설치를 중단한 뒤 다시 설치하거나 제거할 수 있습니다',
+      skillStopAccepted: '중지했습니다',
+      skillStopFailed: '중지하지 못했습니다',
       skillEmpty: '아직 설치된 스킬이 없습니다. 레지스트리 URL을 붙여넣거나 zip을 업로드하세요.',
       skillVersion: 'Version',
       skillVersionEmpty: 'Not specified',
@@ -5435,7 +5410,7 @@ export default {
       },
     },
     skills: {
-      title: '스킬',
+      title: '스킬 관리',
       description: '스킬은 워크스페이스 카탈로그에 속합니다. 먼저 등록한 뒤 하나 이상의 샌드박스에 설치할 수 있습니다. 에이전트는 현재 샌드박스에서 준비된 스킬만 사용할 수 있습니다.',
       helpTooltip: '카탈로그 스킬은 아무 샌드박스에도 설치하지 않아도 됩니다. 스크립트를 실행하려면 에이전트가 쓰는 샌드박스 이미지에 설치해야 합니다. Docker, Cube, E2B 이미지는 호환되지 않으므로 샌드박스마다 따로 설치합니다.',
       goSandboxSettings: '샌드박스 구성',
@@ -5462,10 +5437,16 @@ export default {
       noSandboxToInstall: '설치할 수 있는 샌드박스가 없습니다.',
       noInstalls: '어떤 샌드박스에도 설치되지 않음',
       installedOn: '설치됨',
+      installedOnName: '{name}에 설치됨',
+      installedCount: '{count}개 샌드박스에 설치됨',
+      installPanelGroup: '설치됨',
+      installPanelAvailable: '미설치',
+      viewInstallProgress: '진행 상황',
       manageOnSandbox: '「{name}」 샌드박스에서 관리',
       manageDrawerDesc: '샌드박스 「{name}」에서 사용 여부, 변수, 제거를 관리합니다.',
       manageEnable: '사용',
       manageUninstall: '샌드박스에서 제거',
+      manageUninstallConfirm: '샌드박스에서 「{name}」을(를) 제거할까요?',
       deleteCatalog: '카탈로그에서 삭제',
       deleteCatalogConfirm: '「{name}」을 카탈로그에서 삭제할까요? 모든 샌드박스에서 먼저 제거하세요.',
       deleteCatalogBlocked: '모든 샌드박스에서 이 스킬을 먼저 제거하세요.',
@@ -5717,12 +5698,6 @@ export default {
     }
   },
   agent: {
-  setAsDefault: '스페이스 기본으로 설정',
-  unsetAsDefault: '스페이스 기본 해제',
-  defaultBadge: '기본',
-  defaultAgentSet: '스페이스 기본 에이전트로 설정되었습니다',
-  defaultAgentCleared: '스페이스 기본 설정이 해제되었습니다',
-  defaultAgentSetFailed: '기본 에이전트 설정에 실패했습니다',
     taskLabel: '작업:',
     think: '사고',
     copy: '복사',
@@ -5736,7 +5711,6 @@ export default {
       collecting: '생성된 파일을 저장하는 중…',
       download: '다운로드',
       downloadFailed: '다운로드에 실패했습니다. 다시 시도해 주세요.',
-      downloadDisabled: '이 버전은 파일 다운로드를 지원하지 않습니다',
       inlinePreviewHint: '클릭하여 미리보기',
       inlineMissing: '파일을 사용할 수 없습니다',
     },
@@ -5748,6 +5722,9 @@ export default {
     toolCalls: '도구 <strong>{tools}</strong>회 호출',
     durationSuffix: '소요 시간 <strong>{duration}</strong>',
     stepSummarySeparator: ' · ',
+    contextCompacted: '컨텍스트 압축',
+    contextCompactedSummary: '{before} → {after} 토큰',
+    contextCompactedDegraded: '요약을 사용할 수 없어 원본 기록을 유지했습니다',
     title: '에이전트',
     subtitle: '에이전트 구성 및 관리, 대화 동작 및 기능 맞춤화',
     createAgent: '에이전트 만들기',
@@ -5847,6 +5824,8 @@ export default {
       rerankModelPlaceholder: 'ReRank 모델을 선택하세요.',
       rerankModelOptionalHint: '현재 범위에 RAG 유형의 지식베이스가 없으므로 선택 사항입니다. 이후 RAG 지식베이스가 추가되면 워크스페이스 기본 ReRank 모델로 자동 폴백되지만, 명시적으로 설정하는 것을 권장합니다.',
       maxIterations: '최대 반복 횟수',
+      maxIterationsLimit: '제한',
+      maxIterationsUnlimited: '제한 없음',
       allowedTools: '허용된 도구',
       multiTurn: '여러 라운드의 대화',
       historyTurns: '라운드 수를 유지하세요',
@@ -5870,30 +5849,33 @@ export default {
       rewritePromptUser: '사용자 프롬프트 다시 작성',
       rewritePromptUserPlaceholder: '시스템 기본 프롬프트를 사용하려면 비워 두세요.',
       maxCompletionTokens: '생성된 토큰의 최대 수',
+      maxCompletionTokensDefault: '기본값',
+      maxCompletionTokensCustom: '사용자 지정',
       fallbackStrategy: '폴백 전략',
       fallbackResponse: '고정 응답 내용',
       fallbackResponsePlaceholder: '죄송합니다. 이 질문에는 답변해 드릴 수 없습니다.',
       fallbackPrompt: '폴백 프롬프트',
       fallbackPromptPlaceholder: '시스템 기본 프롬프트를 사용하려면 비워 두세요.',
       skillsConfig: '스킬',
-      skillsConfigDesc: '스킬 스크립트가 실행될 샌드박스를 고른 뒤, 워크스페이스 카탈로그에서 선택합니다. 해당 샌드박스에 설치되지 않은 스킬은 보이지만 설치 전에는 선택할 수 없습니다.',
-      skillsSelection: '사용 가능한 스킬',
-      skillsSelectionDesc: '목록은 워크스페이스 스킬 카탈로그에서 가져옵니다. 선택한 샌드박스에서 준비된 스킬만 사용할 수 있습니다.',
+      skillsConfigDesc: '먼저 실행 샌드박스를 선택한 뒤 아래 목록에서 스킬을 고르세요. 해당 샌드박스에 없는 스킬은 「설치」가 보이며, 설치한 뒤에만 선택할 수 있습니다.',
+      skillsSelection: '스킬 목록',
+      skillsSelectionDesc: '워크스페이스 카탈로그의 스킬이 모두 표시됩니다. 이 샌드박스에 설치된 것은 바로 쓸 수 있고, 나머지는 먼저 「설치」해야 합니다.',
       skillsAll: '전체',
       skillsSelected: '지정',
       skillsNone: '비활성화',
       selectSkills: '스킬 선택',
-      selectSkillsDesc: '사용할 스킬을 선택하세요. 설치되지 않았거나 아직 준비되지 않은 스킬은 선택할 수 없습니다.',
-      skillsAllListHint: '이 샌드박스에서 준비된 스킬이 사용됩니다. 설치되지 않은 스킬은 설치해야 「전체」에 포함됩니다.',
-      skillsListSummary: '준비됨 {ready}개, 이 샌드박스에서 아직 사용 불가 {pending}개',
-      skillsListSummaryReadyOnly: '준비됨 {ready}개',
+      selectSkillsDesc: '이 에이전트에서 쓸 스킬을 선택하세요. 설치되지 않은 스킬은 선택할 수 없으며, 오른쪽 「설치」를 먼저 누르세요.',
+      skillsAllListHint: '「전체」에는 이 샌드박스에 이미 설치된 스킬만 포함됩니다. 설치되지 않은 스킬은 「설치」한 뒤에야 포함됩니다.',
+      skillsGroupAvailable: '사용 가능',
+      skillsGroupUnavailable: '사용 불가',
       noSkillsAvailable: '워크스페이스 카탈로그에 스킬이 없습니다.',
       skillsNeedSandbox: '먼저 실행 샌드박스를 선택하세요.',
       goSandboxSettings: '샌드박스 관리',
       goSkillSettings: '스킬 관리',
       installToThisSandbox: '이 샌드박스에 설치',
       installShort: '설치',
-      skillNotInstalled: '현재 샌드박스에 설치되지 않음',
+      viewInstallProgress: '진행 상황',
+      skillNotInstalled: '미설치',
       skillNotReady: '아직 준비되지 않음',
       skillDisabledOnSandbox: '이 샌드박스에서 비활성화됨',
       sandboxBackend: '실행 샌드박스',
@@ -6760,8 +6742,6 @@ export default {
   },
   menu: {
     knowledgeBase: '지식베이스',
-    notes: '내 노트',
-    announcements: '공지사항',
     agents: '에이전트',
     organizations: '공유 공간',
     newChat: '새 대화',

@@ -184,9 +184,6 @@ func (f *fakeTenantService) GetTenantByIDForUser(
 func (f *fakeTenantService) GetWeKnoraCloudCredentials(ctx context.Context) *types.WeKnoraCloudCredentials {
 	return nil
 }
-func (f *fakeTenantService) UpdateTenantDefaultAgentID(context.Context, uint64, string) error {
-	return nil
-}
 
 var (
 	_ interfaces.EmbedChannelService = (*fakeEmbedChannelService)(nil)

@@ -293,8 +293,8 @@ func RegisterIMRoutes(r *gin.Engine, imHandler *handler.IMHandler) {
 //
 // IM channels carry external bot credentials (WeChat/Feishu/Slack/...);
 // sicau-v1 ADR-009-7 seals listing for students (Contributor+). Mutations,
-// toggles, and QR-code login (which can hijack a personal WeChat session)
-// remain Admin+.
+// toggle, or QR-code login flow (which can hijack a personal WeChat session)
+// stay Admin+.
 func RegisterIMChannelRoutes(r *gin.RouterGroup, imHandler *handler.IMHandler, g *rbacGuards) {
 	// Channel CRUD under agents
 	agentChannels := g.apiKeyGroup(r.Group("/agents/:id/im-channels"), apiKeyManageChannels(apiKeyFullAccess()))

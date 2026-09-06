@@ -88,7 +88,7 @@ func EnsureSuperAdmin(ctx context.Context, store UserStore, cfg Config) (*types.
 		}
 		return nil, ErrMissingBootstrapCreds
 	}
-	if err := service.ValidatePasswordPolicy(cfg.Password); err != nil {
+	if err := service.ValidatePasswordPolicy(cfg.Password, false); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrMissingBootstrapCreds, err)
 	}
 

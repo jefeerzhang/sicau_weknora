@@ -1,6 +1,5 @@
 import { get, post, put, del, patch, postUpload } from '@/utils/request'
 import type { CreatedTenantAPIKey, TenantAPIKey, TenantAPIKeyCapability } from '@/api/tenant'
-import type { PlatformIdentity } from '@/api/auth'
 
 export interface CreatePlatformAPIKeyPayload {
   name: string
@@ -360,109 +359,6 @@ export async function listSystemAdmins(
   const suffix = qs.toString() ? `?${qs.toString()}` : ''
   const response = await get(`/api/v1/system/admin/list${suffix}`)
   return response as unknown as ListSystemAdminsResponse
-}
-
-// ---- Teacher Management (#9) ----
-
-export interface TeacherUser {
-  id: string
-  username: string
-  email: string
-  avatar?: string
-  is_active?: boolean
-  is_teacher?: boolean
-  // is_system_admin marks the composite SuperAdmin (inherits teacher capability
-  // without a separate appointment, see CONTEXT.md). Such entries are shown as
-  // non-revocable // #14.
-  is_system_admin?: boolean
-  // 平台层身份分类（用户身份标签）：superadmin / teacher / student / unset。
-  // 在教师管理范围内供超级管理员查看被管理账号的身份。
-  platform_identity?: PlatformIdentity
-  created_at: string
-  updated_at: string
-}
-
-export interface ListTeachersResponse {
-  users: TeacherUser[]
-  total: number
-  offset: number
-  limit: number
-}
-
-export interface TeacherIdentityRequest {
-  user_id?: string
-  email?: string
-}
-
-export async function appointTeacher(req: TeacherIdentityRequest): Promise<TeacherUser> {
-  const response = await post('/api/v1/system/admin/teachers/appoint', req)
-  return response as unknown as TeacherUser
-}
-
-export async function revokeTeacher(req: TeacherIdentityRequest): Promise<TeacherUser> {
-  const response = await post('/api/v1/system/admin/teachers/revoke', req)
-  return response as unknown as TeacherUser
-}
-
-export async function listTeachers(
-  params?: { offset?: number; limit?: number },
-): Promise<ListTeachersResponse> {
-  const qs = new URLSearchParams()
-  if (params?.offset != null) qs.set('offset', String(params.offset))
-  if (params?.limit != null) qs.set('limit', String(params.limit))
-  const suffix = qs.toString() ? `?${qs.toString()}` : ''
-  const response = await get(`/api/v1/system/admin/teachers${suffix}`)
-  return response as unknown as ListTeachersResponse
-}
-
-export type WorkspaceOwnershipAnomalyKind = 'zero_owner' | 'multi_owner'
-
-export interface WorkspaceOwnershipAnomaly {
-  id: number
-  tenant_id: number
-  kind: WorkspaceOwnershipAnomalyKind
-  owner_count: number
-  owner_user_ids?: string[] | string
-  status: string
-  created_at?: string
-  updated_at?: string
-  candidates?: Array<{ user_id: string; email?: string; username?: string }>
-}
-
-export interface TeachingRoleMigrationReport {
-  downgraded: number
-  skipped: number
-  failed: number
-  anomaly_tenant_ids: number[]
-}
-
-export async function runTeachingRoleMigration(): Promise<TeachingRoleMigrationReport> {
-  const response = await post('/api/v1/system/admin/migrations/teaching-roles', {})
-  const body = response as unknown as { data?: TeachingRoleMigrationReport } & TeachingRoleMigrationReport
-  return (body.data ?? body) as TeachingRoleMigrationReport
-}
-
-export async function listWorkspaceOwnershipAnomalies(): Promise<{
-  anomalies: WorkspaceOwnershipAnomaly[]
-  total: number
-}> {
-  const response = await get('/api/v1/system/admin/workspace-anomalies')
-  const body = response as unknown as {
-    data?: { anomalies: WorkspaceOwnershipAnomaly[]; total: number }
-    anomalies?: WorkspaceOwnershipAnomaly[]
-    total?: number
-  }
-  if (body.data) return body.data
-  return { anomalies: body.anomalies ?? [], total: body.total ?? 0 }
-}
-
-export async function resolveWorkspaceOwnershipAnomaly(
-  tenantId: number,
-  newOwnerUserId: string,
-): Promise<void> {
-  await post(`/api/v1/system/admin/workspace-anomalies/${tenantId}/resolve`, {
-    new_owner_user_id: newOwnerUserId,
-  })
 }
 
 export interface ResetUserPasswordRequest {
@@ -870,6 +766,7 @@ export interface SandboxConfig {
   volume_mount?: SandboxVolumeMountConfig
   skill_image?: SandboxSkillImage
   skill_rollout?: 'next_turn' | 'new_session'
+  network?: SandboxNetworkPolicy
   cube?: SandboxCubeConfig
   e2b?: SandboxE2BConfig
   docker?: SandboxDockerConfig
@@ -887,6 +784,51 @@ export interface SandboxDockerConfig {
   runtime?: string
   idle_ttl_seconds?: number
   http_timeout_sec?: number
+}
+
+/** One injected credential header on a Cube L7 rule. */
+export interface SandboxCubeHeaderInject {
+  header: string
+  /** Masked as '***' in responses; send the placeholder back to keep it. */
+  secret?: string
+  /** Defaults to '${SECRET}' server-side. */
+  format?: string
+}
+
+/** One CubeEgress L7 rule. Match fields are AND-ed; methods are OR-ed. */
+export interface SandboxCubeEgressRule {
+  name: string
+  scheme?: string
+  sni?: string
+  host?: string
+  methods?: string[]
+  path?: string
+  /** Absent means allow. A deny rule still needs host or sni. */
+  deny?: boolean
+  audit?: string
+  inject?: SandboxCubeHeaderInject[]
+}
+
+/** One E2B per-host request transform. host must also be in allow_out. */
+export interface SandboxE2BHostRule {
+  host: string
+  /** Values are masked as '***' in responses. */
+  headers?: Record<string, string>
+}
+
+/**
+ * Network policy for every sandbox created from this config. Absent fields
+ * mean egress allowed. Inbound is always credential-required:
+ * allow_public_inbound is accepted then ignored/cleared.
+ */
+export interface SandboxNetworkPolicy {
+  deny_egress_by_default?: boolean
+  /** Ignored. Inbound is always credential-required. */
+  allow_public_inbound?: boolean
+  allow_out?: string[]
+  deny_out?: string[]
+  cube_rules?: SandboxCubeEgressRule[]
+  e2b_host_rules?: SandboxE2BHostRule[]
 }
 
 /** `ok: null` means the probe was not executed in this run. */
@@ -1186,6 +1128,18 @@ export function reinstallConfigSkill(
     `/api/v1/sandbox-configs/${configId}/skills/${skillId}/reinstall`,
     {},
   ) as unknown as Promise<{ data: { skill_id: string } }>
+}
+
+// Aborts an in-flight install so retry/uninstall become available.
+// After a process restart the row may still say installing with nothing running.
+export function stopConfigSkill(
+  configId: string,
+  skillId: string,
+): Promise<{ data: ConfigSkill }> {
+  return post(
+    `/api/v1/sandbox-configs/${configId}/skills/${skillId}/stop`,
+    {},
+  ) as unknown as Promise<{ data: ConfigSkill }>
 }
 
 /**

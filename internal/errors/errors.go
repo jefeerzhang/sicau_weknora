@@ -30,9 +30,6 @@ const (
 	ErrTenantNameRequired     ErrorCode = 2003
 	ErrTenantInvalidStatus    ErrorCode = 2004
 	ErrTenantCreationDisabled ErrorCode = 2005
-	// ErrModelSetupRequired is returned when a workspace has no usable
-	// tenant-owned chat model and QA refuses platform/builtin fallback (#12).
-	ErrModelSetupRequired ErrorCode = 2006
 
 	// Agent related error codes (2100-2199)
 	ErrAgentMissingThinkingModel ErrorCode = 2100
@@ -46,6 +43,11 @@ const (
 	// but is currently unavailable" without parsing the message text.
 	ErrVectorStoreBindingInvalid ErrorCode = 2200
 	ErrVectorStoreUnavailable    ErrorCode = 2201
+
+	// Model lifecycle errors (2300-2399).
+	// The dedicated code lets clients render structured usage details without
+	// parsing the backwards-compatible English error message.
+	ErrModelInUse ErrorCode = 2300
 
 	// Add more error codes here
 )
@@ -74,6 +76,17 @@ func NewBadRequestError(message string) *AppError {
 	return &AppError{
 		Code:     ErrBadRequest,
 		Message:  message,
+		HTTPCode: http.StatusBadRequest,
+	}
+}
+
+// NewModelInUseError creates the typed HTTP 400 returned when active tenant
+// resources still reference a model.
+func NewModelInUseError(message string, details any) *AppError {
+	return &AppError{
+		Code:     ErrModelInUse,
+		Message:  message,
+		Details:  details,
 		HTTPCode: http.StatusBadRequest,
 	}
 }
@@ -198,17 +211,6 @@ func NewTenantCreationDisabledError() *AppError {
 	}
 }
 
-// NewModelSetupRequiredError reports that the active workspace has no
-// usable tenant-owned chat model. Callers must configure models in the
-// workspace; platform/builtin models are not used as an implicit fallback.
-func NewModelSetupRequiredError() *AppError {
-	return &AppError{
-		Code:     ErrModelSetupRequired,
-		Message:  "workspace chat model is not configured; ask a teacher to add a model in settings",
-		HTTPCode: http.StatusBadRequest,
-	}
-}
-
 // Agent related errors
 func NewAgentMissingThinkingModelError() *AppError {
 	return &AppError{
@@ -229,7 +231,7 @@ func NewAgentMissingAllowedToolsError() *AppError {
 func NewAgentInvalidMaxIterationsError() *AppError {
 	return &AppError{
 		Code:     ErrAgentInvalidMaxIterations,
-		Message:  "最大迭代次数必须在1-20之间",
+		Message:  "最大迭代次数须为正整数，或 -1 表示不限制",
 		HTTPCode: http.StatusBadRequest,
 	}
 }

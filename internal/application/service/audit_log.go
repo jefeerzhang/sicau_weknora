@@ -76,7 +76,7 @@ func (s *auditLogService) Log(ctx context.Context, entry *types.AuditLog) error 
 
 // LogTx is the transaction-aware write path: the entry is inserted on tx
 // so it commits or rolls back together with the permission change it
-// describes. Unlike Log, the error is ALWAYS returned to the caller —
+// describes. Unlike Log, the error is ALWAYS returned to the caller -
 // swallowing it here would leave the business row committed while its
 // audit is gone. The tx-scoped repository is built on demand because the
 // service's own repo is bound to the shared connection, not to tx.

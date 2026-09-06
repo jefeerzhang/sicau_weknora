@@ -184,11 +184,12 @@ import { resolveFilePreviewExt } from '@/utils/filePreview'
 import DocumentPreview from '@/components/document-preview.vue'
 import { useAuthStore } from '@/stores/auth'
 
+const httpForbiddenStatus = 403
+
 const LIST_WIDTH = 440
 const PREVIEW_WIDTH_KEY = 'weknora-chat-artifact-preview-width'
 const PREVIEW_DEFAULT_WIDTH = 760
 const PREVIEW_MIN_WIDTH = 520
-const httpForbiddenStatus = 403
 
 const props = defineProps<{
     visible: boolean
@@ -210,9 +211,8 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const authStore = useAuthStore()
-// sicau-v1 ticket 03: artifact downloads are Contributor+ (backend enforces
-// it); the course student (viewer) gets a read-only drawer and, if a stale
-// client still reaches a 403, a friendly notice instead of a raw error.
+// Artifact downloads are Contributor+ (backend enforces it); course students
+// get a read-only drawer, with a friendly notice if a stale client hits 403.
 const canDownloadFiles = computed(
     () => authStore.canAccessAllTenants || authStore.hasRole('contributor'),
 )

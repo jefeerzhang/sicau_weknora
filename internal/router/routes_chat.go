@@ -59,7 +59,7 @@ func RegisterSessionRoutes(
 		sessions.DELETE("/:id/messages", handler.ClearSessionMessages)
 		sessions.POST("/:session_id/generate_title", handler.GenerateTitle)
 		// sicau-v1: course students (viewers) cannot upload chat
-		// attachments — pure Q&A deployment (design ADR-009-6 pattern,
+		// attachments - pure Q&A deployment (design ADR-009-6 pattern,
 		// backend-enforced rather than frontend-hidden only).
 		sessions.POST("/:session_id/attachments", g.Contributor(), handler.UploadTemporaryDocument)
 		sessions.GET("/:id/attachments", g.Contributor(), handler.ListTemporaryDocuments)
@@ -88,7 +88,7 @@ func RegisterSessionRoutes(
 		// so the storage URL never appears on the wire.
 		//
 		// sicau-v1 ticket 03: artifact routes sit on the Viewer+ sessions
-		// group but carry an extra Contributor+ guard — course students
+		// group but carry an extra Contributor+ guard - course students
 		// (viewers) are pure Q&A and must not fetch generated files. The
 		// frontend hides the download surface for viewers and shows a
 		// friendly notice if a stale client still hits a 403.

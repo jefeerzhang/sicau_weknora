@@ -229,7 +229,7 @@ onUnmounted(() => {
     dragCounter = 0;
 });
 </script>
-<style lang="less" scoped>
+<style lang="less">
 .main {
     display: flex;
     align-items: stretch;

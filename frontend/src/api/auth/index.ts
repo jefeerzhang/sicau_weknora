@@ -117,8 +117,7 @@ export interface UserInfo {
   is_system_admin?: boolean
   must_change_password?: boolean
   is_teacher?: boolean
-  // 平台层身份分类（用户身份标签），与空间内 Owner/Admin/Contributor/Viewer 角色分开表达。
-  // 取值：superadmin（超级管理员，含教师能力）/ teacher（教师）/ student（学生）/ unset（身份未设置）。
+  // Platform identity label - independent of workspace Owner/Admin/Contributor/Viewer.
   platform_identity?: PlatformIdentity
   created_at: string
   updated_at: string
@@ -272,6 +271,7 @@ export async function getOIDCConfig(): Promise<OIDCConfigResponse> {
 export interface AuthConfigResponse {
   success: boolean
   registration_mode: 'self_serve' | 'invite_only' | string
+  complex_password_enabled: boolean
 }
 
 export async function getAuthConfig(): Promise<AuthConfigResponse> {
@@ -279,7 +279,7 @@ export async function getAuthConfig(): Promise<AuthConfigResponse> {
     const response = await get('/api/v1/auth/config')
     return response as unknown as AuthConfigResponse
   } catch {
-    return { success: false, registration_mode: 'self_serve' }
+    return { success: false, registration_mode: 'self_serve', complex_password_enabled: false }
   }
 }
 

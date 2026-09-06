@@ -47,6 +47,8 @@ type ModelParametersDTO struct {
 	ExtraConfig         map[string]string         `json:"extra_config,omitempty"`
 	CustomHeaders       map[string]string         `json:"custom_headers,omitempty"`
 	SupportsVision      bool                      `json:"supports_vision"`
+	ContextWindow       int                       `json:"context_window,omitempty"`
+	MaxOutputTokens     int                       `json:"max_output_tokens,omitempty"`
 	MaxConcurrency      int                       `json:"max_concurrency,omitempty"`
 	AppID               string                    `json:"app_id,omitempty"`
 }
@@ -68,6 +70,8 @@ func NewModelResponse(ctx context.Context, m *types.Model) *ModelResponse {
 		ExtraConfig:         m.Parameters.ExtraConfig,
 		CustomHeaders:       m.Parameters.CustomHeaders,
 		SupportsVision:      m.Parameters.SupportsVision,
+		ContextWindow:       m.Parameters.ContextWindow,
+		MaxOutputTokens:     m.Parameters.MaxOutputTokens,
 		MaxConcurrency:      m.Parameters.MaxConcurrency,
 		AppID:               m.Parameters.AppID,
 	}
@@ -80,22 +84,19 @@ func NewModelResponse(ctx context.Context, m *types.Model) *ModelResponse {
 	if m.IsBuiltin && !canManageBuiltin {
 		// Builtin: strip everything that could reveal per-tenant config.
 		// EmbeddingParameters and ParameterSize / Provider / InterfaceType /
-		// SupportsVision are intentionally preserved (they describe the
-		// capability surface, not the configured endpoint).
+		// SupportsVision / ContextWindow / MaxOutputTokens are intentionally
+		// preserved (they describe the capability surface, not the configured
+		// endpoint).
 		params.BaseURL = ""
 		params.ExtraConfig = nil
 		params.CustomHeaders = nil
 		params.AppID = ""
 	}
-	// #12: credential presence is Admin+ (or SystemAdmin for builtins).
-	// Students/viewers must not learn whether API keys are configured.
 	var creds map[string]CredentialFieldMetadata
-	if CanViewIntegrationSecrets(ctx) || canManageBuiltin {
-		if !m.IsBuiltin || canManageBuiltin {
-			creds = map[string]CredentialFieldMetadata{
-				"api_key":    {Configured: m.Parameters.APIKey != ""},
-				"app_secret": {Configured: m.Parameters.AppSecret != ""},
-			}
+	if !m.IsBuiltin || canManageBuiltin {
+		creds = map[string]CredentialFieldMetadata{
+			"api_key":    {Configured: m.Parameters.APIKey != ""},
+			"app_secret": {Configured: m.Parameters.AppSecret != ""},
 		}
 	}
 	return &ModelResponse{

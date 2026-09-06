@@ -100,6 +100,9 @@ func (f *flowTenantSvc) GetTenantsByIDs(context.Context, []uint64) (map[uint64]*
 func (f *flowTenantSvc) UpdateTenant(context.Context, *types.Tenant) (*types.Tenant, error) {
 	return nil, nil
 }
+func (f *flowTenantSvc) UpdateTenantDefaultAgentID(context.Context, uint64, string) error {
+	return nil
+}
 func (f *flowTenantSvc) DeleteTenant(context.Context, uint64) error { return nil }
 func (f *flowTenantSvc) ListTenants(context.Context) ([]*types.Tenant, error) {
 	return nil, nil
@@ -117,9 +120,6 @@ func (f *flowTenantSvc) GetTenantByIDForUser(context.Context, uint64, string) (*
 	return f.tenant, nil
 }
 func (f *flowTenantSvc) GetWeKnoraCloudCredentials(context.Context) *types.WeKnoraCloudCredentials {
-	return nil
-}
-func (f *flowTenantSvc) UpdateTenantDefaultAgentID(context.Context, uint64, string) error {
 	return nil
 }
 

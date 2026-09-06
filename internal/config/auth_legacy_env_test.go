@@ -21,15 +21,13 @@ func TestApplyAuthAndTenantDefaults_DisableRegistrationDrivesRegistrationMode(t 
 		{"true overrides explicit self_serve YAML", "true", AuthRegistrationModeSelfServe, AuthRegistrationModeInviteOnly},
 		{"true is a no-op when YAML already invite_only", "true", AuthRegistrationModeInviteOnly, AuthRegistrationModeInviteOnly},
 		{"false leaves YAML untouched", "false", AuthRegistrationModeSelfServe, AuthRegistrationModeSelfServe},
-		// Teaching default (#11): empty YAML → invite_only (not self_serve).
-		{"unset falls back to default invite_only", "", "", AuthRegistrationModeInviteOnly},
+		{"unset falls back to default self_serve", "", "", AuthRegistrationModeSelfServe},
 		{"unset keeps explicit invite_only YAML", "", AuthRegistrationModeInviteOnly, AuthRegistrationModeInviteOnly},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("DISABLE_REGISTRATION", tc.disable)
-			t.Setenv("WEKNORA_AUTH_REGISTRATION_MODE", "")
 			// Other tenant env vars must not leak between cases.
 			t.Setenv("WEKNORA_TENANT_ENABLE_RBAC", "")
 			t.Setenv("WEKNORA_TENANT_MAX_OWNED_PER_USER", "")
@@ -46,14 +44,14 @@ func TestApplyAuthAndTenantDefaults_DisableRegistrationDrivesRegistrationMode(t 
 }
 
 func TestApplyAuthAndTenantDefaults_SelfServiceTenantCreation(t *testing.T) {
-	t.Run("defaults disabled for teaching", func(t *testing.T) {
+	t.Run("defaults enabled", func(t *testing.T) {
 		t.Setenv("WEKNORA_TENANT_SELF_SERVICE_CREATION_ENABLED", "")
 		cfg := &Config{Tenant: &TenantConfig{}}
 
 		applyAuthAndTenantDefaults(cfg)
 
-		if cfg.Tenant.IsSelfServiceCreationEnabled() {
-			t.Fatal("self-service tenant creation should default to disabled (#10)")
+		if !cfg.Tenant.IsSelfServiceCreationEnabled() {
+			t.Fatal("self-service tenant creation should default to enabled")
 		}
 	})
 
@@ -68,28 +66,17 @@ func TestApplyAuthAndTenantDefaults_SelfServiceTenantCreation(t *testing.T) {
 			t.Fatal("environment override should disable self-service tenant creation")
 		}
 	})
-
-	t.Run("environment enables teaching default", func(t *testing.T) {
-		t.Setenv("WEKNORA_TENANT_SELF_SERVICE_CREATION_ENABLED", "true")
-		cfg := &Config{Tenant: &TenantConfig{}}
-
-		applyAuthAndTenantDefaults(cfg)
-
-		if !cfg.Tenant.IsSelfServiceCreationEnabled() {
-			t.Fatal("environment override should enable self-service tenant creation")
-		}
-	})
 }
 
 func TestApplyAuthAndTenantDefaults_DefaultTenantMode(t *testing.T) {
-	t.Run("teaching default is tenantless", func(t *testing.T) {
+	t.Run("historical default creates a personal tenant", func(t *testing.T) {
 		t.Setenv("WEKNORA_AUTH_DEFAULT_TENANT_MODE", "")
 		cfg := &Config{Auth: &AuthConfig{}}
 
 		applyAuthAndTenantDefaults(cfg)
 
-		if cfg.Auth.DefaultTenantMode != AuthDefaultTenantModeTenantless {
-			t.Fatalf("default_tenant_mode = %q, want %q", cfg.Auth.DefaultTenantMode, AuthDefaultTenantModeTenantless)
+		if cfg.Auth.DefaultTenantMode != AuthDefaultTenantModeCreatePersonal {
+			t.Fatalf("default_tenant_mode = %q, want %q", cfg.Auth.DefaultTenantMode, AuthDefaultTenantModeCreatePersonal)
 		}
 	})
 
@@ -164,6 +151,33 @@ func TestApplyAuthAndTenantDefaults_CrossTenantAccess(t *testing.T) {
 
 		if !cfg.Tenant.EnableCrossTenantAccess {
 			t.Fatal("empty env should leave the YAML-provided cross-tenant access value untouched")
+		}
+	})
+}
+
+func TestApplyAuthAndTenantDefaults_ComplexPasswordEnabledEnv(t *testing.T) {
+	t.Run("1 enables via ParseBool", func(t *testing.T) {
+		t.Setenv("WEKNORA_AUTH_COMPLEX_PASSWORD_ENABLED", "1")
+		cfg := &Config{Auth: &AuthConfig{}}
+		applyAuthAndTenantDefaults(cfg)
+		if !cfg.Auth.ComplexPasswordEnabled {
+			t.Fatal("WEKNORA_AUTH_COMPLEX_PASSWORD_ENABLED=1 should enable complex passwords")
+		}
+	})
+	t.Run("false disables", func(t *testing.T) {
+		t.Setenv("WEKNORA_AUTH_COMPLEX_PASSWORD_ENABLED", "false")
+		cfg := &Config{Auth: &AuthConfig{ComplexPasswordEnabled: true}}
+		applyAuthAndTenantDefaults(cfg)
+		if cfg.Auth.ComplexPasswordEnabled {
+			t.Fatal("WEKNORA_AUTH_COMPLEX_PASSWORD_ENABLED=false should disable complex passwords")
+		}
+	})
+	t.Run("unset leaves yaml", func(t *testing.T) {
+		t.Setenv("WEKNORA_AUTH_COMPLEX_PASSWORD_ENABLED", "")
+		cfg := &Config{Auth: &AuthConfig{ComplexPasswordEnabled: true}}
+		applyAuthAndTenantDefaults(cfg)
+		if !cfg.Auth.ComplexPasswordEnabled {
+			t.Fatal("empty env should leave YAML complex-password flag untouched")
 		}
 	})
 }

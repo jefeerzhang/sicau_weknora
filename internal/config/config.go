@@ -227,10 +227,8 @@ type TenantConfig struct {
 	// applyAuthAndTenantDefaults for the semantics of <0 / 0 / >0.
 	MaxOwnedPerUser int `yaml:"max_owned_per_user" json:"max_owned_per_user" mapstructure:"max_owned_per_user"`
 	// SelfServiceCreationEnabled controls whether ordinary authenticated
-	// users may create a workspace for themselves. Nil falls back to
-	// disabled after applyAuthAndTenantDefaults (teaching default #10);
-	// cross-tenant superusers / appointed Teachers (when enabled) are
-	// the create path. Explicit true restores open self-service.
+	// users may create a workspace for themselves. Nil preserves the
+	// historical default (enabled); cross-tenant superusers are exempt.
 	SelfServiceCreationEnabled *bool `yaml:"self_service_creation_enabled" json:"self_service_creation_enabled" mapstructure:"self_service_creation_enabled"`
 }
 
@@ -248,13 +246,9 @@ func (t *TenantConfig) IsRBACEnforced() bool {
 }
 
 // IsSelfServiceCreationEnabled reports whether ordinary users may create
-// tenants. Nil defaults to false (teaching #10); applyAuthAndTenantDefaults
-// materializes an explicit pointer on startup.
+// tenants. Nil keeps the historical behaviour enabled.
 func (t *TenantConfig) IsSelfServiceCreationEnabled() bool {
-	if t == nil || t.SelfServiceCreationEnabled == nil {
-		return false
-	}
-	return *t.SelfServiceCreationEnabled
+	return t == nil || t.SelfServiceCreationEnabled == nil || *t.SelfServiceCreationEnabled
 }
 
 // AuditConfig governs durable audit log behaviour. Writes happen on
@@ -274,16 +268,19 @@ type AuditConfig struct {
 // AuthConfig governs the user authentication entry points.
 type AuthConfig struct {
 	// RegistrationMode controls who may call POST /auth/register.
-	//   "invite_only" (teaching default) — public registration is rejected;
-	//                            new accounts join via invitation.
-	//   "self_serve"           — anyone may register; a new tenant may be
-	//                            auto-created depending on DefaultTenantMode.
+	//   "self_serve" (default) — anyone may register; a new tenant is
+	//                            auto-created and the registrant becomes
+	//                            its Owner. Preserves existing behaviour.
+	//   "invite_only"          — public registration is rejected; new
+	//                            users only enter through the invitation
+	//                            flow added in PR 3.
 	RegistrationMode string `yaml:"registration_mode" json:"registration_mode"`
 	// DefaultTenantMode controls public password-registration provisioning.
 	// create_personal preserves the historical one-user-one-workspace default;
 	// tenantless creates only the identity and waits for an invitation or an
 	// explicit self-service tenant creation.
-	DefaultTenantMode string `yaml:"default_tenant_mode" json:"default_tenant_mode"`
+	DefaultTenantMode      string `yaml:"default_tenant_mode" json:"default_tenant_mode"`
+	ComplexPasswordEnabled bool   `yaml:"complex_password_enabled" json:"complex_password_enabled"`
 }
 
 // AuthRegistrationMode constants used by handlers and middleware.
@@ -320,6 +317,7 @@ type OIDCAuthConfig struct {
 	AuthorizationEndpoint string               `yaml:"authorization_endpoint" json:"authorization_endpoint"`
 	TokenEndpoint         string               `yaml:"token_endpoint"         json:"token_endpoint"`
 	UserInfoEndpoint      string               `yaml:"user_info_endpoint"     json:"user_info_endpoint"`
+	JwksURI               string               `yaml:"jwks_uri"               json:"jwks_uri"`
 	Scopes                []string             `yaml:"scopes"                 json:"scopes"`
 	UserInfoMapping       *OIDCUserInfoMapping `yaml:"user_info_mapping"      json:"user_info_mapping"`
 }
@@ -636,6 +634,7 @@ func ValidateConfig(cfg *Config) error {
 			errs = append(errs, fmt.Sprintf("auth.registration_mode must be %q or %q, got %q",
 				AuthRegistrationModeSelfServe, AuthRegistrationModeInviteOnly, mode))
 		}
+
 		tenantMode := strings.TrimSpace(cfg.Auth.DefaultTenantMode)
 		if tenantMode != "" && tenantMode != AuthDefaultTenantModeCreatePersonal && tenantMode != AuthDefaultTenantModeTenantless {
 			errs = append(errs, fmt.Sprintf("auth.default_tenant_mode must be %q or %q, got %q",
@@ -721,6 +720,9 @@ func applyOIDCEnvOverrides(cfg *Config) {
 	}
 	if value := strings.TrimSpace(os.Getenv("OIDC_AUTH_USER_INFO_ENDPOINT")); value != "" {
 		cfg.OIDCAuth.UserInfoEndpoint = value
+	}
+	if value := strings.TrimSpace(os.Getenv("OIDC_AUTH_JWKS_URI")); value != "" {
+		cfg.OIDCAuth.JwksURI = value
 	}
 	if value := strings.TrimSpace(os.Getenv("OIDC_AUTH_SCOPES")); value != "" {
 		cfg.OIDCAuth.Scopes = strings.Fields(strings.ReplaceAll(value, ",", " "))
@@ -810,6 +812,7 @@ func applyAgentEnvOverrides(cfg *Config) {
 //
 // Env overrides (when set and non-empty):
 //   - WEKNORA_AUTH_DEFAULT_TENANT_MODE ("create_personal"/"tenantless")
+//   - WEKNORA_AUTH_COMPLEX_PASSWORD_ENABLED (boolean)
 //   - WEKNORA_TENANT_SELF_SERVICE_CREATION_ENABLED (boolean)
 //   - WEKNORA_TENANT_ENABLE_RBAC      ("true"/"false", case-insensitive)
 //   - WEKNORA_TENANT_ENABLE_CROSS_TENANT_ACCESS ("true"/"false", case-insensitive).
@@ -845,19 +848,21 @@ func applyAuthAndTenantDefaults(cfg *Config) {
 		}
 	}
 
-	// Teaching deployments (#11): invite_only + tenantless when unset.
-	// Explicit YAML/env self_serve / create_personal still win.
-	if value := strings.TrimSpace(os.Getenv("WEKNORA_AUTH_REGISTRATION_MODE")); value != "" {
-		cfg.Auth.RegistrationMode = value
-	}
 	if strings.TrimSpace(cfg.Auth.RegistrationMode) == "" {
-		cfg.Auth.RegistrationMode = AuthRegistrationModeInviteOnly
+		cfg.Auth.RegistrationMode = AuthRegistrationModeSelfServe
 	}
+
+	if value := strings.TrimSpace(os.Getenv("WEKNORA_AUTH_COMPLEX_PASSWORD_ENABLED")); value != "" {
+		if parsed, err := strconv.ParseBool(value); err == nil {
+			cfg.Auth.ComplexPasswordEnabled = parsed
+		}
+	}
+
 	if value := strings.TrimSpace(os.Getenv("WEKNORA_AUTH_DEFAULT_TENANT_MODE")); value != "" {
 		cfg.Auth.DefaultTenantMode = value
 	}
 	if strings.TrimSpace(cfg.Auth.DefaultTenantMode) == "" {
-		cfg.Auth.DefaultTenantMode = AuthDefaultTenantModeTenantless
+		cfg.Auth.DefaultTenantMode = AuthDefaultTenantModeCreatePersonal
 	}
 
 	if value := strings.TrimSpace(os.Getenv("WEKNORA_TENANT_ENABLE_RBAC")); value != "" {
@@ -891,12 +896,9 @@ func applyAuthAndTenantDefaults(cfg *Config) {
 			)
 		}
 	}
-	// Teaching deployments default to false (#10): only appointed Teachers
-	// may create workspaces. Explicit env/YAML true restores upstream
-	// self-service behavior for non-teaching installs.
 	if cfg.Tenant.SelfServiceCreationEnabled == nil {
-		off := false
-		cfg.Tenant.SelfServiceCreationEnabled = &off
+		on := true
+		cfg.Tenant.SelfServiceCreationEnabled = &on
 	}
 
 	if value := strings.TrimSpace(os.Getenv("WEKNORA_TENANT_MAX_OWNED_PER_USER")); value != "" {

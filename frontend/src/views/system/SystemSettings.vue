@@ -33,7 +33,25 @@
   -->
   <div class="system-settings">
     <div class="section-header">
-      <h2>{{ t('system.globalSettings.title') }}</h2>
+      <div class="section-header__titlewrap">
+        <h2>{{ t('system.globalSettings.title') }}</h2>
+        <t-popup placement="bottom-start" trigger="hover" :overlay-inner-style="{ maxWidth: '420px' }">
+          <button type="button" class="hint-trigger"
+            :aria-label="t('system.globalSettings.priorityHint.disclosure')">
+            <t-icon name="info-circle" size="16px" />
+          </button>
+          <template #content>
+            <div class="hint-popover">
+              <p class="hint-popover__title">{{ t('system.globalSettings.priorityHint.disclosure') }}</p>
+              <ul class="hint-popover__list">
+                <li>{{ t('system.globalSettings.priorityHint.tier1') }}</li>
+                <li>{{ t('system.globalSettings.priorityHint.tier2') }}</li>
+                <li>{{ t('system.globalSettings.priorityHint.tier3') }}</li>
+              </ul>
+            </div>
+          </template>
+        </t-popup>
+      </div>
       <p class="section-description">
         {{ t('system.globalSettings.description') }}
       </p>
@@ -49,18 +67,6 @@
     </div>
 
     <template v-else>
-      <div class="settings-intro-panel">
-        <div class="priority-hint-title">
-          <t-icon name="info-circle" />
-          <span>{{ t('system.globalSettings.priorityHint.disclosure') }}</span>
-        </div>
-        <ul class="priority-hint-list">
-          <li>{{ t('system.globalSettings.priorityHint.tier1') }}</li>
-          <li>{{ t('system.globalSettings.priorityHint.tier2') }}</li>
-          <li>{{ t('system.globalSettings.priorityHint.tier3') }}</li>
-        </ul>
-      </div>
-
       <t-tabs v-model="activeSettingsSection" class="settings-section-tabs">
         <t-tab-panel value="access" :label="sectionTabLabel('access')" />
         <t-tab-panel value="tenant" :label="sectionTabLabel('tenant')" />
@@ -73,15 +79,12 @@
         />
       </t-tabs>
 
-      <section class="settings-section-panel" :aria-labelledby="`settings-section-${activeSettingsSection}`">
+      <section class="settings-section-panel" :aria-label="activeSectionTitle">
         <div
           class="settings-section-intro"
           :class="{ 'settings-section-intro--runtime': activeSettingsSection === 'runtime' }"
         >
-          <div>
-            <h3 :id="`settings-section-${activeSettingsSection}`">{{ activeSectionTitle }}</h3>
-            <p>{{ activeSectionDescription }}</p>
-          </div>
+          <p>{{ activeSectionDescription }}</p>
           <t-tag v-if="activeSettingsSection === 'runtime'" theme="warning" variant="light" size="small">
             {{ t('system.globalSettings.sections.runtime.restartHint') }}
           </t-tag>
@@ -153,134 +156,6 @@
           </div>
         </div>
       </div>
-
-          <div v-if="activeSettingsSection === 'access'" class="setting-row setting-row--teacher">
-        <div class="setting-info">
-              <div class="setting-label">
-            <span>{{ t('system.globalSettings.teachers.label') }}</span>
-              </div>
-          <p class="desc">{{ t('system.globalSettings.teachers.description') }}</p>
-        </div>
-        <div class="setting-control">
-          <div class="setting-control-row">
-            <t-popconfirm
-              v-model:visible="teacherPopconfirm.visible"
-              :content="teacherPopconfirm.content"
-              :theme="teacherPopconfirm.theme"
-              :confirm-btn="teacherPopconfirm.confirmBtn"
-              :cancel-btn="t('system.globalSettings.confirm.cancelBtn')"
-              :popup-props="PROGRAMMATIC_POPCONFIRM_PROPS"
-              placement="left"
-              @confirm="teacherPopconfirm.finish(true)"
-              @cancel="teacherPopconfirm.finish(false)"
-              @visible-change="teacherPopconfirm.onVisibleChange"
-            >
-              <div class="setting-control-anchor">
-                <t-tag-input
-                  v-model="teacherEmails"
-                  :placeholder="t('system.globalSettings.teachers.placeholder')"
-                  :aria-label="t('system.globalSettings.teachers.label')"
-                  :disabled="teacherBusy"
-                  class="setting-input setting-input--wide"
-                  clearable
-                  @change="onTeachersChange"
-                />
-                <div v-if="teacherSystemAdminEmails.length > 0" class="locked-teachers">
-                  <t-tag theme="primary" variant="light" size="small" class="locked-teachers-badge">
-                    <t-icon name="lock-on" />
-                    {{ t('system.globalSettings.teachers.systemAdmin') }}
-                  </t-tag>
-                  <t-tag
-                    v-for="email in teacherSystemAdminEmails"
-                    :key="email"
-                    theme="warning"
-                    variant="outline"
-                    size="small"
-                    class="locked-teachers-item"
-                  >
-                    <t-icon name="lock-on" />
-                    {{ email }}
-                  </t-tag>
-                  <div class="locked-teachers-hint">
-                    {{ t('system.globalSettings.teachers.systemAdminHint') }}
-                  </div>
-                </div>
-              </div>
-            </t-popconfirm>
-                <div v-if="teacherBusy" class="setting-save-state" role="status">
-                  <t-loading size="small" />
-                  <span>{{ t('system.globalSettings.saving') }}</span>
-                </div>
-          </div>
-          <!-- 教师管理范围内可见被管理账号的平台身份（用户身份标签）。只读，不参与编辑。 -->
-          <div v-if="managedTeachers.length > 0" class="managed-identities" data-testid="managed-teacher-identities">
-            <span class="managed-identities-label">{{ t('system.globalSettings.teachers.identityLabel') }}</span>
-            <div class="managed-identities-list">
-              <span v-for="item in managedTeachers" :key="item.email" class="managed-identity-item">
-                <span class="managed-identity-email">{{ item.email }}</span>
-                <span class="managed-identity-tag">{{ identityLabel(item.identity) }}</span>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-          <div v-if="activeSettingsSection === 'access'" class="setting-row setting-row--ownership">
-            <div class="setting-info">
-              <div class="setting-label">
-                <span>{{ t('system.globalSettings.ownershipAnomalies.label') }}</span>
-              </div>
-              <p class="desc">{{ t('system.globalSettings.ownershipAnomalies.description') }}</p>
-            </div>
-            <div class="setting-control">
-              <div class="setting-control-row ownership-actions">
-                <t-button size="small" variant="outline" :loading="ownershipBusy" @click="loadOwnershipAnomalies">
-                  {{ t('system.globalSettings.ownershipAnomalies.refresh') }}
-                </t-button>
-                <t-button size="small" theme="primary" :loading="ownershipBusy" @click="runOwnershipMigration">
-                  {{ t('system.globalSettings.ownershipAnomalies.runMigration') }}
-                </t-button>
-              </div>
-              <div v-if="ownershipAnomalies.length === 0" class="ownership-empty">
-                {{ t('system.globalSettings.ownershipAnomalies.empty') }}
-              </div>
-              <div v-else class="ownership-list">
-                <div
-                  v-for="row in ownershipAnomalies"
-                  :key="row.tenant_id"
-                  class="ownership-item"
-                >
-                  <div class="ownership-item-meta">
-                    <strong>{{ t('system.globalSettings.ownershipAnomalies.tenant', { id: row.tenant_id }) }}</strong>
-                    <t-tag size="small" theme="warning" variant="light">
-                      {{ t(`system.globalSettings.ownershipAnomalies.kind.${row.kind}`) }}
-                    </t-tag>
-                    <span class="ownership-count">
-                      {{ t('system.globalSettings.ownershipAnomalies.ownerCount', { count: row.owner_count }) }}
-                    </span>
-                  </div>
-                  <div class="ownership-item-resolve">
-                    <t-select
-                      v-model="ownershipSelections[row.tenant_id]"
-                      :placeholder="t('system.globalSettings.ownershipAnomalies.pickLead')"
-                      :options="candidateOptions(row)"
-                      clearable
-                      class="setting-input"
-                    />
-                    <t-button
-                      size="small"
-                      theme="primary"
-                      :disabled="!ownershipSelections[row.tenant_id]"
-                      :loading="ownershipBusy"
-                      @click="resolveOwnership(row)"
-                    >
-                      {{ t('system.globalSettings.ownershipAnomalies.resolve') }}
-                    </t-button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <div v-if="activeSettingsSection === 'access'" class="setting-row setting-row--password-reset">
             <div class="setting-info">
@@ -393,6 +268,28 @@
             class="setting-input"
             @change="onChange(item)"
           />
+          <t-popconfirm
+            v-else-if="item.value_type === 'bool' && isHighRiskKey(item.key)"
+            v-model:visible="highRiskPopconfirm.visible"
+            :content="highRiskPopconfirm.content"
+            :theme="highRiskPopconfirm.theme"
+            :confirm-btn="highRiskPopconfirm.confirmBtn"
+            :cancel-btn="t('system.globalSettings.confirm.cancelBtn')"
+            :popup-props="PROGRAMMATIC_POPCONFIRM_PROPS"
+            placement="left"
+            @confirm="highRiskPopconfirm.finish(true)"
+            @cancel="highRiskPopconfirm.finish(false)"
+            @visible-change="highRiskPopconfirm.onVisibleChange"
+          >
+            <div class="setting-control-anchor">
+              <t-switch
+                v-model="editValues[item.key]"
+                :aria-label="keyLabel(item.key)"
+                :disabled="savingKey === item.key"
+                @change="onHighRiskBoolChange(item)"
+              />
+            </div>
+          </t-popconfirm>
           <t-switch
             v-else-if="item.value_type === 'bool'"
             v-model="editValues[item.key]"
@@ -620,21 +517,17 @@ import {
   listSystemAdmins,
   promoteUserToSystemAdmin,
   revokeSystemAdmin,
-  listTeachers,
-  appointTeacher,
-  revokeTeacher,
   resetUserPassword,
-  listWorkspaceOwnershipAnomalies,
-  runTeachingRoleMigration,
-  resolveWorkspaceOwnershipAnomaly,
-  type WorkspaceOwnershipAnomaly,
   type SystemSettingItem,
 } from '@/api/system'
+import { getAuthConfig } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
-import type { PlatformIdentity } from '@/api/auth'
-import { platformIdentityKey } from '@/utils/platformIdentity'
+import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
+import { newPasswordRules, PASSWORD_SPECIAL_CHARS } from '@/utils/passwordPolicy'
+import { isSettingValueDirty, resolveCurrentSetting } from './systemSettingsEdit'
 
 const authStore = useAuthStore()
+const deploymentCapabilities = useDeploymentCapabilitiesStore()
 const currentUserId = computed(() => authStore.currentUserId)
 
 const { t, tm, te, locale } = useI18n()
@@ -652,7 +545,12 @@ function keyLabel(k: string): string {
 // user-facing copy lives in i18n (system.globalSettings.keyDescriptions.*).
 function settingDescription(item: { key: string; description?: string }): string {
   const path = `system.globalSettings.keyDescriptions.${item.key}`
-  if (te(path)) return t(path) as string
+  if (te(path)) {
+    if (path === 'system.globalSettings.keyDescriptions.auth.complex_password_enabled') {
+      return t(path, { specialChars: PASSWORD_SPECIAL_CHARS }) as string
+    }
+    return t(path) as string
+  }
   return item.description ?? ''
 }
 
@@ -660,12 +558,14 @@ function settingDescription(item: { key: string; description?: string }): string
 // PUT. ssrf.whitelist is not here — it uses per-tag confirm instead.
 const HIGH_RISK_KEYS = new Set<string>([
   'auth.registration_mode',
+  'sandbox.docker_enabled',
 ])
 
 const HIGH_IMPACT_KEYS = new Set<string>([
   'auth.registration_mode',
   'tenant.auto_create_api_key',
   'ssrf.whitelist',
+  'sandbox.docker_enabled',
 ])
 
 function isHighRiskKey(key: string): boolean {
@@ -729,7 +629,6 @@ function createInlinePopconfirm() {
 
 const ssrfPopconfirm = createInlinePopconfirm()
 const adminPopconfirm = createInlinePopconfirm()
-const teacherPopconfirm = createInlinePopconfirm()
 const highRiskPopconfirm = createInlinePopconfirm()
 
 // Friendly labels for enum options live in i18n
@@ -758,6 +657,7 @@ type SettingsSection = 'access' | 'tenant' | 'runtime' | 'security' | 'other'
 const SETTINGS_SECTION_KEYS: Record<Exclude<SettingsSection, 'other'>, readonly string[]> = {
   access: [
     'auth.registration_mode',
+    'auth.complex_password_enabled',
     'auth.default_tenant_mode',
     'tenant.self_service_creation_enabled',
     'tenant.max_owned_per_user',
@@ -765,6 +665,7 @@ const SETTINGS_SECTION_KEYS: Record<Exclude<SettingsSection, 'other'>, readonly 
   tenant: [
     'tenant.default_storage_quota_gb',
     'tenant.auto_create_api_key',
+    'tenant.auto_accept_invitation',
   ],
   runtime: [
     'asynq.core_concurrency',
@@ -775,12 +676,12 @@ const SETTINGS_SECTION_KEYS: Record<Exclude<SettingsSection, 'other'>, readonly 
     'asynq.wiki_concurrency',
     'model.max_concurrency',
   ],
-  security: ['ssrf.whitelist'],
+  security: ['ssrf.whitelist', 'sandbox.docker_enabled'],
 }
 
 const activeSettingsSection = ref<SettingsSection>('access')
 const knownSettingKeys = new Set(Object.values(SETTINGS_SECTION_KEYS).flat())
-const settingsByKey = computed(() => new Map(settings.value.map((item) => [item.key, item])))
+const settingsByKey = computed<Map<string, SystemSettingItem>>(() => new Map(settings.value.map((item) => [item.key, item])))
 const unknownSettings = computed(() => settings.value.filter((item) => !knownSettingKeys.has(item.key)))
 const hasUnknownSettings = computed(() => unknownSettings.value.length > 0)
 
@@ -808,7 +709,7 @@ const activeSectionDescription = computed(() =>
 function sectionTabLabel(section: SettingsSection): string {
   const count = section === 'other'
     ? unknownSettings.value.length
-    : SETTINGS_SECTION_KEYS[section].filter((key) => settingsByKey.value.has(key)).length + (section === 'access' ? 3 : 0)
+    : SETTINGS_SECTION_KEYS[section].filter((key) => settingsByKey.value.has(key)).length + (section === 'access' ? 2 : 0)
   return t(`system.globalSettings.sections.${section}.tab`, { count })
 }
 
@@ -837,92 +738,6 @@ const adminEmails = ref<string[]>([])
 const adminEmailToId = ref<Record<string, string>>({})
 const adminBusy = ref(false)
 
-const teacherEmails = ref<string[]>([])
-const teacherEmailToId = ref<Record<string, string>>({})
-// Composite SuperAdmins (is_system_admin=true) inherit teacher capability
-// without a separate appointment (CONTEXT.md). They are locked: shown as a
-// non-revocable tag and never dispatched to revokeTeacher (#14).
-const teacherSystemAdminEmails = ref<string[]>([])
-// 平台身份分类（用户身份标签）per managed email, surfaced in the SuperAdmin
-// teacher-management scope so each managed account's identity is visible.
-const teacherIdentityMap = ref<Record<string, PlatformIdentity>>({})
-const teacherBusy = ref(false)
-
-const ownershipAnomalies = ref<Array<WorkspaceOwnershipAnomaly & {
-  candidates?: Array<{ user_id: string; email?: string; username?: string }>
-}>>([])
-const ownershipSelections = ref<Record<number, string>>({})
-const ownershipBusy = ref(false)
-
-function candidateOptions(row: {
-  candidates?: Array<{ user_id: string; email?: string; username?: string }>
-}) {
-  return (row.candidates ?? []).map((c) => ({
-    value: c.user_id,
-    label: c.email || c.username || c.user_id,
-  }))
-}
-
-async function loadOwnershipAnomalies() {
-  try {
-    const resp = await listWorkspaceOwnershipAnomalies()
-    ownershipAnomalies.value = resp.anomalies ?? []
-  } catch (err: any) {
-    MessagePlugin.error(err?.message || t('system.globalSettings.ownershipAnomalies.loadFailed'))
-  }
-}
-
-async function runOwnershipMigration() {
-  ownershipBusy.value = true
-  try {
-    const report = await runTeachingRoleMigration()
-    MessagePlugin.success(
-      t('system.globalSettings.ownershipAnomalies.migrationDone', {
-        downgraded: report.downgraded ?? 0,
-        anomalies: (report.anomaly_tenant_ids ?? []).length,
-      }),
-    )
-    await loadOwnershipAnomalies()
-  } catch (err: any) {
-    MessagePlugin.error(err?.message || t('system.globalSettings.ownershipAnomalies.migrationFailed'))
-  } finally {
-    ownershipBusy.value = false
-  }
-}
-
-async function resolveOwnership(row: WorkspaceOwnershipAnomaly) {
-  const userId = ownershipSelections.value[row.tenant_id]
-  if (!userId) return
-  ownershipBusy.value = true
-  try {
-    await resolveWorkspaceOwnershipAnomaly(row.tenant_id, userId)
-    MessagePlugin.success(t('system.globalSettings.ownershipAnomalies.resolveSuccess'))
-    delete ownershipSelections.value[row.tenant_id]
-    await loadOwnershipAnomalies()
-  } catch (err: any) {
-    MessagePlugin.error(err?.message || t('system.globalSettings.ownershipAnomalies.resolveFailed'))
-  } finally {
-    ownershipBusy.value = false
-  }
-}
-
-function isSystemAdminEmail(email: string): boolean {
-  return teacherSystemAdminEmails.value.includes(email)
-}
-
-// 教师管理范围内的被管理账号及其平台身份分类（用户身份标签），供超级管理员查看。
-const managedTeachers = computed(() =>
-  Object.entries(teacherIdentityMap.value).map(([email, identity]) => ({
-    email,
-    identity,
-  })),
-)
-
-// 平台身份分类的本地化标签；缺失/未知一律回退到「身份未设置」，绝不推断为教师/超管。
-function identityLabel(identity: string): string {
-  return t(platformIdentityKey(identity))
-}
-
 const passwordResetVisible = ref(false)
 const passwordResetSubmitting = ref(false)
 const passwordResetFormRef = ref<FormInstanceFunctions>()
@@ -931,26 +746,33 @@ const passwordResetForm = reactive({
   newPassword: '',
   confirmPassword: '',
 })
-const passwordResetRules: Record<string, FormRule[]> = {
+const passwordResetRules = computed(() => ({
   email: [
-    { required: true, message: t('system.globalSettings.passwordReset.validation.emailRequired'), trigger: 'blur' },
-    { email: true, message: t('system.globalSettings.passwordReset.validation.emailInvalid'), trigger: 'blur' },
+    { required: true, message: t('auth.emailRequired'), type: 'error' },
+    { email: true, message: t('auth.emailInvalid'), type: 'error' }
   ],
-  newPassword: [
-    { required: true, message: t('system.globalSettings.passwordReset.validation.passwordRequired'), trigger: 'blur' },
-    { min: 8, message: t('system.globalSettings.passwordReset.validation.passwordLength'), trigger: 'blur' },
-    { max: 32, message: t('system.globalSettings.passwordReset.validation.passwordLength'), trigger: 'blur' },
-    { pattern: /[a-zA-Z]/, message: t('system.globalSettings.passwordReset.validation.passwordLetter'), trigger: 'blur' },
-    { pattern: /\d/, message: t('system.globalSettings.passwordReset.validation.passwordNumber'), trigger: 'blur' },
-  ],
+  newPassword: newPasswordRules(t, complexPasswordEnabled.value),
   confirmPassword: [
-    { required: true, message: t('system.globalSettings.passwordReset.validation.confirmRequired'), trigger: 'blur' },
+    { required: true, message: t('auth.confirmPasswordRequired'), trigger: 'blur' },
     {
       validator: (value: string) => value === passwordResetForm.newPassword,
-      message: t('system.globalSettings.passwordReset.validation.passwordMismatch'),
+      message: t('auth.passwordMismatch'),
       trigger: 'blur',
     },
   ],
+}))
+
+const complexPasswordEnabled = ref(false)
+
+const loadAuthConfig = async () => {
+  try {
+    const resp = await getAuthConfig()
+    complexPasswordEnabled.value = !!resp.complex_password_enabled
+  } catch (err: any) {
+    const msg = err?.message || t('system.globalSettings.messages.loadFailed')
+    MessagePlugin.error(msg)
+    complexPasswordEnabled.value = false
+  }
 }
 
 function resetPasswordResetForm() {
@@ -961,6 +783,7 @@ function resetPasswordResetForm() {
 }
 
 async function openPasswordResetDialog() {
+  await loadAuthConfig()
   resetPasswordResetForm()
   passwordResetVisible.value = true
   await nextTick()
@@ -1090,16 +913,7 @@ async function snapSsrfWhitelistToSaved(item: SystemSettingItem) {
 }
 
 function isDirty(item: SystemSettingItem): boolean {
-  const cur = editValues[item.key]
-  const orig = item.value
-  if (Array.isArray(cur) && Array.isArray(orig)) {
-    if (cur.length !== orig.length) return true
-    for (let i = 0; i < cur.length; i++) {
-      if (cur[i] !== orig[i]) return true
-    }
-    return false
-  }
-  return cur !== orig
+  return isSettingValueDirty(editValues[item.key], item.value)
 }
 
 function formatDate(isoString: string): string {
@@ -1153,7 +967,9 @@ async function loadSettings() {
 // onChange persists non-SSRF settings. SSRF whitelist and system admins
 // have dedicated handlers with inline popconfirm.
 async function onChange(item: SystemSettingItem) {
-  if (!isDirty(item)) return
+  const currentItem = resolveCurrentSetting(settingsByKey.value, item.key)
+  if (!currentItem) return
+  if (!isDirty(currentItem)) return
 
   // SSRF whitelist gets the per-entry confirm flow — same shape as the
   // admin tag-input above. Adding or removing each host/CIDR is its
@@ -1161,19 +977,21 @@ async function onChange(item: SystemSettingItem) {
   // the egress firewall), so we ask once per delta instead of once
   // per "save". This matches the operator's mental model: every tag
   // they touch is acknowledged on its own.
-  await persistSetting(item)
+  await persistSetting(currentItem)
 }
 
 async function onHighRiskSelectChange(item: SystemSettingItem) {
+  const currentItem = resolveCurrentSetting(settingsByKey.value, item.key)
+  if (!currentItem) return
   const newValue = editValues[item.key]
-  if (newValue === item.value) return
+  if (!isDirty(currentItem)) return
 
   // Revert the select immediately so cancel leaves the saved value
   // visible; re-apply only after the inline popconfirm is confirmed.
-  editValues[item.key] = item.value
+  editValues[item.key] = currentItem.value
 
   const ok = await highRiskPopconfirm.ask({
-    content: highRiskConfirmBody(item, newValue),
+    content: highRiskConfirmBody(currentItem, newValue),
     theme: 'danger',
     confirmBtn: {
       content: t('system.globalSettings.confirm.confirmBtn'),
@@ -1183,7 +1001,34 @@ async function onHighRiskSelectChange(item: SystemSettingItem) {
   if (!ok) return
 
   editValues[item.key] = newValue
-  await persistSetting(item)
+  await persistSetting(currentItem)
+}
+
+async function onHighRiskBoolChange(item: SystemSettingItem) {
+  const currentItem = resolveCurrentSetting(settingsByKey.value, item.key)
+  if (!currentItem) return
+  const newValue = editValues[item.key]
+  if (!isDirty(currentItem)) return
+
+  editValues[item.key] = currentItem.value
+  if (newValue !== true) {
+    editValues[item.key] = newValue
+    await persistSetting(currentItem)
+    return
+  }
+
+  const ok = await highRiskPopconfirm.ask({
+    content: t('system.globalSettings.confirm.bodySandboxDockerEnabled'),
+    theme: 'danger',
+    confirmBtn: {
+      content: t('system.globalSettings.confirm.confirmBtn'),
+      theme: 'danger',
+    },
+  })
+  if (!ok) return
+
+  editValues[item.key] = true
+  await persistSetting(currentItem)
 }
 
 function confirmSsrfListEntryChange(
@@ -1292,6 +1137,11 @@ function hasBulkAction(item: SystemSettingItem): boolean {
   return item.key === 'tenant.default_storage_quota_gb'
 }
 
+async function refreshSandboxDockerCapability(key: string) {
+  if (key !== 'sandbox.docker_enabled') return
+  await deploymentCapabilities.ensureLoaded(true)
+}
+
 function bulkActionConfirmBody(item: SystemSettingItem): string {
   // Use the canonical (saved) value, not the in-progress edit, so the
   // operator sees exactly what will be written. The button is disabled
@@ -1338,6 +1188,7 @@ async function resetSetting(item: SystemSettingItem) {
     await loadSettings()
     markSettingSaved(item)
     MessagePlugin.success(t('system.globalSettings.reset.success'))
+    await refreshSandboxDockerCapability(item.key)
   } catch (err: any) {
     const msg = err?.message || t('system.globalSettings.reset.failed')
     saveAnnouncement.value = msg
@@ -1364,6 +1215,7 @@ async function persistSetting(item: SystemSettingItem) {
       : updated.value
     markSettingSaved(updated)
     MessagePlugin.success(t('system.globalSettings.messages.saveSuccess'))
+    await refreshSandboxDockerCapability(item.key)
   } catch (err: any) {
     const msg = err?.message || t('system.globalSettings.messages.saveFailed')
     saveAnnouncement.value = msg
@@ -1503,122 +1355,9 @@ async function onAdminsChange(next: string[]) {
   }
 }
 
-async function loadTeachers() {
-  try {
-    const resp = await listTeachers({ limit: 200 })
-    const map: Record<string, string> = {}
-    const emails: string[] = []
-    const systemAdmins: string[] = []
-    for (const u of resp.users ?? []) {
-      if (!u.email) continue
-      map[u.email] = u.id
-      // Composite SuperAdmins (is_system_admin) inherit teacher capability and
-      // cannot be revoked (#14): keep them out of the editable picker and list
-      // them in a locked read-only row instead.
-      if (u.is_system_admin === true) systemAdmins.push(u.email)
-      else emails.push(u.email)
-    }
-    teacherEmailToId.value = map
-    teacherEmails.value = emails
-    teacherSystemAdminEmails.value = systemAdmins
-    // 平台身份分类（用户身份标签），供超级管理员在教师管理范围内查看。
-    // 后端已统一定义该分类，前端直接使用；缺失/未知一律回退到「身份未设置」，
-    // 从不在此推断教师或超级管理员（见 CONTEXT.md「身份未设置」）。
-    const identityMap: Record<string, PlatformIdentity> = {}
-    for (const u of resp.users ?? []) {
-      if (!u.email) continue
-      identityMap[u.email] = (u.platform_identity as PlatformIdentity) || 'unset'
-    }
-    teacherIdentityMap.value = identityMap
-  } catch (err: any) {
-    const msg = err?.message || t('system.globalSettings.teachers.loadFailed')
-    MessagePlugin.error(msg)
-  }
-}
-
-function confirmTeacherChange(action: 'appoint' | 'revoke', email: string): Promise<boolean> {
-  const base = `system.globalSettings.teachers.confirm.${action}`
-  return teacherPopconfirm.ask({
-    content: globalSettingsText(`${base}.body`, { email }),
-    theme: action === 'revoke' ? 'danger' : 'warning',
-    confirmBtn: {
-      content: globalSettingsText(`${base}.confirmBtn`),
-      theme: action === 'revoke' ? 'danger' : 'primary',
-    },
-  })
-}
-
-async function onTeachersChange(next: string[]) {
-  if (teacherBusy.value) return
-
-  const authoritative = new Set(Object.keys(teacherEmailToId.value))
-  const nextSet = new Set(next.map((e) => e.trim()).filter(Boolean))
-
-  const added: string[] = []
-  for (const email of nextSet) {
-    if (!authoritative.has(email)) added.push(email)
-  }
-  const removed: string[] = []
-  for (const email of authoritative) {
-    if (!nextSet.has(email)) {
-      // Composite SuperAdmins inherit teacher capability and cannot be
-      // revoked (#14); they are rendered in a locked read-only row and never
-      // dispatched to revokeTeacher.
-      if (isSystemAdminEmail(email)) continue
-      removed.push(email)
-    }
-  }
-
-  if (added.length === 0 && removed.length === 0) return
-
-  for (const email of added) {
-    const ok = await confirmTeacherChange('appoint', email)
-    if (!ok) {
-      await loadTeachers()
-      return
-    }
-  }
-  for (const email of removed) {
-    const ok = await confirmTeacherChange('revoke', email)
-    if (!ok) {
-      await loadTeachers()
-      return
-    }
-  }
-
-  teacherBusy.value = true
-  let applied = 0
-  try {
-    for (const email of added) {
-      await appointTeacher({ email })
-      applied++
-    }
-    for (const email of removed) {
-      const userId = teacherEmailToId.value[email]
-      if (!userId) continue
-      await revokeTeacher({ user_id: userId })
-      applied++
-    }
-    await loadTeachers()
-    if (applied > 0) {
-      saveAnnouncement.value = t('system.globalSettings.teachers.saveSuccess')
-      MessagePlugin.success(t('system.globalSettings.teachers.saveSuccess'))
-    }
-  } catch (err: any) {
-    const msg = err?.message || t('system.globalSettings.teachers.saveFailed')
-    saveAnnouncement.value = msg
-    MessagePlugin.error(msg)
-    await loadTeachers()
-  } finally {
-    teacherBusy.value = false
-  }
-}
-
 onMounted(() => {
   loadSettings()
   loadAdmins()
-  loadTeachers()
-  loadOwnershipAnomalies()
 })
 
 onUnmounted(() => {
@@ -1638,46 +1377,60 @@ onUnmounted(() => {
     font-size: 20px;
     font-weight: 600;
     color: var(--td-text-color-primary);
-    margin: 0 0 8px 0;
+    margin: 0;
   }
 
   .section-description {
     font-size: 14px;
     color: var(--td-text-color-secondary);
-    margin: 0;
+    margin: 8px 0 0;
     line-height: 1.5;
   }
 }
 
-
-.settings-intro-panel {
-  margin-bottom: 18px;
-  padding: 12px 14px;
-  border: 1px solid var(--td-component-stroke);
-  border-radius: 6px;
-  background: var(--td-bg-color-secondarycontainer);
-}
-
-.priority-hint-title {
+.section-header__titlewrap {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-bottom: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--td-text-color-secondary);
+  gap: 6px;
+}
 
-  .t-icon {
+.hint-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--td-text-color-placeholder);
+  cursor: help;
+  line-height: 1;
+
+  &:hover,
+  &:focus-visible {
     color: var(--td-brand-color);
   }
 }
 
-.priority-hint-list {
+.hint-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hint-popover__title {
   margin: 0;
-  padding: 0 0 0 20px;
-  font-size: 13px;
-  line-height: 1.65;
   color: var(--td-text-color-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hint-popover__list {
+  margin: 0;
+  padding: 0 0 0 18px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--td-text-color-secondary);
   list-style: disc;
 
   li + li {
@@ -1709,13 +1462,6 @@ onUnmounted(() => {
   gap: 16px;
   padding: 0 0 12px;
   border-bottom: 1px solid var(--td-component-stroke);
-
-  h3 {
-    margin: 0 0 4px;
-    font-size: 16px;
-    line-height: 1.4;
-    color: var(--td-text-color-primary);
-  }
 
   p {
     margin: 0;
@@ -1930,75 +1676,6 @@ onUnmounted(() => {
 
 .setting-input--wide {
   width: 320px;
-}
-
-// Read-only locked row for composite SuperAdmins that inherit teacher
-// capability but cannot be revoked (#14).
-.locked-teachers {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  max-width: 320px;
-}
-
-.locked-teachers-badge,
-.locked-teachers-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.locked-teachers-hint {
-  flex-basis: 100%;
-  margin-top: 4px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--td-text-color-secondary);
-}
-
-.managed-identities {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-  max-width: 320px;
-}
-
-.managed-identities-label {
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
-}
-
-.managed-identities-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.managed-identity-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.managed-identity-email {
-  color: var(--td-text-color-primary);
-  word-break: break-all;
-}
-
-.managed-identity-tag {
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--td-brand-color);
-  background: var(--td-brand-color-light);
-  border-radius: 4px;
-  padding: 0 6px;
-  white-space: nowrap;
 }
 
 .password-reset-trigger {

@@ -3,8 +3,7 @@
         <!-- 展开时：Logo + 搜索/折叠按钮同行 -->
         <div class="logo_row" v-if="!uiStore.sidebarCollapsed">
             <div class="logo_box" @click="router.push('/platform/knowledge-bases')" style="cursor: pointer;">
-                <img class="logo" src="@/assets/img/sicau-crest.png" alt="四川农业大学" title="四川农业大学知识库">
-                <span class="logo-text">川农知识库</span>
+                <img class="logo" src="@/assets/img/weknora.png" alt="">
                 <sup v-if="isLiteEdition" class="lite-badge">Lite</sup>
             </div>
             <div class="logo_actions">
@@ -435,7 +434,7 @@ const getIconActiveState = (itemPath: string) => {
 
 // 分离上下两部分菜单（使用 visibleMenuArr 以便 lite 模式过滤 logout）
 const topMenuItems = computed<MenuItem[]>(() => {
-    // sicau-v1 notes：「我的笔记」与知识库/智能体同级展示
+    // Notes / announcements sit with knowledge base / agents in the top nav.
     return (visibleMenuArr.value as unknown as MenuItem[]).filter((item: MenuItem) =>
         item.path === 'knowledge-bases' || item.path === 'agents' || item.path === 'organizations' || item.path === 'creatChat' || item.path === 'notes' || item.path === 'announcements'
     );
@@ -1280,21 +1279,8 @@ const onDragHandleMouseDown = (e: MouseEvent) => {
         overflow: hidden;
 
         .logo {
-            width: 32px;
-            height: 32px;
-            object-fit: contain;
-            flex-shrink: 0;
-        }
-
-        .logo-text {
-            margin-left: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--td-text-color-primary);
-            font-family: var(--app-font-family);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            width: 128px;
+            height: auto;
         }
 
         .lite-badge {
@@ -1307,6 +1293,23 @@ const onDragHandleMouseDown = (e: MouseEvent) => {
             user-select: none;
             white-space: nowrap;
         }
+    }
+
+    .logo_img {
+        margin-left: 24px;
+        width: 30px;
+        height: 30px;
+        margin-right: 7.25px;
+    }
+
+    .logo_txt {
+        transform: rotate(0.049deg);
+        color: var(--td-text-color-primary);
+        font-family: "TencentSans";
+        font-size: 24.12px;
+        font-style: normal;
+        font-weight: W7;
+        line-height: 21.7px;
     }
 
     .menu_top {
@@ -1892,11 +1895,9 @@ const onDragHandleMouseDown = (e: MouseEvent) => {
 }
 </style>
 <style lang="less">
-// Dark mode: 川农校徽本身就是绿色 + 白底，不需要 invert。
-// 之前 .logo 为黑底 weknora 时用 invert(1) hue-rotate(180deg) 反相；
-// 换成川农校徽后这个 filter 会把绿色变红、白底变黑，必须清除。
+// Dark mode: invert dark logo to light
 html[theme-mode="dark"] .aside_box .logo_box .logo {
-    filter: none;
+    filter: invert(1) hue-rotate(180deg);
 }
 
 // Dark mode: 滚动条在深色背景下需要更亮的颜色才看得见

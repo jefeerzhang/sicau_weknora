@@ -27,6 +27,7 @@ pub const BLOCK_TABLE: c_int = 3;
 pub const BLOCK_QUOTE: c_int = 4;
 pub const BLOCK_CODE: c_int = 5;
 pub const BLOCK_RULE: c_int = 6;
+pub const BLOCK_MATH: c_int = 7;
 
 pub const INLINE_TEXT: c_int = 0;
 pub const INLINE_LINK: c_int = 1;
@@ -34,6 +35,8 @@ pub const INLINE_IMAGE: c_int = 2;
 pub const INLINE_ANCHOR: c_int = 3;
 pub const INLINE_NOTEREF: c_int = 4;
 pub const INLINE_LINEBREAK: c_int = 5;
+pub const INLINE_MATH: c_int = 6;
+pub const INLINE_CHECKBOX: c_int = 7;
 
 pub const LINK_EXTERNAL: c_int = 0;
 pub const LINK_RELATIVE: c_int = 1;
@@ -164,6 +167,10 @@ fn write_block(e: &mut Encoder, block: &model::Block) {
         model::Block::Rule => {
             e.i32(BLOCK_RULE);
         }
+        model::Block::Math(tex) => {
+            e.i32(BLOCK_MATH);
+            e.str(tex);
+        }
     }
 }
 
@@ -201,6 +208,14 @@ fn write_inline(e: &mut Encoder, inline: &model::Inline) {
         }
         model::Inline::LineBreak => {
             e.i32(INLINE_LINEBREAK);
+        }
+        model::Inline::Math(tex) => {
+            e.i32(INLINE_MATH);
+            e.str(tex);
+        }
+        model::Inline::Checkbox(checked) => {
+            e.i32(INLINE_CHECKBOX);
+            e.bool(*checked);
         }
     }
 }
@@ -256,11 +271,8 @@ fn write_list(e: &mut Encoder, list: &model::List) {
 
 fn write_list_item(e: &mut Encoder, item: &model::ListItem) {
     write_blocks(e, &item.blocks);
-    match item.checked {
-        None => e.i32(-1),
-        Some(false) => e.i32(0),
-        Some(true) => e.i32(1),
-    }
+    // anydoc 0.2+ moved task-list state to Inline::Checkbox; ListItem no
+    // longer carries a checked flag on the wire.
     e.opt_str(&item.marker_label);
 }
 

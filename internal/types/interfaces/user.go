@@ -55,6 +55,9 @@ type UserService interface {
 	// returns the corresponding LoginResponse. The caller's previous
 	// refresh token (passed in for revocation) is invalidated. Membership
 	// is verified via the TenantMember service before tokens are issued.
+	// On success the target is recorded as the user's last-active-tenant
+	// preference (next login and refresh land there). A preference-write
+	// failure fails the switch so no token pair is issued.
 	SwitchTenant(ctx context.Context, user *types.User, targetTenantID uint64, currentRefreshToken string) (*types.LoginResponse, error)
 	// ValidateToken validates an access token. It returns the user
 	// referenced by the token plus the active tenant ID encoded in the
@@ -79,7 +82,8 @@ type UserService interface {
 	// callers pass offset/limit to page through results. Used by the
 	// /api/v1/system/admin/list endpoint, gated to SystemAdmin callers.
 	ListSystemAdmins(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
-	// ListTeachers lists users with IsTeacher=true.
+	// ListTeachers lists users with effective Teacher capability
+	// (is_teacher=true OR is_system_admin=true).
 	ListTeachers(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
 	// AdminCreateUser provisions a new local user on behalf of a
 	// SystemAdmin. When req.Password is nil, a random password is generated
@@ -123,7 +127,8 @@ type UserRepository interface {
 	// the slice plus the total count for pagination metadata. Used by
 	// the system-admin management endpoint.
 	ListSystemAdmins(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
-	// ListTeachers lists users where is_teacher = true.
+	// ListTeachers lists users with effective Teacher capability
+	// (is_teacher=true OR is_system_admin=true).
 	ListTeachers(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
 	// RevokeSystemAdmin removes system-admin privileges with the
 	// last-admin/self-revoke checks performed atomically.

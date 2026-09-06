@@ -9,7 +9,6 @@ import (
 	"github.com/Tencent/WeKnora/internal/agent/tools"
 	chatpipeline "github.com/Tencent/WeKnora/internal/application/service/chat_pipeline"
 	"github.com/Tencent/WeKnora/internal/common"
-	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/event"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/modelcontext"
@@ -306,25 +305,21 @@ func (s *sessionService) selectChatModelID(
 		}
 	}
 
-	// No knowledge bases with a summary model — use a tenant-owned chat
-	// model only. Platform/builtin models are never an implicit fallback (#12).
+	// No knowledge bases - try to find any available chat model
 	models, err := s.modelService.ListModels(ctx)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to list models: %v", err)
 		return "", fmt.Errorf("failed to list models: %w", err)
 	}
 	for _, model := range models {
-		if model == nil || model.IsBuiltin {
-			continue
-		}
-		if model.Type == types.ModelTypeKnowledgeQA {
-			logger.Infof(ctx, "Using first available tenant KnowledgeQA model: %s", model.ID)
+		if model != nil && model.Type == types.ModelTypeKnowledgeQA {
+			logger.Infof(ctx, "Using first available KnowledgeQA model: %s", model.ID)
 			return model.ID, nil
 		}
 	}
 
-	logger.Error(ctx, "No tenant-owned chat model configured")
-	return "", apperrors.NewModelSetupRequiredError()
+	logger.Error(ctx, "No chat model ID available")
+	return "", fmt.Errorf("no chat model ID available: no knowledge bases configured and no available models")
 }
 
 // resolveKnowledgeBasesFromAgent resolves knowledge base IDs based on agent's KBSelectionMode.

@@ -148,6 +148,8 @@ func TestAuditAction_SystemNamespacePrefix(t *testing.T) {
 		AuditActionSystemSettingChanged,
 		AuditActionSystemAdminPromoted,
 		AuditActionSystemAdminRevoked,
+		AuditActionTeacherAppointed,
+		AuditActionTeacherRevoked,
 		AuditActionSystemUserPasswordReset,
 		AuditActionSystemUserCreated,
 		AuditActionSystemQueueTaskRetried,

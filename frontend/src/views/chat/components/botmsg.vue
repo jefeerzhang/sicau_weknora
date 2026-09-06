@@ -48,7 +48,7 @@
                     :title="$t('agent.copy')">
                     <t-icon name="copy" />
                 </t-button>
-                <!-- sicau-v1: 学生（viewer）无知识库写权限，不展示 -->
+                <!-- Students (viewer) lack KB write access; hide the entry. -->
                 <t-button v-if="authStore.hasRole('contributor')" size="small" variant="outline" shape="round"
                     @click.stop="handleAddToKnowledge" :title="$t('agent.addToKnowledgeBase')">
                     <t-icon name="bookmark-add" />
@@ -58,7 +58,8 @@
                      Emptiness is the default: the button stays hidden for
                      conversational messages that never touched a skill. -->
                 <span v-if="hasArtifacts || artifactsCollecting" class="answer-toolbar__artifact"
-                    :class="{ 'is-collecting': artifactButtonCollecting }">
+                    :class="{ 'is-collecting': artifactButtonCollecting, 'is-arrived': artifactArrived }"
+                    @animationend="onArtifactArriveEnd">
                     <t-button size="small" variant="outline" shape="round"
                         :disabled="artifactButtonCollecting"
                         :title="hasArtifacts ? $t('agent.artifactDrawer.buttonTitle') : $t('agent.artifactDrawer.collecting')"
@@ -114,6 +115,7 @@ import ChatCitationFloat from '@/components/ChatCitationFloat.vue';
 import picturePreview from '@/components/picture-preview.vue';
 import ChatArtifactsDrawer from './ChatArtifactsDrawer.vue';
 import { isCollectingSkillArtifacts } from '@/utils/skillArtifacts';
+import { useArtifactArriveMotion } from '@/composables/useArtifactArriveMotion';
 import { sanitizeMarkdownHTML, safeMarkdownToHTML, createSafeImage, isValidImageURL, hydrateProtectedFileImages } from '@/utils/security';
 import {
     artifactIndexFromEventTarget,
@@ -229,6 +231,7 @@ const artifactList = computed(() => {
 });
 const hasArtifacts = computed(() => artifactList.value.length > 0);
 const artifactCount = computed(() => artifactList.value.length);
+const { artifactArrived, onArtifactArriveEnd } = useArtifactArriveMotion(artifactCount);
 const artifactsCollecting = computed(() => isCollectingSkillArtifacts(props.session));
 const artifactButtonCollecting = computed(() => artifactsCollecting.value && !hasArtifacts.value);
 const messageIdForArtifacts = computed(() => {
@@ -368,7 +371,6 @@ const handleAddToKnowledge = () => {
     const question = (props.userQuery || '').trim();
     const manualContent = buildManualMarkdown(question, content);
     const manualTitle = formatManualTitle(question);
-    ``
     uiStore.openManualEditor({
         mode: 'create',
         title: manualTitle,

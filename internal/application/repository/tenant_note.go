@@ -44,7 +44,8 @@ func (r *tenantNoteRepository) ListHead(ctx context.Context, tenantID uint64, us
 	var notes []*types.TenantNote
 	err := r.db.WithContext(ctx).
 		Table("tenant_notes").
-		Select("id, LEFT(content, ?) AS content, updated_at", types.NotePreviewContentHead).
+		// substr is portable across Postgres and SQLite (LEFT is PG-only).
+		Select("id, substr(content, 1, ?) AS content, updated_at", types.NotePreviewContentHead).
 		Where("tenant_id = ? AND user_id = ?", tenantID, userID).
 		Order("updated_at DESC").
 		Scan(&notes).Error

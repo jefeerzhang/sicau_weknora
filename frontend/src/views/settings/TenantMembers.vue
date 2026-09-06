@@ -26,7 +26,7 @@
                     :class="['perm-role-block', r, { 'is-me': currentRole === r }]">
                     <div class="perm-role-tag">
                       <t-icon :name="roleMatrixIcon(r)" size="12px" />
-                      <span>{{ $t(teachingMembershipView(r, 1).labelKey) }}</span>
+                      <span>{{ $t('tenantMember.role.' + r) }}</span>
                       <span v-if="currentRole === r" class="me-badge">{{ $t('common.me') }}</span>
                     </div>
                     <div class="perm-items">
@@ -126,8 +126,8 @@
                 </div>
               </template>
               <template #role="{ row }">
-                <t-tag :theme="teachingRoleTagTheme(row.role)" size="small">
-                  {{ $t(teachingMembershipView(row.role).labelKey) }}
+                <t-tag :theme="roleTagTheme(row.role)" size="small">
+                  {{ $t('tenantMember.role.' + row.role) }}
                 </t-tag>
               </template>
               <template #inviter="{ row }">
@@ -219,8 +219,7 @@
                         clearable />
                     </t-form-item>
                     <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
-                      <!-- sicau-v1 ticket 02: invitations are viewer-only; the role is fixed server-side -->
-                      <t-tag theme="default" size="large">{{ $t(teachingMembershipView('viewer').labelKey) }}</t-tag>
+                      <t-select v-model="addForm.role" :options="roleOptions" :popup-props="roleSelectPopupProps" />
                     </t-form-item>
                   </t-form>
                   <div v-else class="invite-confirm-body">
@@ -244,7 +243,7 @@
                 </div>
               </template>
             </t-popup>
-            <!-- Share-link access. Sits next to the invite-by-email
+            <!-- Share-link generator. Sits next to the invite-by-email
                  popup so the two flows live side-by-side: "I know who"
                  (email input) vs "I don't" (one link, group chat). -->
             <t-popup v-if="canManage" v-model="shareLinkPopupVisible" trigger="click" placement="bottom-end"
@@ -269,8 +268,8 @@
                     </p>
                     <t-form :data="shareLinkForm" :label-width="80">
                       <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
-                        <!-- sicau-v1 ticket 02: share links are viewer-only; the role is fixed server-side -->
-                        <t-tag theme="default" size="large">{{ $t(teachingMembershipView('viewer').labelKey) }}</t-tag>
+                        <t-select v-model="shareLinkForm.role" :options="roleOptions"
+                          :popup-props="roleSelectPopupProps" />
                       </t-form-item>
                     </t-form>
                   </div>
@@ -335,24 +334,22 @@
               </template>
               <template #role="{ row }">
                 <div class="role-cell">
-                  <t-tag :theme="teachingRoleTagTheme(row.role)" size="small">
-                    {{ $t(memberRelationView(row).labelKey) }}
+                  <t-select v-if="canManage && row.user_id !== currentUserId" :model-value="row.role"
+                    class="member-role-select" size="small" :popup-props="roleSelectPopupProps"
+                    @change="(val: string) => onRoleChange(row, val)">
+                    <t-option v-for="opt in roleOptions" :key="opt.value" :value="opt.value" :label="opt.label">
+                      <span class="role-option">
+                        <t-icon :name="roleIcon(opt.value)" class="role-option-icon" />
+                        <span>{{ opt.label }}</span>
+                      </span>
+                    </t-option>
+                  </t-select>
+                  <t-tag v-else :theme="roleTagTheme(row.role)" size="small">
+                    {{ $t('tenantMember.role.' + row.role) }}
                   </t-tag>
-                  <t-tooltip
-                    v-if="memberRelationView(row).warningKey"
-                    :content="$t(memberRelationView(row).warningKey!)"
-                    placement="top">
-                    <t-icon name="error-circle" size="16px" class="legacy-role-hint" />
-                  </t-tooltip>
                 </div>
               </template>
               <template #joined_at="{ row }">{{ formatDate(row.joined_at) }}</template>
-              <template #question_count="{ row }">
-                {{ usageStats.get(row.user_id)?.question_count ?? 0 }}
-              </template>
-              <template #last_active_at="{ row }">
-                {{ formatLastActive(usageStats.get(row.user_id)?.last_active_at) }}
-              </template>
               <template #actions="{ row }">
                 <t-popconfirm
                   v-if="canManage && row.user_id !== currentUserId"
@@ -523,16 +520,11 @@ import { AUDIT_ACTION_I18N_ROOTS } from '@/i18n/auditActionRegistry'
 import { auditActionLabel } from '@/i18n/auditActionLabel'
 import {
   listMembers,
+  updateMemberRole,
   removeMember,
   type TenantMember,
   type TenantRole,
-  getMemberUsageStats,
 } from '@/api/tenant/members'
-import {
-  countOwners,
-  teachingMembershipView,
-  type TeachingMembershipView,
-} from '@/utils/teachingMembership'
 import {
   listTenantInvitations,
   createInvitation,
@@ -567,13 +559,11 @@ const error = ref('')
 const adding = ref(false)
 /** 邀请流程：锚在列表头「+」按钮旁的弹出层（非居中模态）。 */
 const invitePopupVisible = ref(false)
-// Share-link state (separate popup next to the email invite). Existing
-// pending links are restored from the invitation list so reopening the
-// popup goes straight to copy mode instead of asking for another link.
+// share-link generator state (separate popup next to the email
+// invite). shareLinkResult is non-null after a successful create —
+// the popup then switches into "here's your link, copy it" mode.
 const shareLinkPopupVisible = ref(false)
-// sicau-v1 ticket 02: invitations are viewer-only (ADR-009-4); the server
-// rejects anything above viewer, so both forms pin the role client-side too.
-const shareLinkForm = reactive<{ role: TenantRole }>({ role: 'viewer' })
+const shareLinkForm = reactive<{ role: TenantRole }>({ role: 'contributor' })
 const creatingShareLink = ref(false)
 const shareLinkResult = ref<TenantInvitation | null>(null)
 // Two-step invite inside the popup: 'form' renders the email/role inputs;
@@ -605,7 +595,6 @@ const memberDisplayByUserId = reactive<Record<string, { username?: string; email
 const invitations = ref<TenantInvitation[]>([])
 const invitationsLoading = ref(false)
 const invitationsError = ref('')
-const activeShareLink = ref<TenantInvitation | null>(null)
 // Invitation TTL is mirrored from the backend constant
 // (defaultInvitationTTL in tenant_invitation.go). Kept as a UI string
 // for the section description; the authoritative number comes from
@@ -645,7 +634,7 @@ let auditScrollObserver: IntersectionObserver | null = null
 // should be a deliberate promote step after the user accepts.
 const addForm = reactive<{ email: string; role: TenantRole }>({
   email: '',
-  role: 'viewer',
+  role: 'contributor',
 })
 
 // Role-aware gates. The server enforces every mutation; UI gates here
@@ -675,28 +664,45 @@ const currentUserId = computed(() => authStore.user?.id ?? '')
 // don't expose a tenant picker here.
 const activeTenantId = computed(() => Number(authStore.currentTenantId ?? 0))
 
-const ownerCount = computed(() => countOwners(members.value))
+const roleOptions = computed(() => [
+  { label: t('tenantMember.role.owner'), value: 'owner' },
+  { label: t('tenantMember.role.admin'), value: 'admin' },
+  { label: t('tenantMember.role.contributor'), value: 'contributor' },
+  { label: t('tenantMember.role.viewer'), value: 'viewer' },
+])
 
-function memberRelationView(row: TenantMember): TeachingMembershipView {
-  return teachingMembershipView(row.role, ownerCount.value)
+/** 下拉层须高于邀请浮层（3050）与组织设置全屏遮罩，否则会被压住 */
+const roleSelectPopupProps = {
+  zIndex: 6200,
+  overlayClassName: 'tenant-members-role-select-popup',
 }
 
-function teachingRoleTagTheme(role: TenantRole): 'primary' | 'warning' | 'success' | 'default' {
-  const kind = teachingMembershipView(role, ownerCount.value).kind
-  if (kind === 'lead') return 'primary'
-  if (kind === 'legacy') return 'warning'
-  return 'default'
-}
-
-// Static role-permissions matrix for the education two-state model (#17).
-// Internal RBAC still uses owner/viewer; admin/contributor are not offered.
+// Static role-permissions matrix. The keys reference i18n strings under
+// `tenantMember.permissions.*` so each locale can rephrase per culture.
+// Keep this aligned with the design-doc §4.3 matrix and the actual
+// PR 2 enforcement; if a permission moves between roles, update both
+// sides in the same PR.
 type RolePerm = { key: string; has: boolean }
-const roleMatrixOrder: TenantRole[] = ['owner', 'viewer']
-const roleMatrix: Record<string, RolePerm[]> = {
+const roleMatrixOrder: TenantRole[] = ['owner', 'admin', 'contributor', 'viewer']
+const roleMatrix: Record<TenantRole, RolePerm[]> = {
   owner: [
     { key: 'manageMembers', has: true },
     { key: 'manageTenantConfig', has: true },
     { key: 'manageInfra', has: true },
+    { key: 'createOwnKB', has: true },
+    { key: 'readAll', has: true },
+  ],
+  admin: [
+    { key: 'manageMembers', has: false },
+    { key: 'manageTenantConfig', has: false },
+    { key: 'manageInfra', has: true },
+    { key: 'createOwnKB', has: true },
+    { key: 'readAll', has: true },
+  ],
+  contributor: [
+    { key: 'manageMembers', has: false },
+    { key: 'manageTenantConfig', has: false },
+    { key: 'manageInfra', has: false },
     { key: 'createOwnKB', has: true },
     { key: 'readAll', has: true },
   ],
@@ -713,6 +719,10 @@ function roleMatrixIcon(role: TenantRole): string {
   switch (role) {
     case 'owner':
       return 'user-vip-filled'
+    case 'admin':
+      return 'user-safety'
+    case 'contributor':
+      return 'edit'
     default:
       return 'browse'
   }
@@ -722,9 +732,6 @@ const columns = computed(() => [
   { colKey: 'member', title: t('tenantMember.columns.member'), ellipsis: true, minWidth: 132 },
   { colKey: 'role', title: t('tenantMember.columns.role'), width: 128 },
   { colKey: 'joined_at', title: t('tenantMember.columns.joinedAt'), width: 154 },
-  // sicau-v1 ticket 05: 教学参与统计（仅计数粒度，见 ADR-009-2）
-  { colKey: 'question_count', title: t('tenantMember.columns.questionCount'), width: 104, align: 'center' },
-  { colKey: 'last_active_at', title: t('tenantMember.columns.lastActive'), width: 150 },
   { colKey: 'actions', title: t('tenantMember.columns.operations'), width: 88, align: 'left' },
 ])
 
@@ -747,6 +754,29 @@ const addFormRules = {
   role: [{ required: true, message: t('tenantMember.errors.roleRequired'), trigger: 'change' }],
 }
 
+// Pretty role tag colour: Owner stands out, Admin is warning, the rest
+// stay neutral so the table doesn't become a confetti cannon.
+function roleTagTheme(role: TenantRole): 'primary' | 'warning' | 'success' | 'default' {
+  switch (role) {
+    case 'owner':
+      return 'primary'
+    case 'admin':
+      return 'warning'
+    case 'contributor':
+      return 'success'
+    default:
+      return 'default'
+  }
+}
+
+/** 成员表/下拉与权限矩阵共用图标（crown 不在 tdesign-icons-vue-next 中）。 */
+function roleIcon(role: TenantRole | string): string {
+  if (role === 'owner' || role === 'admin' || role === 'contributor' || role === 'viewer') {
+    return roleMatrixIcon(role as TenantRole)
+  }
+  return 'user'
+}
+
 function formatDate(s: string | undefined): string {
   if (!s) return '-'
   try {
@@ -767,26 +797,6 @@ function rememberMembersForAudit(rows: TenantMember[]) {
   for (const m of rows) {
     memberDisplayByUserId[m.user_id] = { username: m.username, email: m.email }
   }
-}
-
-// sicau-v1 ticket 05: 成员使用统计（仅计数与最后活跃，不含任何内容）。
-// 接口 Admin+；失败静默降级为"无统计"，不阻塞成员列表本身。
-const usageStats = ref<Map<string, { question_count: number; last_active_at: string | null }>>(new Map())
-
-async function loadUsageStats() {
-  if (!activeTenantId.value) return
-  try {
-    const resp = await getMemberUsageStats(activeTenantId.value)
-    const list = resp?.data?.stats ?? []
-    usageStats.value = new Map(list.map(s => [s.user_id, s]))
-  } catch {
-    usageStats.value = new Map()
-  }
-}
-
-function formatLastActive(value: string | null | undefined): string {
-  if (!value) return t('tenantMember.stats.neverActive')
-  return formatDate(value)
 }
 
 async function loadMembers() {
@@ -814,7 +824,6 @@ async function loadMembers() {
       }
       members.value = resp.data.members ?? []
       membersTotal.value = total
-      void loadUsageStats()
       if (typeof resp.data.page === 'number' && resp.data.page > 0) {
         membersPage.value = resp.data.page
       }
@@ -915,13 +924,6 @@ async function loadInvitations() {
         return
       }
       invitations.value = resp.data.invitations ?? []
-      activeShareLink.value = resp.data.active_share_link
-        ?? invitations.value.find(
-          (invitation) => invitation.is_share_link
-            && invitation.status === 'pending'
-            && Boolean(invitation.invite_url),
-        )
-        ?? null
       invitationsTotal.value = total
       if (typeof resp.data.page === 'number' && resp.data.page > 0) {
         invitationsPage.value = resp.data.page
@@ -951,12 +953,6 @@ async function doRevokeInvitation(row: TenantInvitation) {
   try {
     const resp = await revokeInvitation(activeTenantId.value, row.id)
     if (resp.success) {
-      if (shareLinkResult.value?.id === row.id) {
-        shareLinkResult.value = null
-      }
-      if (activeShareLink.value?.id === row.id) {
-        activeShareLink.value = null
-      }
       await loadInvitations()
       MessagePlugin.success(t('tenantInvitation.revoke.success'))
     } else {
@@ -1246,18 +1242,16 @@ onUnmounted(() => detachAuditInfiniteScroll())
 watch(invitePopupVisible, (open) => {
   if (!open) return
   addForm.email = ''
-  // sicau-v1 ticket 02: 邀请固定 viewer（服务端同样拒绝更高角色）
-  addForm.role = 'viewer'
+  addForm.role = 'contributor'
   addDialogStep.value = 'form'
 })
 
-// Reopening the popup restores the tenant's pending link. Only a tenant
-// without an active link sees the generation form.
+// Share-link popup: re-init on every open so the operator never sees
+// the previous result on a fresh click.
 watch(shareLinkPopupVisible, (open) => {
   if (!open) return
-  // sicau-v1 ticket 02: 分享链接固定 viewer（服务端同样拒绝更高角色）
-  shareLinkForm.role = 'viewer'
-  shareLinkResult.value = activeShareLink.value
+  shareLinkForm.role = 'contributor'
+  shareLinkResult.value = null
 })
 
 // absoluteInviteURL turns the backend's potentially-host-relative
@@ -1284,7 +1278,6 @@ async function submitShareLink() {
       return
     }
     shareLinkResult.value = resp.data
-    activeShareLink.value = resp.data
     invitationsPage.value = 1
     await loadInvitations()
   } catch (err: any) {
@@ -1298,7 +1291,7 @@ async function submitShareLink() {
 // every time the user goes Back, tweaks the form, and re-advances —
 // the summary always mirrors the current form state.
 const addConfirmEmail = computed(() => addForm.email.trim())
-const addConfirmRoleLabel = computed(() => t(teachingMembershipView(addForm.role).labelKey))
+const addConfirmRoleLabel = computed(() => t('tenantMember.role.' + addForm.role))
 
 // submitAdd is wired to the popup footer primary CTA. On step='form' it
 // validates and swaps to summary; on step='confirm' it fires the API.
@@ -1377,6 +1370,49 @@ async function sendInvitation(email: string, role: TenantRole) {
   }
 }
 
+async function onRoleChange(row: TenantMember, newRole: string) {
+  const prev = row.role
+  const next = newRole as TenantRole
+  if (prev === next) return
+
+  try {
+    const resp = await updateMemberRole(activeTenantId.value, row.user_id, next)
+    if (resp.success) {
+      // Mutate the row by replacing it in `members.value` instead of
+      // assigning `row.role = next` in place. The `row` argument here
+      // is the row object handed in by t-table's slot scope, which in
+      // some TDesign versions is a shallow copy that doesn't share
+      // reactivity with the `members` array — assigning `row.role`
+      // updates the local handle but not the rendered cell, so the
+      // select keeps showing the previous value until a refresh.
+      // Splicing a fresh object into the source array guarantees the
+      // table re-renders.
+      const idx = members.value.findIndex((m) => m.user_id === row.user_id)
+      if (idx >= 0) {
+        const merged = { ...members.value[idx], role: next }
+        members.value.splice(idx, 1, merged)
+        rememberMembersForAudit([merged])
+      } else {
+        row.role = next
+      }
+      MessagePlugin.success(t('tenantMember.roleChange.success'))
+      return
+    }
+    MessagePlugin.error(resp.message || t('tenantMember.errors.generic'))
+  } catch (err: any) {
+    const status = err?.status
+    if (status === 409) {
+      MessagePlugin.error(t('tenantMember.errors.lastOwner'))
+    } else if (status === 404) {
+      MessagePlugin.error(t('tenantMember.errors.notFound'))
+    } else {
+      MessagePlugin.error(err?.message || t('tenantMember.errors.generic'))
+    }
+    // The t-select is bound via :model-value (one-way), so its rendered
+    // value stays at `prev` automatically — no DOM hack needed.
+  }
+}
+
 // 原地 popconfirm 替代 DialogPlugin 模态确认：与"共享资源删除"等其它列表内
 // 的删除入口风格统一，避免一个简单的二次确认打断成员管理表格的浏览节奏。
 // 错误分支保持与旧实现一致（409 last-owner / 404 not-found / 兜底）。
@@ -1418,8 +1454,6 @@ watch(
       invitationsPageSize.value = 20
       membersTotal.value = 0
       invitationsTotal.value = 0
-      shareLinkResult.value = null
-      activeShareLink.value = null
       loadMembers()
       loadInvitations()
     }
@@ -1687,19 +1721,17 @@ watch(
     padding-bottom: 12px;
   }
 
-  /* 角色列：标签 + 可选历史角色警告图标，不撑满整格。 */
+  /* 角色列：下拉收缩到内容宽度，不再撑满整格。原先 100% 在窄角色
+     名（如"Owner"）下显得空荡且与其他列对不齐。 */
   &:deep(.role-cell) {
     display: flex;
     align-items: center;
-    gap: 6px;
     min-width: 0;
     box-sizing: border-box;
   }
 
-  &:deep(.legacy-role-hint) {
-    color: var(--td-warning-color-5, #e37318);
-    cursor: help;
-    flex-shrink: 0;
+  &:deep(.member-role-select.t-select) {
+    width: 100%;
   }
 }
 

@@ -190,7 +190,7 @@ func (r *userRepository) ListSystemAdmins(ctx context.Context, offset, limit int
 // or the composite SuperAdmin that inherits the teacher capability without a
 // separate appointment (is_system_admin=true). This mirrors
 // types.User.HasTeacherCapability() so the SuperAdmin console's teacher list
-// reflects the full 教师端 membership defined in CONTEXT.md.
+// reflects the full teaching-side membership.
 func (r *userRepository) ListTeachers(ctx context.Context, offset, limit int) ([]*types.User, int64, error) {
 	var users []*types.User
 	var total int64
@@ -222,9 +222,9 @@ func (r *userRepository) ListTeachers(ctx context.Context, offset, limit int) ([
 //   - (user, nil): revoke actually happened; user.IsSystemAdmin == false
 //   - (user, ErrUserNotSystemAdmin): target was already not an admin;
 //     no row was written. Caller should treat as idempotent success but
-//     MUST distinguish it from a real revoke for audit purposes — the
+//     MUST distinguish it from a real revoke for audit purposes - the
 //     surfaced `user` is the unchanged DB row.
-//   - (nil, ErrCannotRevokeSelf | ErrLastSystemAdmin | ErrUserNotFound | …):
+//   - (nil, ErrCannotRevokeSelf | ErrLastSystemAdmin | ErrUserNotFound | ...):
 //     hard rejection; no row written.
 func (r *userRepository) RevokeSystemAdmin(ctx context.Context, userID, actorID string) (*types.User, error) {
 	if userID == actorID {

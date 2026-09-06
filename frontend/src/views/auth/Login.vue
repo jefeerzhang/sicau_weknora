@@ -95,7 +95,7 @@
       </svg>
     </div>
 
-    <!-- Logo - Top Left -->
+    <!-- Logo - Top Left：川农品牌（I13），勿回退成上游 GitHub logo -->
     <a href="https://www.sicau.edu.cn" target="_blank" class="header-logo" :title="$t('common.website')">
       <img src="@/assets/img/sicau-crest.png" alt="四川农业大学" class="logo-image" />
       <span class="header-logo__text">
@@ -116,13 +116,35 @@
         <span class="link-text">{{ $t('common.website') }}</span>
       </a>
 
-      <a href="https://jefeerzhang.github.io/" target="_blank" class="header-link" :title="$t('common.info')">
+      <!-- 教师主页（个人站）；勿链到上游 Tencent/WeKnora -->
+      <a href="https://jefeerzhang.github.io/" target="_blank" class="header-link" :title="$t('common.teacherHome')">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
           <path
             d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
         </svg>
-        <span class="link-text">GitHub</span>
+        <span class="link-text">{{ $t('common.teacherHome') }}</span>
       </a>
+
+      <div class="language-switch">
+        <button @click="toggleLanguageMenu" class="header-link" :title="currentLangOption?.label">
+          <span class="lang-flag-icon">{{ currentLangOption?.flag }}</span>
+          <span class="link-text">{{ currentLangOption?.shortLabel }}</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        <!-- Language Dropdown -->
+        <div v-if="showLanguageMenu" class="language-dropdown">
+          <div v-for="lang in languageOptions" :key="lang.value" @click="selectLanguage(lang.value)"
+            class="language-option" :class="{ active: currentLanguage === lang.value }">
+            <span class="lang-flag">{{ lang.flag }}</span>
+            <span class="lang-label">{{ lang.label }}</span>
+            <span v-if="currentLanguage === lang.value" class="check-icon">✓</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Left Showcase Section -->
@@ -154,44 +176,13 @@
             delay: 4000,
             disableOnInteraction: false,
           }" :effect="'fade'" :fade-effect="{ crossFade: true }"
-            :pagination="{ clickable: true, dynamicBullets: false }" :speed="800" class="screenshot-swiper"
-            @slide-change="onSlideChange">
+            :pagination="{ clickable: true, dynamicBullets: false }" :speed="800" class="screenshot-swiper">
             <swiper-slide v-for="(slide, index) in slides" :key="index">
               <div class="slide-content">
                 <img :src="slide.image" :alt="slide.title" class="slide-image" />
               </div>
             </swiper-slide>
           </swiper>
-
-          <!-- Data Highlights -->
-          <div class="highlights">
-            <div class="highlight-card">
-              <div class="highlight-card__num">01</div>
-              <div class="highlight-card__body">
-                <div class="highlight-card__title">{{ $t('platform.rag') }}</div>
-                <div class="highlight-card__desc">{{ $t('platform.highlight.ragDesc') }}</div>
-              </div>
-            </div>
-            <div class="highlight-card">
-              <div class="highlight-card__num">02</div>
-              <div class="highlight-card__body">
-                <div class="highlight-card__title">{{ $t('platform.agent') }}</div>
-                <div class="highlight-card__desc">{{ $t('platform.highlight.agentDesc') }}</div>
-              </div>
-            </div>
-            <div class="highlight-card">
-              <div class="highlight-card__num">03</div>
-              <div class="highlight-card__body">
-                <div class="highlight-card__title">{{ $t('platform.wiki') }}</div>
-                <div class="highlight-card__desc">{{ $t('platform.highlight.wikiDesc') }}</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="carousel-caption">
-            <div class="carousel-caption__title">{{ currentSlide.title }}</div>
-            <div class="carousel-caption__desc">{{ currentSlide.description }}</div>
-          </div>
         </div>
       </div>
     </div>
@@ -218,6 +209,7 @@
           </div>
           <div class="form-header">
             <h2 class="form-title">{{ $t('auth.login') }}</h2>
+            <p class="form-welcome">{{ $t('auth.subtitle') }}</p>
             <p v-if="registrationEnabled" class="form-hint">{{ $t('auth.loginHint') }}</p>
           </div>
 
@@ -362,11 +354,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, nextTick, onMounted, computed } from 'vue'
+import { ref, reactive, nextTick, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useRoleLabel } from '@/composables/useRoleLabel'
 import { notifyLoginSuccess } from '@/utils/loginNotify'
+import { newPasswordRules } from '@/utils/passwordPolicy'
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Autoplay, EffectFade, Pagination } from 'swiper/modules'
 import 'swiper/css'
@@ -434,12 +427,14 @@ const registerFormRef = ref()
 const loading = ref(false)
 const oidcLoading = ref(false)
 const isRegisterMode = ref(false)
+const showLanguageMenu = ref(false)
 const oidcEnabled = ref(false)
 const oidcProviderName = ref('')
 // registrationEnabled defaults to true so that on first paint the Register
 // link is visible; the actual mode is fetched from /auth/config in onMounted.
 // In invite_only mode the link/card are hidden.
 const registrationEnabled = ref(true)
+const complexPasswordEnabled = ref(false)
 
 // invite-link state. When the URL carries ?token=xxx we resolve it to
 // the originating tenant + role and switch the form into a "register
@@ -452,20 +447,22 @@ const inviteLookup = ref<InviteLookup | null>(null)
 const inviteLookupError = ref('')
 const inviteLookupLoading = ref(false)
 
-// Track the active slide so we can show its title/description as a caption
-const activeSlideIndex = ref(0)
-const currentSlide = computed(() => slides[activeSlideIndex.value] || slides[0])
-const onSlideChange = (swiper: any) => {
-  // loop:true 时 realIndex 才是源数据的下标
-  activeSlideIndex.value = swiper?.realIndex ?? 0
-}
+// Language options
+const languageOptions = [
+  { value: 'zh-CN', label: '简体中文', shortLabel: '中文', flag: '🇨🇳' },
+  { value: 'en-US', label: 'English', shortLabel: 'EN', flag: '🇺🇸' },
+  { value: 'ru-RU', label: 'Русский', shortLabel: 'RU', flag: '🇷🇺' },
+  { value: 'ko-KR', label: '한국어', shortLabel: '한국어', flag: '🇰🇷' }
+]
 
+const currentLanguage = computed(() => locale.value)
 const oidcLoginText = computed(() => {
   if (oidcProviderName.value) {
     return t('auth.oidcLoginWithProvider', { provider: oidcProviderName.value })
   }
   return t('auth.oidcLogin')
 })
+const currentLangOption = computed(() => languageOptions.find(l => l.value === currentLanguage.value))
 
 // Login form data
 const formData = reactive<{ [key: string]: any }>({
@@ -490,10 +487,8 @@ const formRules = computed(() => ({
   password: [
     { required: true, message: t('auth.passwordRequired'), type: 'error' },
     { min: 8, message: t('auth.passwordMinLength'), type: 'error' },
-    { max: 32, message: t('auth.passwordMaxLength'), type: 'error' },
-    { pattern: /[a-zA-Z]/, message: t('auth.passwordMustContainLetter'), type: 'error' },
-    { pattern: /\d/, message: t('auth.passwordMustContainNumber'), type: 'error' }
-  ]
+    { max: 32, message: t('auth.passwordMaxLength'), type: 'error' }
+  ],
 }))
 
 // Register form validation rules
@@ -512,13 +507,7 @@ const registerRules = computed(() => ({
     { required: true, message: t('auth.emailRequired'), type: 'error' },
     { email: true, message: t('auth.emailInvalid'), type: 'error' }
   ],
-  password: [
-    { required: true, message: t('auth.passwordRequired'), type: 'error' },
-    { min: 8, message: t('auth.passwordMinLength'), type: 'error' },
-    { max: 32, message: t('auth.passwordMaxLength'), type: 'error' },
-    { pattern: /[a-zA-Z]/, message: t('auth.passwordMustContainLetter'), type: 'error' },
-    { pattern: /\d/, message: t('auth.passwordMustContainNumber'), type: 'error' }
-  ],
+  password: newPasswordRules(t, complexPasswordEnabled.value),
   confirmPassword: [
     { required: true, message: t('auth.confirmPasswordRequired'), type: 'error' },
     {
@@ -537,6 +526,36 @@ const toggleMode = () => {
     (registerData as any)[key] = ''
   })
 }
+
+// Toggle language menu
+const toggleLanguageMenu = () => {
+  showLanguageMenu.value = !showLanguageMenu.value
+}
+
+// Select language
+const selectLanguage = (lang: string) => {
+  locale.value = lang
+  localStorage.setItem('locale', lang)
+  showLanguageMenu.value = false
+  MessagePlugin.success(t('language.languageSaved'))
+}
+
+// Close language menu when clicking outside
+const handleClickOutside = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  if (!target.closest('.language-switch')) {
+    showLanguageMenu.value = false
+  }
+}
+
+// Add click outside listener
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 
 const persistLoginResponse = async (response: any, skipRedirect = false) => {
   // Backend renamed `tenant` to `active_tenant` and added `memberships`
@@ -613,8 +632,10 @@ const loadAuthConfig = async () => {
   try {
     const response = await getAuthConfig()
     registrationEnabled.value = response.registration_mode !== 'invite_only'
+    complexPasswordEnabled.value = response.complex_password_enabled
   } catch {
     registrationEnabled.value = true
+    complexPasswordEnabled.value = false
   }
 }
 
@@ -1063,7 +1084,7 @@ onMounted(async () => {
   flex: 0 0 52%;
   display: flex;
   align-items: flex-end;
-  padding: 120px 30px 100px 50px;
+  padding: 100px 30px 100px 50px;
   box-sizing: border-box;
   position: relative;
 }
@@ -1075,27 +1096,17 @@ onMounted(async () => {
   z-index: 2;
   display: flex;
   flex-direction: column;
-  margin-bottom: 30px;
+  margin-bottom: 60px;
 }
 
 .showcase-subtitle {
   margin-top: 0;
-  font-size: 30px;
+  font-size: 22px;
   color: rgba(255, 255, 255, 0.95);
-  margin: 0 0 6px 0;
+  margin: 0 0 8px 0;
   font-family: var(--app-font-family);
   line-height: 1.4;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  text-align: center;
-}
-
-.showcase-description {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.8);
-  margin: 0 0 28px 0;
-  font-family: var(--app-font-family);
-  line-height: 1.5;
+  font-weight: 500;
 }
 
 .showcase-note {
@@ -1122,18 +1133,18 @@ onMounted(async () => {
 
 .feature-tags {
   display: flex;
-  gap: 10px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 40px;
   flex-wrap: wrap;
 }
 
 .tag {
   display: inline-block;
-  padding: 7px 18px;
+  padding: 8px 20px;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 20px;
   color: var(--td-text-color-anti);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   font-family: var(--app-font-family);
 }
@@ -1141,80 +1152,7 @@ onMounted(async () => {
 /* Carousel */
 .carousel-container {
   width: 100%;
-  margin-top: 8px;
-}
-
-.carousel-caption {
-  margin-top: 14px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-
-  &__title {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--td-text-color-anti);
-    margin-bottom: 4px;
-    letter-spacing: 0.3px;
-  }
-
-  &__desc {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.82);
-    line-height: 1.5;
-  }
-}
-
-/* Highlights — 三个数据指标卡片（轮播图下方） */
-.highlights {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.highlight-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: background 0.2s ease, transform 0.2s ease;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.26);
-    transform: translateY(-1px);
-  }
-
-  &__num {
-    font-family: var(--app-font-family);
-    font-size: 14px;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.7);
-    line-height: 1;
-    letter-spacing: 1px;
-  }
-
-  &__title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--td-text-color-anti);
-    line-height: 1.3;
-    letter-spacing: 0.3px;
-  }
-
-  &__desc {
-    font-size: 11.5px;
-    color: rgba(255, 255, 255, 0.82);
-    line-height: 1.5;
-  }
+  margin-top: 48px;
 }
 
 .screenshot-swiper {
@@ -1222,8 +1160,7 @@ onMounted(async () => {
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  padding-bottom: 36px;
-  max-height: 320px;
+  padding-bottom: 40px;
 
   :deep(.swiper-wrapper) {
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -1252,15 +1189,13 @@ onMounted(async () => {
 
 .slide-content {
   width: 100%;
-  height: 280px;
+  height: 100%;
   background: var(--td-bg-color-container);
   border-radius: 16px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
-  box-sizing: border-box;
 }
 
 .slide-image {
@@ -1268,7 +1203,6 @@ onMounted(async () => {
   height: 100%;
   display: block;
   object-fit: contain;
-  max-height: 256px;
 }
 
 /* Right Form Section */
@@ -1284,8 +1218,8 @@ onMounted(async () => {
 
 .form-panel {
   width: 100%;
-  max-width: 440px;
-  margin-bottom: 30px;
+  max-width: 480px;
+  margin-bottom: 60px;
   position: relative;
   z-index: 2;
 }
@@ -1382,10 +1316,85 @@ onMounted(async () => {
   }
 }
 
+.language-switch {
+  position: relative;
+
+  button {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: var(--td-text-color-anti);
+
+    .lang-flag-icon {
+      font-size: 16px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    svg:last-child {
+      margin-left: 2px;
+      flex-shrink: 0;
+    }
+  }
+}
+
+.language-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 160px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  z-index: 1000;
+}
+
+.language-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--app-font-family);
+  color: var(--td-text-color-primary);
+
+  .lang-flag {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .lang-label {
+    flex: 1;
+  }
+
+  .check-icon {
+    color: var(--td-success-color);
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: var(--td-bg-color-secondarycontainer);
+  }
+
+  &.active {
+    background: var(--td-success-color-light);
+    color: var(--td-brand-color-active);
+  }
+}
+
 .form-card {
   background: rgba(255, 255, 255, 0.97);
   border-radius: 16px;
-  padding: 36px;
+  padding: 40px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   box-sizing: border-box;
   border: none;
@@ -1710,19 +1719,10 @@ onMounted(async () => {
   .header-logo {
     top: 26px;
     left: 40px;
-    padding: 4px 14px 4px 6px;
 
     .logo-image {
-      width: 32px;
-      height: 32px;
-    }
-
-    &__title {
-      font-size: 14px;
-    }
-
-    &__subtitle {
-      font-size: 9px;
+      width: 36px;
+      height: 36px;
     }
   }
 
@@ -1768,20 +1768,10 @@ onMounted(async () => {
   .header-logo {
     top: 22px;
     left: 30px;
-    padding: 4px 12px 4px 4px;
 
     .logo-image {
-      width: 28px;
-      height: 28px;
-    }
-
-    &__title {
-      font-size: 13px;
-    }
-
-    &__subtitle {
-      font-size: 8px;
-      letter-spacing: 0.3px;
+      width: 32px;
+      height: 32px;
     }
   }
 
@@ -1839,24 +1829,9 @@ onMounted(async () => {
   .header-logo {
     top: 18px;
     left: 20px;
-    padding: 3px 10px 3px 3px;
 
     .logo-image {
-      width: 24px;
-      height: 24px;
-    }
-
-    &__text {
-      line-height: 1.15;
-    }
-
-    &__title {
-      font-size: 12px;
-      letter-spacing: 0.5px;
-    }
-
-    &__subtitle {
-      display: none;
+      width: 70px;
     }
   }
 
@@ -1924,11 +1899,6 @@ html[theme-mode="dark"] {
     stroke: rgba(255, 255, 255, 0.25);
   }
 
-  .header-logo .logo-image {
-    /* 川农校徽在深色背景上轻微提亮 + 投影保证对比度 */
-    filter: brightness(1.15) drop-shadow(0 0 4px rgba(0, 0, 0, 0.45));
-  }
-
   .header-link {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.15);
@@ -1936,6 +1906,21 @@ html[theme-mode="dark"] {
     &:hover {
       background: rgba(255, 255, 255, 0.2);
     }
+  }
+
+  .language-switch button {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.15);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  }
+
+  .language-dropdown {
+    background: rgba(36, 36, 36, 0.97) !important;
+    border-color: var(--td-component-stroke) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
   }
 
   .tag {

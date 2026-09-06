@@ -21,7 +21,7 @@ func resolveTenantSelfServiceCreationEnabled(
 	cfg *config.Config,
 	settings interfaces.SystemSettingService,
 ) bool {
-	enabled := false
+	enabled := true
 	if cfg != nil && cfg.Tenant != nil {
 		enabled = cfg.Tenant.IsSelfServiceCreationEnabled()
 	}

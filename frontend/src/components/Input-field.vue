@@ -19,6 +19,11 @@ import AgentSelector from './AgentSelector.vue';
 import { getCaretCoordinates } from '@/utils/caret';
 import { getRootZoom, rectToCssPx, cssViewportSize } from '@/utils/zoom';
 import { type ModelConfig } from '@/api/model';
+import {
+  formatContextWindow,
+  isDefaultContextWindow,
+  effectiveContextWindow,
+} from '@/utils/contextWindow';
 import { type CustomAgent, BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID } from '@/api/agent';
 import { useChatResourcesStore } from '@/stores/chatResources';
 import { useEditorResourcesStore } from '@/stores/editorResources';
@@ -98,7 +103,7 @@ const handleDroppedFiles = (files: File[]) => {
     }
   }
 
-  // sicau-v1：学生 viewer 不支持附件（与隐藏的上传按钮一致）
+  // Course students (viewer) cannot upload chat attachments; match the hidden upload button.
   const attachmentsBlocked = !authStore.hasRole('contributor');
   if (attachmentFiles.length > 0 && !attachmentsBlocked) {
     attachmentUploadRef.value?.addFiles(attachmentFiles);
@@ -863,10 +868,9 @@ const loadAgents = async (force = false) => {
   }
 };
 
-// sicau-v1 ticket 04: 应用空间默认 Agent（课程场景：学生零操作进入可提问状态）。
-// 规则：成员显式选过 Agent（localStorage 旗标）或本地已持久化非内置选择时，
-// 以本地为准；否则在空间设置了默认且该 Agent 仍存在时自动选中。
-// 默认 Agent 已被删除则静默忽略（等于无默认），不报错。
+// Apply workspace default agent so course students land ready to ask.
+// Skip when the member already picked an agent (localStorage flag) or local
+// state already holds a non-builtin selection. Missing/deleted defaults are ignored.
 async function applyWorkspaceDefaultAgent() {
   try {
     if (localStorage.getItem(EXPLICIT_AGENT_CHOSEN_KEY) === '1') return;
@@ -1084,6 +1088,27 @@ const modelDisplayName = (model: ModelConfig) => {
   const displayName = model.display_name?.trim();
   return displayName || model.name;
 };
+
+const contextWindowTitle = (tokens?: number) => {
+  if (isDefaultContextWindow(tokens)) {
+    return t('model.editor.contextWindowDefaultHint', { value: formatContextWindow(tokens) });
+  }
+  return t('model.editor.contextWindowTokens', { count: effectiveContextWindow(tokens) });
+};
+
+const selectedModelContextLabel = computed(() => {
+  if (!selectedModel.value) return '';
+  return formatContextWindow(selectedModel.value.parameters?.context_window);
+});
+
+const selectedModelContextIsDefault = computed(() => {
+  return isDefaultContextWindow(selectedModel.value?.parameters?.context_window);
+});
+
+const selectedModelContextTitle = computed(() => {
+  if (!selectedModel.value) return '';
+  return contextWindowTitle(selectedModel.value.parameters?.context_window);
+});
 
 const updateModelDropdownPosition = () => {
   const anchor = modelButtonRef.value;
@@ -1879,6 +1904,13 @@ watch(() => uiStore.showSettingsModal, (visible, prevVisible) => {
   }
 });
 
+watch(() => route.path, (path, prev) => {
+  if (prev === '/platform/settings' && path !== '/platform/settings') {
+    loadWebSearchConfig(true);
+    loadChatModels(true);
+  }
+});
+
 watch([selectedKbIds, selectedFileIds], ([kbIds, fileIds]) => {
   if (!kbIds.length && !fileIds.length) {
     closeModelSelector();
@@ -2129,7 +2161,6 @@ const selectAgentMode = async (mode: 'quick-answer' | 'smart-reasoning') => {
   if (shouldEnableAgent !== isAgentEnabled.value) {
     settingsStore.toggleAgent(shouldEnableAgent);
     // 同时更新选中的智能体
-    markAgentExplicitlyChosen();
     settingsStore.selectAgent(shouldEnableAgent ? BUILTIN_SMART_REASONING_ID : BUILTIN_QUICK_ANSWER_ID);
     MessagePlugin.success(shouldEnableAgent ? t('input.messages.agentSwitchedOn') : t('input.messages.agentSwitchedOff'));
   }
@@ -2632,7 +2663,7 @@ defineExpose({
             </div>
           </t-tooltip>
 
-          <!-- 附件上传按钮（sicau-v1：学生 viewer 不展示，后端同步拒绝） -->
+          <!-- 附件上传按钮：学生 (viewer) 不展示；后端同步拒绝 -->
           <t-tooltip v-if="authStore.hasRole('contributor')" placement="top" theme="light" :popupProps="{ overlayClassName: 'input-field-tooltip' }">
             <template #content>
               <span>{{ uploadedAttachments.length > 0 ? $t('chat.attachmentWithCount', {
@@ -2688,6 +2719,12 @@ defineExpose({
                 <span class="model-selector-name">
                   {{ selectedModelDisplayName }}
                 </span>
+                <span
+                  v-if="selectedModelContextLabel"
+                  class="model-selector-ctx"
+                  :class="{ 'is-default': selectedModelContextIsDefault }"
+                  :title="selectedModelContextTitle"
+                >{{ selectedModelContextLabel }}</span>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" class="model-dropdown-arrow"
                   :class="{ 'rotate': showModelSelector }">
                   <path d="M2.5 4.5L6 8L9.5 4.5H2.5Z" />
@@ -2719,6 +2756,11 @@ defineExpose({
                       <span v-if="model.display_name" class="model-option-raw-name">{{ model.name }}</span>
                     </div>
                   </div>
+                  <span
+                    class="model-option-ctx"
+                    :class="{ 'is-default': isDefaultContextWindow(model.parameters?.context_window) }"
+                    :title="contextWindowTitle(model.parameters?.context_window)"
+                  >{{ formatContextWindow(model.parameters?.context_window) }}</span>
                 </div>
                 <div v-if="availableModels.length === 0" class="model-option empty">
                   {{ $t('input.noModel') }}
@@ -3502,6 +3544,18 @@ const getImgSrc = (url: string) => {
   white-space: nowrap;
 }
 
+.model-selector-ctx {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--td-text-color-placeholder, #999);
+  font-weight: 400;
+
+  &.is-default {
+    opacity: 0.85;
+  }
+}
+
 .model-dropdown-arrow {
   width: 10px;
   height: 10px;
@@ -3606,6 +3660,8 @@ const getImgSrc = (url: string) => {
 .model-option {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 6px 8px;
   cursor: pointer;
   transition: background 0.12s;
@@ -3637,8 +3693,8 @@ const getImgSrc = (url: string) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
   min-width: 0;
+  flex: 1;
 }
 
 .model-option-icon {
@@ -3672,6 +3728,21 @@ const getImgSrc = (url: string) => {
   font-size: 11px;
   color: var(--td-text-color-placeholder);
   flex-shrink: 0;
+}
+
+.model-option-ctx {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--td-text-color-secondary);
+  background: var(--td-bg-color-secondarycontainer);
+  padding: 0 6px;
+  border-radius: 4px;
+  line-height: 18px;
+
+  &.is-default {
+    color: var(--td-text-color-placeholder);
+  }
 }
 
 /* Agent 模式选择下拉菜单 */
