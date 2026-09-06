@@ -47,6 +47,8 @@ pub const ERR_PDF_NO_MODEL: c_int = 7;
 pub const ERR_INVALID_ARG: c_int = 8;
 /// Unknown format name passed to the ABI.
 pub const ERR_UNKNOWN_FORMAT: c_int = 9;
+/// `ConvertError::NeedsOcr` (scanned / image-only PDF pages).
+pub const ERR_NEEDS_OCR: c_int = 10;
 
 thread_local! {
     static LAST_ERROR: std::cell::RefCell<Option<CString>> = const { std::cell::RefCell::new(None) };
@@ -65,6 +67,7 @@ fn error_code(err: &ConvertError) -> c_int {
         ConvertError::ResourceLimit { .. } => ERR_RESOURCE_LIMIT,
         ConvertError::MissingPart { .. } => ERR_MISSING_PART,
         ConvertError::Io(_) => ERR_IO,
+        ConvertError::NeedsOcr { .. } => ERR_NEEDS_OCR,
         _ => ERR_UNSUPPORTED,
     }
 }
