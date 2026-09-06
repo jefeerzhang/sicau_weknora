@@ -47,6 +47,12 @@ func (s *tenantService) CreateTenant(ctx context.Context, tenant *types.Tenant) 
 	tenant.Status = "active"
 	tenant.CreatedAt = time.Now()
 	tenant.UpdatedAt = time.Now()
+	// Migration 000091 made default_agent_id NOT NULL DEFAULT ''. A nil
+	// *string becomes SQL NULL under GORM Create and trips that constraint.
+	if tenant.DefaultAgentID == nil {
+		empty := ""
+		tenant.DefaultAgentID = &empty
+	}
 
 	if err := s.validateStorageBucketUniqueness(ctx, tenant); err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
