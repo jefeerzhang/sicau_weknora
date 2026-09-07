@@ -219,7 +219,7 @@
                         clearable />
                     </t-form-item>
                     <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
-                      <t-select v-model="addForm.role" :options="roleOptions" :popup-props="roleSelectPopupProps" />
+                      <t-select v-model="addForm.role" :options="inviteRoleOptions" :popup-props="roleSelectPopupProps" />
                     </t-form-item>
                   </t-form>
                   <div v-else class="invite-confirm-body">
@@ -268,7 +268,7 @@
                     </p>
                     <t-form :data="shareLinkForm" :label-width="80">
                       <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
-                        <t-select v-model="shareLinkForm.role" :options="roleOptions"
+                        <t-select v-model="shareLinkForm.role" :options="inviteRoleOptions"
                           :popup-props="roleSelectPopupProps" />
                       </t-form-item>
                     </t-form>
@@ -563,7 +563,9 @@ const invitePopupVisible = ref(false)
 // invite). shareLinkResult is non-null after a successful create —
 // the popup then switches into "here's your link, copy it" mode.
 const shareLinkPopupVisible = ref(false)
-const shareLinkForm = reactive<{ role: TenantRole }>({ role: 'contributor' })
+// Teaching invariant (viewer-only invites): share links mint students only.
+// Backend CreateInviteLink rejects any role above viewer — keep the FE default aligned.
+const shareLinkForm = reactive<{ role: TenantRole }>({ role: 'viewer' })
 const creatingShareLink = ref(false)
 const shareLinkResult = ref<TenantInvitation | null>(null)
 // Two-step invite inside the popup: 'form' renders the email/role inputs;
@@ -628,13 +630,11 @@ const auditScrollRoot = ref<HTMLElement | null>(null)
 const auditLoadSentinelEl = ref<HTMLElement | null>(null)
 let auditScrollObserver: IntersectionObserver | null = null
 
-// Add dialog model — reset on each open. Default role is contributor:
-// inviting a fresh member with viewer is too restrictive for the
-// expected "let them collaborate on KBs" use case, and admin/owner
-// should be a deliberate promote step after the user accepts.
+// Add dialog model — reset on each open. Teaching invites are viewer-only
+// (Student); backend CreateInvitation / CreateInviteLink reject elevated roles.
 const addForm = reactive<{ email: string; role: TenantRole }>({
   email: '',
-  role: 'contributor',
+  role: 'viewer',
 })
 
 // Role-aware gates. The server enforces every mutation; UI gates here
@@ -668,6 +668,13 @@ const roleOptions = computed(() => [
   { label: t('tenantMember.role.owner'), value: 'owner' },
   { label: t('tenantMember.role.admin'), value: 'admin' },
   { label: t('tenantMember.role.contributor'), value: 'contributor' },
+  { label: t('tenantMember.role.viewer'), value: 'viewer' },
+])
+
+// Invite / share-link minting is fixed to student (viewer) on the teaching
+// deployment. Keep the selector honest so teachers cannot pick a role the
+// API will 400 on.
+const inviteRoleOptions = computed(() => [
   { label: t('tenantMember.role.viewer'), value: 'viewer' },
 ])
 
@@ -1242,7 +1249,7 @@ onUnmounted(() => detachAuditInfiniteScroll())
 watch(invitePopupVisible, (open) => {
   if (!open) return
   addForm.email = ''
-  addForm.role = 'contributor'
+  addForm.role = 'viewer'
   addDialogStep.value = 'form'
 })
 
@@ -1250,7 +1257,7 @@ watch(invitePopupVisible, (open) => {
 // the previous result on a fresh click.
 watch(shareLinkPopupVisible, (open) => {
   if (!open) return
-  shareLinkForm.role = 'contributor'
+  shareLinkForm.role = 'viewer'
   shareLinkResult.value = null
 })
 

@@ -230,7 +230,7 @@
                 {{ loading ? $t('auth.loggingIn') : $t('auth.login') }}
               </t-button>
 
-              <div class="register-cta" v-if="registrationEnabled">
+              <div class="register-cta" v-if="registrationEnabled || inviteLookup">
                 <div class="register-cta__divider">
                   <span>{{ $t('auth.firstTime') }}</span>
                 </div>
@@ -813,11 +813,13 @@ onMounted(async () => {
       return
     }
 
-    // 3. 未登录：按注册模式决定界面。invite_only 停在登录页、登录后再兑换；self_serve 保持注册流程。
+    // 3. 未登录：分享链接落地始终进入「邀请注册」表单。
+    // register-by-invite 不受 invite_only 门禁；若只停在登录卡，新学生无法建号。
+    // 已有账号可切回登录卡再兑换 token。
     const cfg = await getAuthConfig()
     const inviteOnly = cfg.registration_mode === 'invite_only'
     registrationEnabled.value = !inviteOnly
-    isRegisterMode.value = !inviteOnly
+    isRegisterMode.value = true
     loadOIDCConfig()
     return
   }
