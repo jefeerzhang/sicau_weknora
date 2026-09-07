@@ -5,6 +5,10 @@
 !.gitignore
 !.github/
 
+# .env 含真实凭据（数据库密码、API key、AES 主密钥、JWT 等），
+# 已被上面 ".*" 隐式忽略；此处显式声明便于维护者一眼看到。
+.env
+
 # 敏感文件
 *.pem
 *_key
