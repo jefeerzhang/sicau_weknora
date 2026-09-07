@@ -6628,7 +6628,7 @@ export default {
   },
   tenantMember: {
     title: 'Members',
-    sectionDescription: 'Invite teammates to the workspace and manage their roles. Only Owner can add or remove members.',
+    sectionDescription: 'Invite students to this workspace. Only the workspace lead can add or remove members; teaching roles are fixed to workspace lead / student.',
     learnRbacGuide: 'Learn about RBAC',
     listTitle: 'Workspace members',
     loading: 'Loading members…',
@@ -6657,6 +6657,13 @@ export default {
       admin: 'Admin',
       contributor: 'Contributor',
       viewer: 'Viewer'
+    },
+    teaching: {
+      lead: 'Workspace lead',
+      student: 'Student',
+      legacyOwner: 'Owner (needs cleanup)',
+      legacyWarning: 'Legacy elevated membership; teaching workspaces no longer allow role changes here',
+      unknown: 'Unknown role',
     },
     add: {
       button: 'Add Member',

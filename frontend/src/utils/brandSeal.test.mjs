@@ -28,12 +28,11 @@ test('user menu does not open upstream Tencent GitHub', () => {
   assert.doesNotMatch(src, /openGithub|openDocs/)
 })
 
-test('sidebar menu keeps notes and announcements entries', () => {
-  const menu = read('../stores/menu.ts')
-  assert.match(menu, /menu\.notes/)
-  assert.match(menu, /menu\.announcements/)
-  assert.match(menu, /path: 'notes'/)
-  assert.match(menu, /path: 'announcements'/)
+test('sidebar menu uses SICAU brand text, not WEKNORA wordmark', () => {
+  const src = read('../components/menu.vue')
+  assert.match(src, /川农知识库/)
+  assert.match(src, /sicau-crest\.png/)
+  assert.doesNotMatch(src, /weknora\.png/)
 })
 
 test('platformIdentity util never invents teacher/superadmin from unknown', () => {

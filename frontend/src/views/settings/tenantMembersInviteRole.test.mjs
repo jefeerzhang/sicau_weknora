@@ -16,11 +16,11 @@ test('share-link and email invite default to viewer (student)', () => {
   assert.doesNotMatch(src, /shareLinkForm = reactive<\{ role: TenantRole \}>\(\{ role: 'contributor' \}\)/)
 })
 
-test('invite / share-link selectors use viewer-only options', () => {
+test('member roster has no role-change select; uses teaching labels', () => {
+  assert.doesNotMatch(src, /class="member-role-select"/)
+  assert.doesNotMatch(src, /onRoleChange/)
+  assert.doesNotMatch(src, /updateMemberRole/)
+  assert.match(src, /teachingRoleLabel/)
+  assert.match(src, /formatRoleLabel/)
   assert.match(src, /inviteRoleOptions/)
-  assert.match(src, /:options="inviteRoleOptions"/)
-  assert.match(
-    src,
-    /const inviteRoleOptions = computed\(\(\) => \[\s*\{ label: t\('tenantMember\.role\.viewer'\), value: 'viewer' \},\s*\]\)/,
-  )
 })

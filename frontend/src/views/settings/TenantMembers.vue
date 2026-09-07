@@ -127,7 +127,7 @@
               </template>
               <template #role="{ row }">
                 <t-tag :theme="roleTagTheme(row.role)" size="small">
-                  {{ $t('tenantMember.role.' + row.role) }}
+                  {{ teachingRoleLabel(row.role) }}
                 </t-tag>
               </template>
               <template #inviter="{ row }">
@@ -334,19 +334,13 @@
               </template>
               <template #role="{ row }">
                 <div class="role-cell">
-                  <t-select v-if="canManage && row.user_id !== currentUserId" :model-value="row.role"
-                    class="member-role-select" size="small" :popup-props="roleSelectPopupProps"
-                    @change="(val: string) => onRoleChange(row, val)">
-                    <t-option v-for="opt in roleOptions" :key="opt.value" :value="opt.value" :label="opt.label">
-                      <span class="role-option">
-                        <t-icon :name="roleIcon(opt.value)" class="role-option-icon" />
-                        <span>{{ opt.label }}</span>
-                      </span>
-                    </t-option>
-                  </t-select>
-                  <t-tag v-else :theme="roleTagTheme(row.role)" size="small">
-                    {{ $t('tenantMember.role.' + row.role) }}
+                  <t-tag :theme="roleTagTheme(row.role)" size="small">
+                    {{ teachingRoleLabel(row.role) }}
                   </t-tag>
+                  <span
+                    v-if="teachingRoleWarning(row.role)"
+                    class="role-legacy-hint"
+                  >{{ teachingRoleWarning(row.role) }}</span>
                 </div>
               </template>
               <template #joined_at="{ row }">{{ formatDate(row.joined_at) }}</template>
@@ -520,11 +514,12 @@ import { AUDIT_ACTION_I18N_ROOTS } from '@/i18n/auditActionRegistry'
 import { auditActionLabel } from '@/i18n/auditActionLabel'
 import {
   listMembers,
-  updateMemberRole,
   removeMember,
   type TenantMember,
   type TenantRole,
 } from '@/api/tenant/members'
+import { formatRoleLabel } from '@/composables/formatRoleLabel'
+import { countOwners, teachingMembershipView } from '@/utils/teachingMembership'
 import {
   listTenantInvitations,
   createInvitation,
@@ -664,16 +659,18 @@ const currentUserId = computed(() => authStore.user?.id ?? '')
 // don't expose a tenant picker here.
 const activeTenantId = computed(() => Number(authStore.currentTenantId ?? 0))
 
-const roleOptions = computed(() => [
-  { label: t('tenantMember.role.owner'), value: 'owner' },
-  { label: t('tenantMember.role.admin'), value: 'admin' },
-  { label: t('tenantMember.role.contributor'), value: 'contributor' },
-  { label: t('tenantMember.role.viewer'), value: 'viewer' },
-])
+/** Teaching UI: owner/viewer → 空间负责人/学生; never expose role edits. */
+const ownerCount = computed(() => countOwners(members.value))
+function teachingRoleLabel(role: string | null | undefined): string {
+  return formatRoleLabel(t, role, ownerCount.value)
+}
+function teachingRoleWarning(role: string | null | undefined): string {
+  const view = teachingMembershipView(role, ownerCount.value)
+  if (!view.warningKey) return ''
+  const label = t(view.warningKey)
+  return label === view.warningKey ? '' : label
+}
 
-// Invite / share-link minting is fixed to student (viewer) on the teaching
-// deployment. Keep the selector honest so teachers cannot pick a role the
-// API will 400 on.
 const inviteRoleOptions = computed(() => [
   { label: t('tenantMember.role.viewer'), value: 'viewer' },
 ])
@@ -777,13 +774,6 @@ function roleTagTheme(role: TenantRole): 'primary' | 'warning' | 'success' | 'de
 }
 
 /** 成员表/下拉与权限矩阵共用图标（crown 不在 tdesign-icons-vue-next 中）。 */
-function roleIcon(role: TenantRole | string): string {
-  if (role === 'owner' || role === 'admin' || role === 'contributor' || role === 'viewer') {
-    return roleMatrixIcon(role as TenantRole)
-  }
-  return 'user'
-}
-
 function formatDate(s: string | undefined): string {
   if (!s) return '-'
   try {
@@ -1377,49 +1367,6 @@ async function sendInvitation(email: string, role: TenantRole) {
   }
 }
 
-async function onRoleChange(row: TenantMember, newRole: string) {
-  const prev = row.role
-  const next = newRole as TenantRole
-  if (prev === next) return
-
-  try {
-    const resp = await updateMemberRole(activeTenantId.value, row.user_id, next)
-    if (resp.success) {
-      // Mutate the row by replacing it in `members.value` instead of
-      // assigning `row.role = next` in place. The `row` argument here
-      // is the row object handed in by t-table's slot scope, which in
-      // some TDesign versions is a shallow copy that doesn't share
-      // reactivity with the `members` array — assigning `row.role`
-      // updates the local handle but not the rendered cell, so the
-      // select keeps showing the previous value until a refresh.
-      // Splicing a fresh object into the source array guarantees the
-      // table re-renders.
-      const idx = members.value.findIndex((m) => m.user_id === row.user_id)
-      if (idx >= 0) {
-        const merged = { ...members.value[idx], role: next }
-        members.value.splice(idx, 1, merged)
-        rememberMembersForAudit([merged])
-      } else {
-        row.role = next
-      }
-      MessagePlugin.success(t('tenantMember.roleChange.success'))
-      return
-    }
-    MessagePlugin.error(resp.message || t('tenantMember.errors.generic'))
-  } catch (err: any) {
-    const status = err?.status
-    if (status === 409) {
-      MessagePlugin.error(t('tenantMember.errors.lastOwner'))
-    } else if (status === 404) {
-      MessagePlugin.error(t('tenantMember.errors.notFound'))
-    } else {
-      MessagePlugin.error(err?.message || t('tenantMember.errors.generic'))
-    }
-    // The t-select is bound via :model-value (one-way), so its rendered
-    // value stays at `prev` automatically — no DOM hack needed.
-  }
-}
-
 // 原地 popconfirm 替代 DialogPlugin 模态确认：与"共享资源删除"等其它列表内
 // 的删除入口风格统一，避免一个简单的二次确认打断成员管理表格的浏览节奏。
 // 错误分支保持与旧实现一致（409 last-owner / 404 not-found / 兜底）。
@@ -1728,17 +1675,20 @@ watch(
     padding-bottom: 12px;
   }
 
-  /* 角色列：下拉收缩到内容宽度，不再撑满整格。原先 100% 在窄角色
-     名（如"Owner"）下显得空荡且与其他列对不齐。 */
+  /* 角色列：只读教学标签（空间负责人 / 学生） */
   &:deep(.role-cell) {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
     min-width: 0;
     box-sizing: border-box;
   }
 
-  &:deep(.member-role-select.t-select) {
-    width: 100%;
+  &:deep(.role-legacy-hint) {
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--td-warning-color);
   }
 }
 

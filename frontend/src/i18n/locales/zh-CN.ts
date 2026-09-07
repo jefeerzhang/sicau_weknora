@@ -120,7 +120,7 @@ export default {
   },
   tenantMember: {
     title: '成员管理',
-    sectionDescription: '邀请伙伴加入当前空间并分配角色。只有 Owner 可以新增或移除成员。',
+    sectionDescription: '邀请学生加入当前空间。只有空间负责人可以新增或移除成员；教学空间内角色固定为「空间负责人 / 学生」。',
     learnRbacGuide: '了解 RBAC',
     listTitle: '空间成员',
     loading: '正在加载成员…',
@@ -206,6 +206,13 @@ export default {
       admin: '管理员',
       contributor: '编辑',
       viewer: '访客'
+    },
+    teaching: {
+      lead: '空间负责人',
+      student: '学生',
+      legacyOwner: '所有者（待整理）',
+      legacyWarning: '历史高权限成员，教学空间不再允许在此调整角色',
+      unknown: '未知角色',
     },
     columns: {
       member: '姓名与邮箱',

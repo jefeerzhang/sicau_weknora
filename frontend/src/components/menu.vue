@@ -3,7 +3,8 @@
         <!-- 展开时：Logo + 搜索/折叠按钮同行 -->
         <div class="logo_row" v-if="!uiStore.sidebarCollapsed">
             <div class="logo_box" @click="router.push('/platform/knowledge-bases')" style="cursor: pointer;">
-                <img class="logo" src="@/assets/img/weknora.png" alt="">
+                <img class="logo_img" src="@/assets/img/sicau-crest.png" alt="四川农业大学" />
+                <span class="logo_txt">川农知识库</span>
                 <sup v-if="isLiteEdition" class="lite-badge">Lite</sup>
             </div>
             <div class="logo_actions">
@@ -1278,9 +1279,25 @@ const onDragHandleMouseDown = (e: MouseEvent) => {
         min-width: 0;
         overflow: hidden;
 
-        .logo {
-            width: 128px;
-            height: auto;
+        .logo_img {
+            width: 28px;
+            height: 28px;
+            margin-right: 8px;
+            flex-shrink: 0;
+            object-fit: contain;
+        }
+
+        .logo_txt {
+            transform: none;
+            color: var(--td-text-color-primary);
+            font-family: "TencentSans", "PingFang SC", "Microsoft YaHei", sans-serif;
+            font-size: 16px;
+            font-style: normal;
+            font-weight: 600;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .lite-badge {
@@ -1293,23 +1310,6 @@ const onDragHandleMouseDown = (e: MouseEvent) => {
             user-select: none;
             white-space: nowrap;
         }
-    }
-
-    .logo_img {
-        margin-left: 24px;
-        width: 30px;
-        height: 30px;
-        margin-right: 7.25px;
-    }
-
-    .logo_txt {
-        transform: rotate(0.049deg);
-        color: var(--td-text-color-primary);
-        font-family: "TencentSans";
-        font-size: 24.12px;
-        font-style: normal;
-        font-weight: W7;
-        line-height: 21.7px;
     }
 
     .menu_top {
@@ -1895,9 +1895,9 @@ const onDragHandleMouseDown = (e: MouseEvent) => {
 }
 </style>
 <style lang="less">
-// Dark mode: invert dark logo to light
-html[theme-mode="dark"] .aside_box .logo_box .logo {
-    filter: invert(1) hue-rotate(180deg);
+// Dark mode: crest stays as-is; text uses theme color via CSS vars
+html[theme-mode="dark"] .aside_box .logo_box .logo_img {
+    filter: none;
 }
 
 // Dark mode: 滚动条在深色背景下需要更亮的颜色才看得见
