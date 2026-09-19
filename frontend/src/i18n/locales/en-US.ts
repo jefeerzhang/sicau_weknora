@@ -4571,6 +4571,12 @@ export default {
 
   platform: {
     subtitle: 'Search teaching and research materials for campus courses. Join by invitation; you cannot register on your own.',
+    schoolName: 'Sichuan Agricultural University',
+    founded: '1906',
+    mottoLabel: 'Motto',
+    motto: '追求真理 造福社会 自强不息',
+    spirit: '爱国敬业 艰苦奋斗 团结拼搏 求实创新',
+    campuses: 'Ya\'an · Chengdu · Dujiangyan',
     note: 'This system is built on the open-source project ',
     noteSuffix: ', customized for Sichuan Agricultural University\'s teaching and research document retrieval.',
     loginFeature1: 'Real materials',

@@ -2250,6 +2250,12 @@ export default {
   },
   platform: {
     subtitle: '교내 수업의 교육·연구 자료를 검색합니다. 초대로 가입하며, 직접 등록할 수 없습니다.',
+    schoolName: '쓰촨농업대학',
+    founded: '1906',
+    mottoLabel: '교훈',
+    motto: '追求真理 造福社会 自强不息',
+    spirit: '爱国敬业 艰苦奋斗 团结拼搏 求实创新',
+    campuses: '야안 · 청두 · 두장옌',
     description: 'RAG 검색, 에이전트 추론, Wiki 지식베이스로 문서를 진정으로 이해하고 활용합니다',
     rag: 'RAG 강화 생성',
     agent: 'ReAct 에이전트',

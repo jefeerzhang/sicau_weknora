@@ -2316,6 +2316,12 @@ export default {
 
   platform: {
     subtitle: '供校内课程检索教学与科研资料。通过邀请加入，不能自行注册。',
+    schoolName: '四川农业大学',
+    founded: '1906',
+    mottoLabel: '校训',
+    motto: '追求真理 造福社会 自强不息',
+    spirit: '爱国敬业 艰苦奋斗 团结拼搏 求实创新',
+    campuses: '雅安校区 · 成都校区 · 都江堰校区',
     note: '本系统基于开源项目 ',
     noteSuffix: ' 构建，专为川农校内教学与科研资料检索场景定制。',
     loginFeature1: '真实资料',

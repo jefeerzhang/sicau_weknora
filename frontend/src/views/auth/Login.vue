@@ -150,7 +150,12 @@
     <!-- Left Showcase Section -->
     <div class="showcase-section">
       <div class="showcase-content">
+        <p class="showcase-kicker">{{ $t('platform.schoolName') }} · {{ $t('platform.founded') }}</p>
+        <p class="showcase-motto-label">{{ $t('platform.mottoLabel') }}</p>
+        <p class="showcase-motto">{{ $t('platform.motto') }}</p>
+        <p class="showcase-spirit">{{ $t('platform.spirit') }}</p>
         <p class="showcase-subtitle">{{ $t('platform.subtitle') }}</p>
+        <p class="showcase-campuses">{{ $t('platform.campuses') }}</p>
       </div>
     </div>
 
@@ -999,6 +1004,39 @@ onMounted(async () => {
   margin-bottom: 60px;
 }
 
+.showcase-kicker {
+  margin: 0 0 18px 0;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: var(--app-font-family);
+}
+
+.showcase-motto-label {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  letter-spacing: 0.28em;
+  color: #e8c56a;
+  font-family: var(--app-font-family);
+}
+
+.showcase-motto {
+  margin: 0 0 12px 0;
+  font-size: 32px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: #f6e7b2;
+  font-family: var(--app-font-family);
+}
+
+.showcase-spirit {
+  margin: 0 0 22px 0;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--app-font-family);
+}
+
 .showcase-subtitle {
   margin-top: 0;
   font-size: 22px;
@@ -1007,6 +1045,14 @@ onMounted(async () => {
   font-family: var(--app-font-family);
   line-height: 1.4;
   font-weight: 500;
+}
+
+.showcase-campuses {
+  margin: 16px 0 0 0;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: var(--app-font-family);
 }
 
 .showcase-note {
@@ -1612,6 +1658,10 @@ onMounted(async () => {
     display: none;
   }
 
+  .showcase-motto {
+    font-size: 24px;
+  }
+
   .showcase-subtitle {
     font-size: 18px;
   }
@@ -1675,6 +1725,10 @@ onMounted(async () => {
     }
   }
 
+  .showcase-motto {
+    font-size: 22px;
+  }
+
   .showcase-subtitle {
     font-size: 16px;
     margin-bottom: 24px;
@@ -1733,6 +1787,10 @@ onMounted(async () => {
     .logo-image {
       width: 70px;
     }
+  }
+
+  .showcase-motto {
+    font-size: 20px;
   }
 
   .showcase-subtitle {
