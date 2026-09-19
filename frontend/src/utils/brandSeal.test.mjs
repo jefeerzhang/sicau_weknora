@@ -40,6 +40,7 @@ test('sidebar menu uses SICAU brand text, not WEKNORA wordmark', () => {
   const src = read('../components/menu.vue')
   assert.match(src, /川农知识库/)
   assert.match(src, /sicau-crest\.png/)
+  assert.match(src, /class="logo_box" @click="router\.push\('\/platform\/creatChat'\)"/)
   assert.doesNotMatch(src, /weknora\.png/)
 })
 

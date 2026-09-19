@@ -377,14 +377,12 @@
               </div>
               <div v-if="answerFullyRendered && event.done && event.content && event.content.trim() && !embeddedMode"
                 class="answer-toolbar">
-                <t-button size="small" variant="outline" shape="round" @click.stop="handleCopyAnswer(event)"
-                  :title="$t('agent.copy')">
+                <t-button size="small" variant="outline" class="answer-toolbar__labeled"
+                  @click.stop="handleCopyAnswer(event)">
                   <t-icon name="copy" />
+                  <span>{{ $t('agent.copy') }}</span>
                 </t-button>
-                <t-button v-if="authStore.hasRole('contributor')" size="small" variant="outline" shape="round"
-                  @click.stop="handleAddToKnowledge(event)" :title="$t('agent.addToKnowledgeBase')">
-                  <t-icon name="bookmark-add" />
-                </t-button>
+                <SaveAnswerToNoteButton :question="userQuery" :answer="event.content" />
                 <!-- Skill artifact download: only shown when the persisted
                      assistant message recorded any generated files. Agent
                      mode is the primary path for skills, so this is where
@@ -611,7 +609,6 @@ import type { KnowledgeReferenceLike, ReferenceHighlightTarget } from '@/utils/r
 import { resolveCitationChunkId } from '@/utils/citationMarkdown';
 import { getWikiPage, type WikiPage } from '@/api/wiki';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { useUIStore } from '@/stores/ui';
 import { useSettingsStore } from '@/stores/settings';
 import { useAuthStore } from '@/stores/auth';
 import { useI18n } from 'vue-i18n';
@@ -640,8 +637,6 @@ import { previewShellCommand } from '@/utils/shellExecResult';
 import type { DisplayType } from '@/types/tool-results';
 import { parseWikiToolReferences } from '@/utils/wikiToolReferences';
 import {
-  buildManualMarkdown,
-  formatManualTitle,
   replaceIncompleteMermaidWithPlaceholder,
   prepareStreamingMermaidMarkdown,
   extractMermaidCodes,
@@ -649,6 +644,7 @@ import {
   type CachedMermaidSvgHtml,
 } from '@/utils/chatMessageShared';
 import { copyWithToast } from '@/utils/clipboard';
+import SaveAnswerToNoteButton from '@/components/SaveAnswerToNoteButton.vue';
 import {
   configureMarkedForChatMarkdown,
   renderChatMarkdown,
@@ -668,7 +664,6 @@ const getToolIconName = getAgentToolIconName;
 
 const router = useRouter();
 const route = useRoute();
-const uiStore = useUIStore();
 const settingsStore = useSettingsStore();
 const authStore = useAuthStore();
 const { t } = useI18n();
@@ -3078,27 +3073,6 @@ const handleCopyAnswer = async (answerEvent: any) => {
   }
 
   await copyWithToast(content, 'agentStream.copy.success', 'agentStream.copy.failed');
-};
-
-const handleAddToKnowledge = (answerEvent: any) => {
-  const content = getActualContent(answerEvent);
-  if (!content) {
-    MessagePlugin.warning(t('agentStream.saveToKb.emptyContent'));
-    return;
-  }
-
-  const question = (props.userQuery || '').trim();
-  const manualContent = buildManualMarkdown(question, content);
-  const manualTitle = formatManualTitle(question);
-
-  uiStore.openManualEditor({
-    mode: 'create',
-    title: manualTitle,
-    content: manualContent,
-    status: 'draft',
-  });
-
-  MessagePlugin.info(t('agentStream.saveToKb.editorOpened'));
 };
 </script>
 

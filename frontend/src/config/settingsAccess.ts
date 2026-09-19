@@ -78,3 +78,14 @@ export function canSeeSettingsSection(identity: ShellIdentity, section: string):
 export function sidebarShowsAgents(identity: ShellIdentity): boolean {
   return identity !== 'student'
 }
+
+/**
+ * Knowledge-base list's second rail (全部 / 我的 / 收藏 / 最近 / 共享空间).
+ * Favorites and recents are not a reason to keep it. Students never see it;
+ * superadmins always do; everyone else only after joining a shared space.
+ */
+export function showKnowledgeSpaceRail(identity: ShellIdentity, sharedSpaceCount: number): boolean {
+  if (identity === 'student') return false
+  if (identity === 'superadmin') return true
+  return sharedSpaceCount > 0
+}

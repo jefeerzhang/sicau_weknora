@@ -5,6 +5,7 @@ import {
   SYSTEM_ADMIN_SETTINGS_SECTIONS,
   canSeeSettingsSection,
   shellIdentityOf,
+  showKnowledgeSpaceRail,
   sidebarShowsAgents,
   visibleSettingsSections,
 } from './settingsAccess'
@@ -79,4 +80,12 @@ test('a superadmin sees the teacher catalog plus system admin and deployment', (
   }
   assert.equal(canSeeSettingsSection('superadmin', 'ollama'), true)
   assert.equal(canSeeSettingsSection('superadmin', 'integration-im'), true)
+})
+
+test('knowledge-base space rail follows shared spaces, not favorites', () => {
+  assert.equal(showKnowledgeSpaceRail('student', 0), false)
+  assert.equal(showKnowledgeSpaceRail('student', 3), false)
+  assert.equal(showKnowledgeSpaceRail('teacher', 0), false)
+  assert.equal(showKnowledgeSpaceRail('teacher', 1), true)
+  assert.equal(showKnowledgeSpaceRail('superadmin', 0), true)
 })

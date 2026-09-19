@@ -2288,6 +2288,10 @@ export default {
     loadFailed: '笔记加载失败',
     leaveConfirm: '有未保存的更改，确定离开？',
     placeholder: '用 Markdown 记录，首行将成为标题…',
+    saveAnswer: '加入笔记',
+    saveAsNew: '新建笔记',
+    appendToCurrent: '追加到「{title}」',
+    savedToNotes: '已记入笔记',
   },
 
   announcements: {

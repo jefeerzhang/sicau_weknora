@@ -42,17 +42,14 @@
                 <div class="ai-markdown-template markdown-content" v-stable-html="renderedHTML">
                 </div>
             </div>
-            <!-- 复制和添加到知识库按钮 - 非 Agent 模式下显示 -->
             <div v-if="answerFullyRendered && (content || session.content)" class="answer-toolbar">
-                <t-button size="small" variant="outline" shape="round" @click.stop="handleCopyAnswer"
-                    :title="$t('agent.copy')">
+                <t-button size="small" variant="outline" class="answer-toolbar__labeled"
+                    @click.stop="handleCopyAnswer">
                     <t-icon name="copy" />
+                    <span>{{ $t('agent.copy') }}</span>
                 </t-button>
-                <!-- Students (viewer) lack KB write access; hide the entry. -->
-                <t-button v-if="authStore.hasRole('contributor')" size="small" variant="outline" shape="round"
-                    @click.stop="handleAddToKnowledge" :title="$t('agent.addToKnowledgeBase')">
-                    <t-icon name="bookmark-add" />
-                </t-button>
+                <SaveAnswerToNoteButton v-if="!embeddedMode" :question="userQuery"
+                    :answer="content || session.content" />
                 <!-- Skill artifact download: only shown when this reply's
                      assistant message actually recorded any generated files.
                      Emptiness is the default: the button stays hidden for
@@ -104,7 +101,6 @@
 </template>
 <script setup>
 import { onMounted, onBeforeUnmount, watch, computed, ref, reactive, nextTick, onUpdated } from 'vue';
-import { useAuthStore } from '@/stores/auth';
 import 'katex/dist/katex.min.css';
 import docInfo from './docInfo.vue';
 import deepThink from './deepThink.vue';
@@ -125,12 +121,8 @@ import {
 } from '@/utils/sandboxArtifactRefs';
 import { useI18n } from 'vue-i18n';
 import { MessagePlugin } from 'tdesign-vue-next';
-import { useUIStore } from '@/stores/ui';
-import {
-    buildManualMarkdown,
-    formatManualTitle,
-} from '@/utils/chatMessageShared';
 import { copyWithToast } from '@/utils/clipboard';
+import SaveAnswerToNoteButton from '@/components/SaveAnswerToNoteButton.vue';
 import {
     createChatMarkdownRenderer,
     renderChatMarkdown,
@@ -163,7 +155,6 @@ const mentionTagIcon = (item) => {
 
 const emit = defineEmits(['scroll-bottom', 'render-complete-change'])
 const { t } = useI18n()
-const uiStore = useUIStore();
 let parentMd = ref()
 const { float: citationFloat, rebind: rebindCitations, cancelClose: cancelCitationClose, scheduleClose: scheduleCitationClose } = useChatCitationPopover(parentMd, {
     getKnowledgeReferences: () => props.session?.knowledge_references,
@@ -349,7 +340,6 @@ const getActualContent = () => {
 };
 
 // 复制回答内容
-const authStore = useAuthStore();
 const handleCopyAnswer = async () => {
     const content = getActualContent();
     if (!content) {
@@ -358,27 +348,6 @@ const handleCopyAnswer = async () => {
     }
 
     await copyWithToast(content, 'chat.copySuccess', 'chat.copyFailed');
-};
-
-// 添加到知识库
-const handleAddToKnowledge = () => {
-    const content = getActualContent();
-    if (!content) {
-        MessagePlugin.warning(t('chat.emptyContentWarning'));
-        return;
-    }
-
-    const question = (props.userQuery || '').trim();
-    const manualContent = buildManualMarkdown(question, content);
-    const manualTitle = formatManualTitle(question);
-    uiStore.openManualEditor({
-        mode: 'create',
-        title: manualTitle,
-        content: manualContent,
-        status: 'draft',
-    });
-
-    MessagePlugin.info(t('chat.editorOpened'));
 };
 
 // 处理 markdown-content 中图片的点击事件

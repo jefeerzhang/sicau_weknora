@@ -1,6 +1,6 @@
 <template>
   <div class="kb-list-container">
-    <ListSpaceSidebar v-if="!authStore.isLiteMode" v-model="spaceSelection" :count-all="allKnowledgeBases"
+    <ListSpaceSidebar v-if="!authStore.isLiteMode && knowledgeSpaceRailVisible" v-model="spaceSelection" :count-all="allKnowledgeBases"
       :count-mine="kbs.length" :count-by-org="effectiveSharedCountByOrg" :count-favorites="kbFavoritesCount"
       :count-recents="kbRecentsCount" />
     <div class="kb-list-content">
@@ -803,6 +803,7 @@ import { useTenantModelReadiness } from '@/composables/useTenantModelReadiness'
 import { useI18n } from 'vue-i18n'
 import { useListUrlState } from '@/composables/useListUrlState'
 import { useResourcePins } from '@/composables/useResourcePins'
+import { shellIdentityOf, showKnowledgeSpaceRail } from '@/config/settingsAccess'
 
 const router = useRouter()
 const route = useRoute()
@@ -828,6 +829,29 @@ const { scope: spaceSelection, creator: creatorFilter } = useListUrlState({
   defaultScope,
   defaultCreator: 'all',
 })
+
+const knowledgeSpaceRailVisible = computed(() =>
+  showKnowledgeSpaceRail(
+    shellIdentityOf(authStore.user),
+    orgStore.organizations.length,
+  ),
+)
+
+const fallBackHiddenKnowledgeRail = () => {
+  if (knowledgeSpaceRailVisible.value) return
+  if (spaceSelection.value !== 'all') spaceSelection.value = 'all'
+}
+
+watch(knowledgeSpaceRailVisible, (visible) => {
+  if (!visible) fallBackHiddenKnowledgeRail()
+})
+
+// Superadmin and student do not depend on the organization list.
+// A teacher waits for fetchList, so an empty list before that request
+// returns does not wipe a shared-space link.
+if (shellIdentityOf(authStore.user) !== 'teacher') {
+  fallBackHiddenKnowledgeRail()
+}
 
 // Per-user favorites + recents (localStorage-backed). isFavorite & touchRecent
 // are wired into card render and click handlers below.
@@ -1238,6 +1262,7 @@ const fetchList = (force = false) => {
     // 各空间知识库数量已由 GET /organizations 的 resource_counts 带回，存于 orgStore.resourceCounts
     const counts = orgStore.resourceCounts?.knowledge_bases?.by_organization
     if (counts) spaceCountByOrg.value = { ...counts }
+    fallBackHiddenKnowledgeRail()
   })
 }
 

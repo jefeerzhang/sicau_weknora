@@ -13,11 +13,11 @@ test('viewer cannot see chat attachment upload control', () => {
   assert.match(src, /getDefaultAgentId/)
 })
 
-test('viewer cannot see add-to-knowledge buttons', () => {
+test('answer toolbars do not offer add-to-knowledge', () => {
   const bot = read('../views/chat/components/botmsg.vue')
   const stream = read('../views/chat/components/AgentStreamDisplay.vue')
-  assert.match(bot, /v-if="authStore\.hasRole\('contributor'\)"[^>]*handleAddToKnowledge/)
-  assert.match(stream, /v-if="authStore\.hasRole\('contributor'\)"[^>]*handleAddToKnowledge/)
+  assert.doesNotMatch(bot, /handleAddToKnowledge|addToKnowledgeBase|bookmark-add/)
+  assert.doesNotMatch(stream, /handleAddToKnowledge|addToKnowledgeBase|bookmark-add/)
 })
 
 test('artifact drawer gates downloads to contributor+', () => {

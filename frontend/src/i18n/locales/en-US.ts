@@ -4543,6 +4543,10 @@ export default {
     loadFailed: 'Failed to load note',
     leaveConfirm: 'You have unsaved changes. Leave anyway?',
     placeholder: 'Write in Markdown — the first line becomes the title…',
+    saveAnswer: 'Add to notes',
+    saveAsNew: 'New note',
+    appendToCurrent: 'Append to "{title}"',
+    savedToNotes: 'Saved to notes',
   },
 
   announcements: {

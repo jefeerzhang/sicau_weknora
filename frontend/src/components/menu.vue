@@ -2,7 +2,7 @@
     <div class="aside_box" :class="{ 'aside_box--collapsed': uiStore.sidebarCollapsed }">
         <!-- 展开时：Logo + 搜索/折叠按钮同行 -->
         <div class="logo_row" v-if="!uiStore.sidebarCollapsed">
-            <div class="logo_box" @click="router.push('/platform/knowledge-bases')" style="cursor: pointer;">
+            <div class="logo_box" @click="router.push('/platform/creatChat')" style="cursor: pointer;">
                 <img class="logo_img" src="@/assets/img/sicau-crest.png" alt="四川农业大学" />
                 <span class="logo_txt">川农知识库</span>
                 <sup v-if="isLiteEdition" class="lite-badge">Lite</sup>

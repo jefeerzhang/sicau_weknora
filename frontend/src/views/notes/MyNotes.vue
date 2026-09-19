@@ -69,6 +69,12 @@
                     </t-button>
                     <input ref="imageInputRef" type="file" accept="image/png,image/jpeg,image/gif,image/webp"
                         style="display: none" @change="onImageFileChange" />
+                    <div class="notes-format-bar">
+                        <t-button v-for="action in formatActions" :key="action.key" variant="text" size="small"
+                            shape="square" :title="action.title" @click="action.run()">
+                            <template #icon><t-icon :name="action.icon" /></template>
+                        </t-button>
+                    </div>
                     <span class="notes-editor-spacer"></span>
                     <!-- sicau-v1 N-4(v2)：自动保存状态机 -->
                     <span v-if="saving" class="notes-unsaved">{{ $t('notes.savingNow') }}</span>
@@ -103,6 +109,20 @@ import { createNote, deleteNote, getNote, listNotes, updateNote, type MyNoteList
 import { safeMarkdownToHTML, sanitizeHTML } from '@/utils/security'
 import { fetchNoteImageBlob, uploadNoteImage } from '@/api/me/notes'
 import { deriveLocalTitle } from './deriveLocalTitle'
+import { forgetCurrentNote, rememberCurrentNote } from './currentNote'
+import {
+    applyBlockquote,
+    applyBulletList,
+    applyHeading,
+    applyOrderedList,
+    applyTaskList,
+    insertCodeBlock,
+    insertHorizontalRule,
+    insertLink,
+    insertTable,
+    wrapRange,
+    type TextEdit,
+} from '@/utils/markdownSelection'
 
 const { t } = useI18n()
 
@@ -131,6 +151,41 @@ const noteImageObjectURLs = ref<string[]>([])
 const dirty = computed(() => content.value !== savedContent.value)
 // 当前激活键：草稿态为 'new'，真实笔记为其 id
 const selectedKey = computed(() => (isNewDraft.value ? 'new' : currentId.value))
+
+async function runEdit(build: (value: string, start: number, end: number) => TextEdit) {
+    if (previewMode.value) {
+        previewMode.value = false
+        await nextTick()
+    }
+    const el = editorRef.value
+    const start = el?.selectionStart ?? content.value.length
+    const end = el?.selectionEnd ?? start
+    const edit = build(content.value, start, end)
+    content.value = edit.value
+    await nextTick()
+    const next = editorRef.value
+    next?.focus()
+    next?.setSelectionRange(edit.selectionStart, edit.selectionEnd)
+    scheduleAutoSave()
+}
+
+const formatActions = computed(() => [
+    { key: 'bold', icon: 'textformat-bold', title: t('manualEditor.toolbar.bold'), run: () => runEdit((v, s, e) => wrapRange(v, s, e, '**', '**', t('manualEditor.placeholders.bold'))) },
+    { key: 'italic', icon: 'textformat-italic', title: t('manualEditor.toolbar.italic'), run: () => runEdit((v, s, e) => wrapRange(v, s, e, '*', '*', t('manualEditor.placeholders.italic'))) },
+    { key: 'strike', icon: 'textformat-strikethrough', title: t('manualEditor.toolbar.strike'), run: () => runEdit((v, s, e) => wrapRange(v, s, e, '~~', '~~', t('manualEditor.placeholders.strike'))) },
+    { key: 'inline-code', icon: 'code', title: t('manualEditor.toolbar.inlineCode'), run: () => runEdit((v, s, e) => wrapRange(v, s, e, '`', '`', t('manualEditor.placeholders.inlineCode'))) },
+    { key: 'h1', icon: 'numbers-1', title: t('manualEditor.toolbar.heading1'), run: () => runEdit((v, s, e) => applyHeading(v, s, e, 1, t('manualEditor.placeholders.heading', { level: 1 }))) },
+    { key: 'h2', icon: 'numbers-2', title: t('manualEditor.toolbar.heading2'), run: () => runEdit((v, s, e) => applyHeading(v, s, e, 2, t('manualEditor.placeholders.heading', { level: 2 }))) },
+    { key: 'h3', icon: 'numbers-3', title: t('manualEditor.toolbar.heading3'), run: () => runEdit((v, s, e) => applyHeading(v, s, e, 3, t('manualEditor.placeholders.heading', { level: 3 }))) },
+    { key: 'ul', icon: 'view-list', title: t('manualEditor.toolbar.bulletList'), run: () => runEdit((v, s, e) => applyBulletList(v, s, e, t('manualEditor.placeholders.listItem'))) },
+    { key: 'ol', icon: 'list-numbered', title: t('manualEditor.toolbar.orderedList'), run: () => runEdit((v, s, e) => applyOrderedList(v, s, e, t('manualEditor.placeholders.listItem'))) },
+    { key: 'task', icon: 'check-rectangle', title: t('manualEditor.toolbar.taskList'), run: () => runEdit((v, s, e) => applyTaskList(v, s, e, t('manualEditor.placeholders.taskItem'))) },
+    { key: 'quote', icon: 'quote', title: t('manualEditor.toolbar.blockquote'), run: () => runEdit((v, s, e) => applyBlockquote(v, s, e, t('manualEditor.placeholders.quote'))) },
+    { key: 'codeblock', icon: 'code-1', title: t('manualEditor.toolbar.codeBlock'), run: () => runEdit((v, s, e) => insertCodeBlock(v, s, e, t('manualEditor.placeholders.code'))) },
+    { key: 'link', icon: 'link', title: t('manualEditor.toolbar.link'), run: () => runEdit((v, s, e) => insertLink(v, s, e, t('manualEditor.placeholders.linkText'))) },
+    { key: 'table', icon: 'table', title: t('manualEditor.toolbar.table'), run: () => runEdit((v, s, e) => insertTable(v, s, e, t('manualEditor.table.column1'), t('manualEditor.table.column2'), t('manualEditor.table.cell'))) },
+    { key: 'hr', icon: 'component-divider-horizontal', title: t('manualEditor.toolbar.horizontalRule'), run: () => runEdit((v, s, e) => insertHorizontalRule(v, s, e)) },
+])
 
 // N-3：预览管线与 manual editor 同源——
 // 去脚本标签 → marked 渲染 → DOMPurify 清理
@@ -193,6 +248,7 @@ async function doPersist(): Promise<boolean> {
                 title: deriveLocalTitle(content.value),
                 updated_at: resp.data.updated_at,
             })
+            rememberCurrentNote(resp.data.id, deriveLocalTitle(content.value))
         } else {
             const resp = await updateNote(currentId.value, content.value)
             if (!resp.success) {
@@ -204,6 +260,7 @@ async function doPersist(): Promise<boolean> {
                 item.title = deriveLocalTitle(content.value)
                 item.updated_at = new Date().toISOString()
             }
+            rememberCurrentNote(currentId.value, deriveLocalTitle(content.value))
         }
         autoSaveFailed.value = false
         justSaved.value = true
@@ -310,6 +367,7 @@ async function openNote(id: string) {
     content.value = resp.data.content
     savedContent.value = resp.data.content
     previewMode.value = false
+    rememberCurrentNote(id, deriveLocalTitle(resp.data.content))
     nextTick(() => editorRef.value?.focus())
 }
 
@@ -327,6 +385,7 @@ async function handleDelete(id: string) {
         return
     }
     notes.value = notes.value.filter(n => n.id !== id)
+    forgetCurrentNote(id)
     if (currentId.value === id) {
         resetDraft()
     }
@@ -561,6 +620,13 @@ onBeforeRouteLeave(async () => {
     gap: 6px;
     padding: 8px 14px;
     border-bottom: 1px solid var(--td-component-stroke);
+    flex-wrap: wrap;
+
+    .notes-format-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+    }
 
     .is-active {
         color: var(--td-brand-color);

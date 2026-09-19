@@ -2248,6 +2248,12 @@ export default {
     earlier: '이전',
     pinned: '고정됨'
   },
+  notes: {
+    saveAnswer: '노트에 추가',
+    saveAsNew: '새 노트',
+    appendToCurrent: '「{title}」에 추가',
+    savedToNotes: '노트에 저장했습니다',
+  },
   platform: {
     subtitle: '교내 수업의 교육·연구 자료를 검색합니다. 초대로 가입하며, 직접 등록할 수 없습니다.',
     schoolName: '쓰촨농업대학',
