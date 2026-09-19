@@ -120,11 +120,18 @@ type User struct {
 // HasTeacherCapability reports whether the user has effective teacher
 // capability. SuperAdmin is a composite identity — platform governance
 // plus inherited teacher capability — so it satisfies this without being
-// separately appointed as a Teacher. This is a capability floor used to
-// gate teacher-only workspace actions; it is NOT a cross-tenant bypass
-// (that is governed by CanAccessAllTenants + EnableCrossTenantAccess).
+// separately appointed as a Teacher.
 func (u *User) HasTeacherCapability() bool {
-	return u.IsTeacher || u.IsSystemAdmin
+	return u != nil && (u.IsTeacher || u.IsSystemAdmin)
+}
+
+// ManagesEveryWorkspace reports whether this account may enter and manage
+// any teaching workspace, not only ones it created or was invited into.
+// SuperAdmin is that account. The separate CanAccessAllTenants flag plus
+// EnableCrossTenantAccess remains the opt-in path for non-SuperAdmin
+// operators; it must not be required for SuperAdmin.
+func (u *User) ManagesEveryWorkspace() bool {
+	return u != nil && u.IsSystemAdmin
 }
 
 // AuthToken represents an authentication token
@@ -335,7 +342,7 @@ func (u *User) ToUserInfo() *UserInfo {
 		Avatar:              u.Avatar,
 		TenantID:            u.TenantID,
 		IsActive:            u.IsActive,
-		CanAccessAllTenants: u.CanAccessAllTenants,
+		CanAccessAllTenants: u.CanAccessAllTenants || u.IsSystemAdmin,
 		IsSystemAdmin:       u.IsSystemAdmin,
 		MustChangePassword:  u.MustChangePassword,
 		IsTeacher:           u.IsTeacher,

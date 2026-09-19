@@ -233,7 +233,11 @@ func TestTenantMember_ListMembers_HappyPath(t *testing.T) {
 	}
 	us := &stubMemberUserService{
 		getByID: func(_ context.Context, id string) (*types.User, error) {
-			return &types.User{ID: id, Username: id, Email: id + "@x.com"}, nil
+			u := &types.User{ID: id, Username: id, Email: id + "@x.com"}
+			if id == "u-owner" {
+				u.IsSystemAdmin = true
+			}
+			return u, nil
 		},
 	}
 	h := newTestMemberHandler(ms, us)
@@ -259,14 +263,17 @@ func TestTenantMember_ListMembers_HappyPath(t *testing.T) {
 	if resp.Data.Members[0].Email == "" {
 		t.Fatalf("expected hydrated email, got empty")
 	}
-	// CONTEXT.md "平台身份可见性": the workspace member roster must not
-	// leak members' platform identity. The member response carries only
-	// workspace roles (owner/admin/contributor/viewer), never platform
-	// identity, SuperAdmin, or teacher flags.
-	if strings.Contains(w.Body.String(), "platform_identity") ||
-		strings.Contains(w.Body.String(), "is_system_admin") ||
-		strings.Contains(w.Body.String(), "is_teacher") {
-		t.Fatalf("member roster leaked platform identity: %s", w.Body.String())
+	// The course roster labels the workspace owner as teacher or super
+	// administrator. It must not dump raw platform flags for every row.
+	body := w.Body.String()
+	if strings.Contains(body, "is_system_admin") || strings.Contains(body, "is_teacher") || strings.Contains(body, "platform_identity") {
+		t.Fatalf("member roster leaked raw platform flags: %s", body)
+	}
+	if resp.Data.Members[0].RosterIdentity != string(types.PlatformIdentitySuperAdmin) {
+		t.Fatalf("owner roster identity = %q", resp.Data.Members[0].RosterIdentity)
+	}
+	if resp.Data.Members[1].RosterIdentity != "" {
+		t.Fatalf("legacy role must stay unlabeled, got %q", resp.Data.Members[1].RosterIdentity)
 	}
 }
 

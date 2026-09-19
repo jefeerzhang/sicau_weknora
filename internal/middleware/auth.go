@@ -755,6 +755,17 @@ func resolveTenantRole(
 	crossTenantSwitch bool,
 	cfg *config.Config,
 ) (types.TenantRole, bool) {
+	// SuperAdmin manages every workspace, including ones where a lower
+	// membership row exists. The grant is request-scoped and does not
+	// rewrite tenant_members. Owner is required because teaching mutations
+	// (invite, remove student) are Owner-gated.
+	if user != nil && user.ManagesEveryWorkspace() {
+		logger.Infof(ctx,
+			"[auth] resolveTenantRole superadmin -> Owner: user=%s tenant=%d",
+			user.ID, targetTenantID)
+		return types.TenantRoleOwner, true
+	}
+
 	// 1. 正常成员关系
 	member, err := memberService.GetMembership(ctx, user.ID, targetTenantID)
 	if err == nil && member != nil && member.Status == types.TenantMemberStatusActive {

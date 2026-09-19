@@ -85,6 +85,10 @@ type UserService interface {
 	// ListTeachers lists users with effective Teacher capability
 	// (is_teacher=true OR is_system_admin=true).
 	ListTeachers(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
+	// ListUsersPage lists registered accounts for the SuperAdmin directory.
+	// query matches username or email (empty matches everyone). Total is the
+	// unpaged count so the directory can paginate.
+	ListUsersPage(ctx context.Context, query string, offset, limit int) ([]*types.User, int64, error)
 	// AdminCreateUser provisions a new local user on behalf of a
 	// SystemAdmin. When req.Password is nil, a random password is generated
 	// and returned exactly once as the second result. provisioning is
@@ -130,6 +134,8 @@ type UserRepository interface {
 	// ListTeachers lists users with effective Teacher capability
 	// (is_teacher=true OR is_system_admin=true).
 	ListTeachers(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
+	// ListUsersPage lists registered accounts. See UserService.ListUsersPage.
+	ListUsersPage(ctx context.Context, query string, offset, limit int) ([]*types.User, int64, error)
 	// RevokeSystemAdmin removes system-admin privileges with the
 	// last-admin/self-revoke checks performed atomically.
 	RevokeSystemAdmin(ctx context.Context, userID, actorID string) (*types.User, error)

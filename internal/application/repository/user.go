@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -150,6 +151,35 @@ func (r *userRepository) ListUsers(ctx context.Context, offset, limit int) ([]*t
 		return nil, err
 	}
 	return users, nil
+}
+
+// ListUsersPage lists registered accounts newest-first, optionally filtered
+// by username or email. Inactive accounts stay visible: the SuperAdmin
+// directory is a roster, not a picker of people you can invite.
+func (r *userRepository) ListUsersPage(ctx context.Context, query string, offset, limit int) ([]*types.User, int64, error) {
+	var users []*types.User
+	var total int64
+
+	base := r.db.WithContext(ctx).Model(&types.User{})
+	if q := strings.TrimSpace(query); q != "" {
+		pattern := "%" + q + "%"
+		base = base.Where("username ILIKE ? OR email ILIKE ?", pattern, pattern)
+	}
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	dbQuery := base.Order("created_at DESC, id ASC")
+	if limit > 0 {
+		dbQuery = dbQuery.Limit(limit)
+	}
+	if offset > 0 {
+		dbQuery = dbQuery.Offset(offset)
+	}
+	if err := dbQuery.Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
 }
 
 // ListSystemAdmins lists users where is_system_admin = true.

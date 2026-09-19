@@ -376,6 +376,72 @@ export async function resetUserPassword(req: ResetUserPasswordRequest): Promise<
   return response as unknown as { message: string }
 }
 
+export interface TeacherUser {
+  id: string
+  email: string
+  username?: string
+  is_teacher?: boolean
+  is_system_admin?: boolean
+}
+
+export interface ListTeachersResponse {
+  total: number
+  users: TeacherUser[]
+}
+
+/** Appoint an existing account as a platform Teacher. SuperAdmin only. */
+export async function appointTeacher(target: { email?: string; user_id?: string }): Promise<TeacherUser> {
+  const response = await post('/api/v1/system/admin/teachers/appoint', target)
+  return response as unknown as TeacherUser
+}
+
+/** Remove the platform Teacher flag. Does not delete that person's workspaces. */
+export async function revokeTeacher(userId: string): Promise<TeacherUser> {
+  const response = await post('/api/v1/system/admin/teachers/revoke', { user_id: userId })
+  return response as unknown as TeacherUser
+}
+
+export async function listTeachers(params?: { offset?: number; limit?: number }): Promise<ListTeachersResponse> {
+  const qs = new URLSearchParams()
+  if (params?.offset != null) qs.set('offset', String(params.offset))
+  if (params?.limit != null) qs.set('limit', String(params.limit))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  const response = await get(`/api/v1/system/admin/teachers${suffix}`)
+  return response as unknown as ListTeachersResponse
+}
+
+export interface DirectoryUser {
+  id: string
+  username?: string
+  email: string
+  is_teacher?: boolean
+  is_system_admin?: boolean
+  platform_identity?: string
+  created_at?: string
+}
+
+export interface ListRegisteredUsersResponse {
+  total: number
+  users: DirectoryUser[]
+  offset: number
+  limit: number
+}
+
+/** Every registered account, for the SuperAdmin user directory. */
+export async function listRegisteredUsers(params?: {
+  offset?: number
+  limit?: number
+  q?: string
+}): Promise<ListRegisteredUsersResponse> {
+  const qs = new URLSearchParams()
+  if (params?.offset != null) qs.set('offset', String(params.offset))
+  if (params?.limit != null) qs.set('limit', String(params.limit))
+  if (params?.q) qs.set('q', params.q)
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  const response = await get(`/api/v1/system/admin/users${suffix}`)
+  return response as unknown as ListRegisteredUsersResponse
+}
+
 export interface CreateSystemUserRequest {
   /** 2-50 characters. */
   username: string

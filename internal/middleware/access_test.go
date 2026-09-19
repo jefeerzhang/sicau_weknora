@@ -34,7 +34,18 @@ func TestIsCrossTenantSuperuser_NilCfgRejects(t *testing.T) {
 	ctx := context.WithValue(context.Background(), types.UserContextKey,
 		&types.User{ID: "u1", CanAccessAllTenants: true})
 	if IsCrossTenantSuperuser(ctx, nil) {
-		t.Fatalf("nil cfg must reject (no flag implies no cross-tenant access)")
+		t.Fatalf("nil cfg must reject a non-superadmin even when CanAccessAllTenants=true")
+	}
+}
+
+func TestIsCrossTenantSuperuser_SystemAdminIgnoresClusterFlag(t *testing.T) {
+	ctx := context.WithValue(context.Background(), types.UserContextKey,
+		&types.User{ID: "sa", IsSystemAdmin: true})
+	if !IsCrossTenantSuperuser(ctx, nil) {
+		t.Fatal("superadmin must manage every workspace even when cross-tenant flag is absent")
+	}
+	if !IsCrossTenantSuperuser(ctx, cfgCrossTenant(false)) {
+		t.Fatal("superadmin must manage every workspace when EnableCrossTenantAccess=false")
 	}
 }
 

@@ -1,67 +1,17 @@
 <template>
   <div class="tenant-members">
-    <!-- Section header. The (i) permission speed-look popover lives
-         next to the title so it reads as meta-info about *this
-         section*. The audit-log entry sits on the right of the header
-         row — secondary navigation that opens the audit drawer; gated
-         to Admin+ so non-managers don't see a button they can't use. -->
+    <!-- Course roster: who is in this workspace, plus invite and remove. -->
     <div class="section-header">
       <div class="section-header-row">
         <div class="section-header-titlewrap">
           <h2>{{ $t('tenantMember.title') }}</h2>
-          <t-popup placement="bottom-start" trigger="hover" overlay-class-name="permissions-popup-overlay"
-            :overlay-inner-style="permissionsPopupInnerStyle">
-            <button type="button" class="permissions-trigger-btn" :aria-label="$t('tenantMember.permissions.title')"
-              :title="$t('tenantMember.permissions.iconHint')">
-              <t-icon name="info-circle" size="16px" />
-            </button>
-            <template #content>
-              <div class="permissions-compact permissions-compact--popover">
-                <div class="permissions-compact-header">
-                  <span class="permissions-compact-title">{{ $t('tenantMember.permissions.title') }}</span>
-                  <span class="permissions-compact-desc">{{ $t('tenantMember.permissions.desc') }}</span>
-                </div>
-                <div class="permissions-compact-grid">
-                  <div v-for="r in roleMatrixOrder" :key="r"
-                    :class="['perm-role-block', r, { 'is-me': currentRole === r }]">
-                    <div class="perm-role-tag">
-                      <t-icon :name="roleMatrixIcon(r)" size="12px" />
-                      <span>{{ $t('tenantMember.role.' + r) }}</span>
-                      <span v-if="currentRole === r" class="me-badge">{{ $t('common.me') }}</span>
-                    </div>
-                    <div class="perm-items">
-                      <span v-for="(perm, i) in roleMatrix[r]" :key="i" :class="['perm-item', perm.has ? 'has' : 'no']">
-                        <t-icon :name="perm.has ? 'check' : 'close'" size="12px" />
-                        {{ $t('tenantMember.permissions.' + perm.key) }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-          </t-popup>
-          <!-- Audit log entry sits inline with the title: title (i)
-               [审计日志]. Keeping all section-level affordances on the
-               left edge avoids the "lonely right-aligned button"
-               pattern in narrow settings panels. -->
           <t-button v-if="canViewAudit" variant="text" size="small" class="header-audit-btn" @click="openAuditDrawer">
             <template #icon><t-icon name="history" /></template>
             {{ $t('tenantMember.audit.tabLabel') }}
           </t-button>
         </div>
       </div>
-      <p class="section-description">
-        {{ $t('tenantMember.sectionDescription') }}
-        <a
-          class="doc-link"
-          href="https://github.com/Tencent/WeKnora/blob/main/docs/RBAC%E8%AF%B4%E6%98%8E.md"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {{ $t('tenantMember.learnRbacGuide') }}
-          <t-icon name="link" class="link-icon" />
-        </a>
-      </p>
+      <p class="section-description">{{ $t('tenantMember.sectionDescription') }}</p>
     </div>
 
     <div class="members-tab-layout">
@@ -218,15 +168,9 @@
                       <t-input v-model="addForm.email" :placeholder="$t('tenantMember.add.emailPlaceholder')"
                         clearable />
                     </t-form-item>
-                    <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
-                      <t-select v-model="addForm.role" :options="inviteRoleOptions" :popup-props="roleSelectPopupProps" />
-                    </t-form-item>
                   </t-form>
                   <div v-else class="invite-confirm-body">
-                    {{ $t('tenantInvitation.confirmInviteBody', {
-                      email: addConfirmEmail,
-                      role: addConfirmRoleLabel,
-                    }) }}
+                    {{ $t('tenantInvitation.confirmInviteBody', { email: addConfirmEmail }) }}
                   </div>
                   <div class="invite-popup-footer">
                     <t-button v-if="addDialogStep === 'form'" variant="outline" :disabled="adding"
@@ -266,12 +210,6 @@
                     <p class="invite-confirm-body">
                       {{ $t('tenantInvitation.shareLink.description', { days: INVITATION_TTL_DAYS }) }}
                     </p>
-                    <t-form :data="shareLinkForm" :label-width="80">
-                      <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
-                        <t-select v-model="shareLinkForm.role" :options="inviteRoleOptions"
-                          :popup-props="roleSelectPopupProps" />
-                      </t-form-item>
-                    </t-form>
                   </div>
                   <div v-else class="share-link-result">
                     <p class="invite-confirm-body">
@@ -335,7 +273,7 @@
               <template #role="{ row }">
                 <div class="role-cell">
                   <t-tag :theme="roleTagTheme(row.role)" size="small">
-                    {{ teachingRoleLabel(row.role) }}
+                    {{ teachingRoleLabel(row.role, row.roster_identity) }}
                   </t-tag>
                   <span
                     v-if="teachingRoleWarning(row.role)"
@@ -519,7 +457,7 @@ import {
   type TenantRole,
 } from '@/api/tenant/members'
 import { formatRoleLabel } from '@/composables/formatRoleLabel'
-import { countOwners, teachingMembershipView } from '@/utils/teachingMembership'
+import { teachingMembershipView } from '@/utils/teachingMembership'
 import {
   listTenantInvitations,
   createInvitation,
@@ -536,16 +474,6 @@ import {
 
 const { t, tm, locale } = useI18n()
 const authStore = useAuthStore()
-
-/** 悬停层限制在视口内，内容由内部滚动 */
-const permissionsPopupInnerStyle = {
-  boxSizing: 'border-box' as const,
-  padding: '0',
-  width: 'min(520px, calc(100vw - 24px))',
-  maxWidth: 'min(520px, calc(100vw - 24px))',
-  maxHeight: 'min(400px, 65vh)',
-  overflow: 'hidden',
-}
 
 // State
 const members = ref<TenantMember[]>([])
@@ -659,82 +587,19 @@ const currentUserId = computed(() => authStore.user?.id ?? '')
 // don't expose a tenant picker here.
 const activeTenantId = computed(() => Number(authStore.currentTenantId ?? 0))
 
-/** Teaching UI: owner/viewer → 空间负责人/学生; never expose role edits. */
-const ownerCount = computed(() => countOwners(members.value))
-function teachingRoleLabel(role: string | null | undefined): string {
-  return formatRoleLabel(t, role, ownerCount.value)
+function teachingRoleLabel(role: string | null | undefined, rosterIdentity?: string | null): string {
+  return formatRoleLabel(t, role, rosterIdentity)
 }
 function teachingRoleWarning(role: string | null | undefined): string {
-  const view = teachingMembershipView(role, ownerCount.value)
+  const view = teachingMembershipView(role)
   if (!view.warningKey) return ''
   const label = t(view.warningKey)
   return label === view.warningKey ? '' : label
 }
 
-const inviteRoleOptions = computed(() => [
-  { label: t('tenantMember.role.viewer'), value: 'viewer' },
-])
-
-/** 下拉层须高于邀请浮层（3050）与组织设置全屏遮罩，否则会被压住 */
-const roleSelectPopupProps = {
-  zIndex: 6200,
-  overlayClassName: 'tenant-members-role-select-popup',
-}
-
-// Static role-permissions matrix. The keys reference i18n strings under
-// `tenantMember.permissions.*` so each locale can rephrase per culture.
-// Keep this aligned with the design-doc §4.3 matrix and the actual
-// PR 2 enforcement; if a permission moves between roles, update both
-// sides in the same PR.
-type RolePerm = { key: string; has: boolean }
-const roleMatrixOrder: TenantRole[] = ['owner', 'admin', 'contributor', 'viewer']
-const roleMatrix: Record<TenantRole, RolePerm[]> = {
-  owner: [
-    { key: 'manageMembers', has: true },
-    { key: 'manageTenantConfig', has: true },
-    { key: 'manageInfra', has: true },
-    { key: 'createOwnKB', has: true },
-    { key: 'readAll', has: true },
-  ],
-  admin: [
-    { key: 'manageMembers', has: false },
-    { key: 'manageTenantConfig', has: false },
-    { key: 'manageInfra', has: true },
-    { key: 'createOwnKB', has: true },
-    { key: 'readAll', has: true },
-  ],
-  contributor: [
-    { key: 'manageMembers', has: false },
-    { key: 'manageTenantConfig', has: false },
-    { key: 'manageInfra', has: false },
-    { key: 'createOwnKB', has: true },
-    { key: 'readAll', has: true },
-  ],
-  viewer: [
-    { key: 'manageMembers', has: false },
-    { key: 'manageTenantConfig', has: false },
-    { key: 'manageInfra', has: false },
-    { key: 'createOwnKB', has: false },
-    { key: 'readAll', has: true },
-  ],
-}
-
-function roleMatrixIcon(role: TenantRole): string {
-  switch (role) {
-    case 'owner':
-      return 'user-vip-filled'
-    case 'admin':
-      return 'user-safety'
-    case 'contributor':
-      return 'edit'
-    default:
-      return 'browse'
-  }
-}
-
 const columns = computed(() => [
   { colKey: 'member', title: t('tenantMember.columns.member'), ellipsis: true, minWidth: 132 },
-  { colKey: 'role', title: t('tenantMember.columns.role'), width: 128 },
+  { colKey: 'role', title: t('tenantMember.columns.identity'), width: 140 },
   { colKey: 'joined_at', title: t('tenantMember.columns.joinedAt'), width: 154 },
   { colKey: 'actions', title: t('tenantMember.columns.operations'), width: 88, align: 'left' },
 ])
@@ -755,7 +620,6 @@ const addFormRules = {
     { required: true, message: t('tenantMember.errors.emailRequired'), trigger: 'blur' },
     { email: true, message: t('tenantMember.errors.emailFormat'), trigger: 'blur' },
   ],
-  role: [{ required: true, message: t('tenantMember.errors.roleRequired'), trigger: 'change' }],
 }
 
 // Pretty role tag colour: Owner stands out, Admin is warning, the rest
@@ -856,7 +720,7 @@ watch(searchQuery, () => {
 
 const invitationColumns = computed(() => [
   { colKey: 'invitee', title: t('tenantInvitation.columns.invitee'), ellipsis: true, minWidth: 160 },
-  { colKey: 'role', title: t('tenantInvitation.columns.role'), width: 110 },
+  { colKey: 'role', title: t('tenantInvitation.columns.identity'), width: 110 },
   { colKey: 'inviter', title: t('tenantInvitation.columns.inviter'), ellipsis: true, minWidth: 140 },
   { colKey: 'expires_at', title: t('tenantInvitation.columns.expiresAt'), width: 160 },
   { colKey: 'status', title: t('tenantInvitation.columns.status'), width: 100 },
@@ -1288,7 +1152,6 @@ async function submitShareLink() {
 // every time the user goes Back, tweaks the form, and re-advances —
 // the summary always mirrors the current form state.
 const addConfirmEmail = computed(() => addForm.email.trim())
-const addConfirmRoleLabel = computed(() => t('tenantMember.role.' + addForm.role))
 
 // submitAdd is wired to the popup footer primary CTA. On step='form' it
 // validates and swaps to summary; on step='confirm' it fires the API.

@@ -13,7 +13,9 @@ test('share-link and email invite default to viewer (student)', () => {
   assert.match(src, /shareLinkForm\.role = 'viewer'/)
   assert.match(src, /addForm\.role = 'viewer'/)
   assert.doesNotMatch(src, /shareLinkForm\.role = 'contributor'/)
-  assert.doesNotMatch(src, /shareLinkForm = reactive<\{ role: TenantRole \}>\(\{ role: 'contributor' \}\)/)
+  assert.doesNotMatch(src, /inviteRoleOptions/)
+  assert.doesNotMatch(src, /learnRbacGuide/)
+  assert.doesNotMatch(src, /roleMatrixOrder/)
 })
 
 test('member roster has no role-change select; uses teaching labels', () => {
@@ -22,5 +24,5 @@ test('member roster has no role-change select; uses teaching labels', () => {
   assert.doesNotMatch(src, /updateMemberRole/)
   assert.match(src, /teachingRoleLabel/)
   assert.match(src, /formatRoleLabel/)
-  assert.match(src, /inviteRoleOptions/)
+  assert.match(src, /roster_identity/)
 })

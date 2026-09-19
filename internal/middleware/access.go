@@ -53,11 +53,17 @@ import (
 // attribute and the cluster-wide flag must be true; either alone is
 // not enough.
 func IsCrossTenantSuperuser(ctx context.Context, cfg *config.Config) bool {
-	if cfg == nil || cfg.Tenant == nil || !cfg.Tenant.EnableCrossTenantAccess {
-		return false
-	}
 	u, ok := ctx.Value(types.UserContextKey).(*types.User)
 	if !ok || u == nil {
+		return false
+	}
+	// SuperAdmin manages every workspace even when the cluster-wide
+	// cross-tenant flag is off. That flag only gates the older
+	// CanAccessAllTenants operator attribute.
+	if u.ManagesEveryWorkspace() {
+		return true
+	}
+	if cfg == nil || cfg.Tenant == nil || !cfg.Tenant.EnableCrossTenantAccess {
 		return false
 	}
 	return u.CanAccessAllTenants
@@ -85,6 +91,9 @@ func IsTenantAccessible(
 		return false
 	}
 	if user.TenantID == targetTenantID {
+		return true
+	}
+	if user.ManagesEveryWorkspace() {
 		return true
 	}
 	if cfg != nil && cfg.Tenant != nil && cfg.Tenant.EnableCrossTenantAccess && user.CanAccessAllTenants {
@@ -115,9 +124,14 @@ func RequireCrossTenantAccess(cfg *config.Config) gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		if u, ok := ctx.Value(types.UserContextKey).(*types.User); ok && u.ManagesEveryWorkspace() {
+			c.Next()
+			return
+		}
 		// First the cluster-wide flag — if it's off, nobody gets through,
-		// not even users with CanAccessAllTenants=true. This mirrors the
-		// "must require BOTH" rule that previously lived in tenant.go.
+		// not even users with CanAccessAllTenants=true. SuperAdmin already
+		// returned above. This mirrors the "must require BOTH" rule that
+		// previously lived in tenant.go.
 		if cfg == nil || cfg.Tenant == nil || !cfg.Tenant.EnableCrossTenantAccess {
 			uid, _ := types.UserIDFromContext(ctx)
 			logger.Warnf(ctx,

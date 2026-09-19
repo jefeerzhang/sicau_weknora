@@ -15,20 +15,17 @@ function tZh(): (key: string) => string {
   return (key: string) => String(i18n.global.t(key))
 }
 
-test('formatRoleLabel maps single owner to 空间负责人', () => {
+test('formatRoleLabel maps the workspace owner to 教师', () => {
   const t = tZh()
-  assert.equal(formatRoleLabel(t, 'owner', 1), '空间负责人')
+  assert.equal(formatRoleLabel(t, 'owner'), '教师')
+})
+
+test('formatRoleLabel maps a superadmin owner to 超级管理员', () => {
+  const t = tZh()
+  assert.equal(formatRoleLabel(t, 'owner', 'superadmin'), '超级管理员')
 })
 
 test('formatRoleLabel maps viewer to 学生', () => {
   const t = tZh()
   assert.equal(formatRoleLabel(t, 'viewer'), '学生')
-})
-
-test('formatRoleLabel does not label ambiguous owner counts as 空间负责人', () => {
-  const t = tZh()
-  assert.notEqual(formatRoleLabel(t, 'owner', 0), '空间负责人')
-  assert.notEqual(formatRoleLabel(t, 'owner', 2), '空间负责人')
-  assert.equal(formatRoleLabel(t, 'owner', 0), '历史负责人（待处理）')
-  assert.equal(formatRoleLabel(t, 'owner', 2), '历史负责人（待处理）')
 })

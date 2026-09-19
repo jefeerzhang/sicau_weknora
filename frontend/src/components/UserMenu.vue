@@ -292,8 +292,8 @@ const handleSettings = () => {
 // API keys and the audit log remain available beside it in the settings nav.
 const handleSystemAdmin = () => {
   menuVisible.value = false
-  uiStore.openSettings('system-global')
-  router.push({ path: '/platform/settings', query: { section: 'system-global' } })
+  uiStore.openSettings('user-directory')
+  router.push({ path: '/platform/settings', query: { section: 'user-directory' } })
 }
 
 // Hover-driven submenu controls. A small hide delay tolerates the pointer

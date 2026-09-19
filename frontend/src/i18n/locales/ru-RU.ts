@@ -57,7 +57,7 @@ export default {
     inviteSubmit: 'Send invitation',
     inviteSuccess: 'Invitation sent. Waiting for the invitee to accept.',
     confirmInviteTitle: 'Send invitation?',
-    confirmInviteBody: 'Send an invitation to {email} (role: {role}). They will join the workspace only after accepting.',
+    confirmInviteBody: 'Отправить {email} приглашение студента. Участник появится в пространстве только после принятия.',
     confirmSend: 'Send',
     copyLink: 'Copy invite link',
     copied: 'Copied to clipboard',
@@ -94,6 +94,7 @@ export default {
     columns: {
       invitee: 'Invitee',
       role: 'Role',
+      identity: 'Роль',
       inviter: 'Inviter',
       expiresAt: 'Expires',
       status: 'Status',
@@ -120,7 +121,7 @@ export default {
   },
   tenantMember: {
     title: 'Участники',
-    sectionDescription: 'Приглашайте коллег в пространство и управляйте их ролями. Добавлять и удалять участников может только Владелец.',
+    sectionDescription: 'Приглашайте студентов в это пространство или исключайте их. Этот список не меняет платформенную роль.',
     learnRbacGuide: 'Подробнее о RBAC',
     listTitle: 'Участники пространства',
     loading: 'Загрузка участников…',
@@ -207,9 +208,18 @@ export default {
       contributor: 'Участник',
       viewer: 'Наблюдатель'
     },
+    teaching: {
+      teacher: 'Преподаватель',
+      superadmin: 'Супер-администратор',
+      student: 'Студент',
+      legacyOwner: 'Владелец (нужно разобрать)',
+      legacyWarning: 'Старое повышенное членство. В учебном пространстве роль здесь больше не меняется.',
+      unknown: 'Неизвестная роль',
+    },
     columns: {
       member: 'Имя и email',
       role: 'Роль',
+      identity: 'Роль',
       joinedAt: 'Дата вступления',
       operations: 'Действия'
     },
@@ -5463,6 +5473,7 @@ export default {
     tenantInfo: 'Информация о пространстве',
     workspaceSettings: 'Настройки пространства',
     system: 'Настройки системы',
+    userManagement: 'Пользователи',
     storage: {
       title: 'Хранилище',
       description: 'Настройте хранение документов и изображений. Здесь задаются параметры хранилищ; в базе знаний выбирается только тип хранилища.',
@@ -6766,5 +6777,38 @@ export default {
     myChats: 'Мои чаты',
     apiChats: 'Сессии API',
     noSessions: 'Пока нет диалогов'
+  },
+  userDirectory: {
+    title: 'Пользователи',
+    description: 'Все зарегистрированные учётные записи. В колонке «Роль» можно сразу назначить студента, преподавателя или супер-администратора. Свою роль изменить нельзя, и хотя бы один супер-администратор должен остаться.',
+    searchPlaceholder: 'Поиск по имени или email',
+    refresh: 'Обновить',
+    retry: 'Повторить',
+    empty: 'Нет подходящих пользователей',
+    self: 'Вы',
+    saveSuccess: 'Роль обновлена',
+    saveFailed: 'Не удалось обновить роль',
+    columns: {
+      username: 'Имя',
+      email: 'Email',
+      identity: 'Роль',
+      createdAt: 'Регистрация'
+    },
+    identity: {
+      student: 'Студент',
+      teacher: 'Преподаватель',
+      superadmin: 'Супер-администратор'
+    },
+    confirm: {
+      header: 'Сменить роль',
+      body: 'Сменить роль {email} на «{identity}»?',
+      confirmBtn: 'Сменить',
+      cancelBtn: 'Отмена'
+    },
+    errors: {
+      self: 'Нельзя снять с себя роль супер-администратора',
+      lastAdmin: 'Нельзя снять последнего супер-администратора',
+      notFound: 'Пользователь не найден'
+    }
   }
 }

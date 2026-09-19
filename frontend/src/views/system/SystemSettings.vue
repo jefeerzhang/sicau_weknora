@@ -154,8 +154,8 @@
                   <span>{{ t('system.globalSettings.saving') }}</span>
                 </div>
           </div>
-        </div>
-      </div>
+          </div>
+          </div>
 
           <div v-if="activeSettingsSection === 'access'" class="setting-row setting-row--password-reset">
             <div class="setting-info">

@@ -1,15 +1,14 @@
 import type { TenantRole } from '@/api/tenant/members'
 
 /**
- * Teaching-deployment presentation of a workspace membership (#17).
+ * Teaching-deployment presentation of a workspace membership.
  *
- * Internal RBAC still uses owner/admin/contributor/viewer. Education UI
- * only admits two active relationships — workspace lead (owner) and
- * student (viewer). Legacy admin/contributor and ambiguous owner counts
- * surface as a non-editable warning rather than being relabeled as
- * Teacher or Student.
+ * Internal RBAC still uses owner/admin/contributor/viewer. The course
+ * roster only shows three labels: the workspace owner is a teacher
+ * (or a super administrator when the API says so), invited members are
+ * students. Legacy admin/contributor rows stay a non-editable warning.
  */
-export type TeachingMembershipKind = 'lead' | 'student' | 'legacy'
+export type TeachingMembershipKind = 'teacher' | 'superadmin' | 'student' | 'legacy'
 
 export interface TeachingMembershipView {
   kind: TeachingMembershipKind
@@ -20,29 +19,24 @@ export interface TeachingMembershipView {
 }
 
 /**
- * Classify a membership row for the education roster.
+ * Classify a membership row for the course roster.
  *
- * @param role - Internal tenant role from the API
- * @param ownerCount - Number of active owner rows visible for this workspace.
- *   Ambiguous owner count (0 or >1) is treated as legacy so the UI never
- *   invents a single workspace lead.
+ * Owner rows are teachers unless rosterIdentity is superadmin. Viewers
+ * are students. rosterIdentity comes from the list API so a super
+ * administrator who owns the space is not relabeled as a plain teacher.
  */
 export function teachingMembershipView(
   role: TenantRole | string | null | undefined,
-  ownerCount = 1,
+  rosterIdentity?: string | null,
 ): TeachingMembershipView {
-  if (role === 'viewer') {
-    return { kind: 'student', labelKey: 'tenantMember.teaching.student' }
+  if (rosterIdentity === 'superadmin') {
+    return { kind: 'superadmin', labelKey: 'tenantMember.teaching.superadmin' }
   }
-  if (role === 'owner') {
-    if (ownerCount === 1) {
-      return { kind: 'lead', labelKey: 'tenantMember.teaching.lead' }
-    }
-    return {
-      kind: 'legacy',
-      labelKey: 'tenantMember.teaching.legacyOwner',
-      warningKey: 'tenantMember.teaching.legacyWarning',
-    }
+  if (rosterIdentity === 'teacher' || role === 'owner') {
+    return { kind: 'teacher', labelKey: 'tenantMember.teaching.teacher' }
+  }
+  if (rosterIdentity === 'student' || role === 'viewer') {
+    return { kind: 'student', labelKey: 'tenantMember.teaching.student' }
   }
   if (role === 'admin' || role === 'contributor') {
     return {

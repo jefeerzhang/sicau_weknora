@@ -181,6 +181,9 @@ func (h *TenantMemberHandler) ListMembers(c *gin.Context) {
 			row.Email = u.Email
 			row.Username = u.Username
 			row.Avatar = u.Avatar
+			row.RosterIdentity = teachingRosterIdentity(m.Role, u)
+		} else {
+			row.RosterIdentity = teachingRosterIdentity(m.Role, nil)
 		}
 		resp = append(resp, row)
 	}
@@ -194,6 +197,24 @@ func (h *TenantMemberHandler) ListMembers(c *gin.Context) {
 			"page_size": pageSize,
 		},
 	})
+}
+
+// teachingRosterIdentity labels a membership for the course roster.
+// The workspace owner is a teacher, or a super administrator when that
+// account already is one. Everyone else invited in is a student. Legacy
+// admin/contributor rows stay unlabeled so the UI can flag them.
+func teachingRosterIdentity(role types.TenantRole, user *types.User) string {
+	switch role {
+	case types.TenantRoleViewer:
+		return string(types.PlatformIdentityStudent)
+	case types.TenantRoleOwner:
+		if user != nil && user.IsSystemAdmin {
+			return string(types.PlatformIdentitySuperAdmin)
+		}
+		return string(types.PlatformIdentityTeacher)
+	default:
+		return ""
+	}
 }
 
 // AddMember godoc
@@ -317,10 +338,11 @@ func writeAddMemberSuccess(c *gin.Context, user *types.User, member *types.Tenan
 			Email:     user.Email,
 			Username:  user.Username,
 			Avatar:    user.Avatar,
-			Role:      member.Role,
-			Status:    member.Status,
-			InvitedBy: member.InvitedBy,
-			JoinedAt:  member.JoinedAt,
+			Role:           member.Role,
+			Status:         member.Status,
+			InvitedBy:      member.InvitedBy,
+			JoinedAt:       member.JoinedAt,
+			RosterIdentity: teachingRosterIdentity(member.Role, user),
 		},
 	})
 }

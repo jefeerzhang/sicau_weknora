@@ -134,6 +134,10 @@ type TenantMemberResponse struct {
 	Status    TenantMemberStatus `json:"status"`
 	InvitedBy *string            `json:"invited_by,omitempty"`
 	JoinedAt  time.Time          `json:"joined_at"`
+	// RosterIdentity is the teaching label for this row: student, teacher,
+	// or superadmin. Viewers stay students even when the account is a
+	// teacher elsewhere. Empty for legacy admin/contributor rows.
+	RosterIdentity string `json:"roster_identity,omitempty"`
 }
 
 // TenantMemberUsageStat is one member's teaching-usage aggregate

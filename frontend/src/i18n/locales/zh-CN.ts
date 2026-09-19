@@ -57,7 +57,7 @@ export default {
     inviteSubmit: '发送邀请',
     inviteSuccess: '邀请已发出，等待对方接受。',
     confirmInviteTitle: '确认发送邀请？',
-    confirmInviteBody: '将向 {email} 发出加入邀请（角色：{role}）。TA 在站内接受后才会成为成员。',
+    confirmInviteBody: '将向 {email} 发出学生邀请。对方接受后才会加入当前空间。',
     confirmSend: '发送',
     copyLink: '复制邀请链接',
     copied: '已复制到剪贴板',
@@ -94,6 +94,7 @@ export default {
     columns: {
       invitee: '被邀请人',
       role: '角色',
+      identity: '身份',
       inviter: '邀请人',
       expiresAt: '到期时间',
       status: '状态',
@@ -120,7 +121,7 @@ export default {
   },
   tenantMember: {
     title: '成员管理',
-    sectionDescription: '邀请学生加入当前空间。只有空间负责人可以新增或移除成员；教学空间内角色固定为「空间负责人 / 学生」。',
+    sectionDescription: '邀请学生加入当前空间，或把学生移出。这里只看这门课的名册，不会改变对方的平台身份。',
     learnRbacGuide: '了解 RBAC',
     listTitle: '空间成员',
     loading: '正在加载成员…',
@@ -208,7 +209,8 @@ export default {
       viewer: '访客'
     },
     teaching: {
-      lead: '空间负责人',
+      teacher: '教师',
+      superadmin: '超级管理员',
       student: '学生',
       legacyOwner: '所有者（待整理）',
       legacyWarning: '历史高权限成员，教学空间不再允许在此调整角色',
@@ -217,6 +219,7 @@ export default {
     columns: {
       member: '姓名与邮箱',
       role: '角色',
+      identity: '身份',
       joinedAt: '加入时间',
       operations: '操作'
     },
@@ -5547,6 +5550,7 @@ export default {
     tenantInfo: '空间信息',
     workspaceSettings: '空间设置',
     system: '系统设置',
+    userManagement: '用户管理',
     storage: {
       title: '存储引擎',
       description: '配置文档与图片的存储方式。此处设置各引擎参数，知识库中仅选择使用哪个引擎。',
@@ -6859,5 +6863,38 @@ export default {
     myChats: '我的对话',
     apiChats: 'API 会话',
     noSessions: '暂无对话'
+  },
+  userDirectory: {
+    title: '用户管理',
+    description: '列出所有已注册用户。在身份列直接改成学生、教师或超级管理员。不能改自己的身份，平台也至少要留一位超级管理员。',
+    searchPlaceholder: '搜索用户名或邮箱',
+    refresh: '刷新',
+    retry: '重试',
+    empty: '没有匹配的用户',
+    self: '当前账号',
+    saveSuccess: '身份已更新',
+    saveFailed: '更新身份失败',
+    columns: {
+      username: '用户名',
+      email: '邮箱',
+      identity: '身份',
+      createdAt: '注册时间'
+    },
+    identity: {
+      student: '学生',
+      teacher: '教师',
+      superadmin: '超级管理员'
+    },
+    confirm: {
+      header: '更改身份',
+      body: '确认把 {email} 改为{identity}？',
+      confirmBtn: '确认更改',
+      cancelBtn: '取消'
+    },
+    errors: {
+      self: '不能撤销自己的超级管理员身份',
+      lastAdmin: '不能撤销最后一位超级管理员',
+      notFound: '找不到这个用户'
+    }
   }
 }

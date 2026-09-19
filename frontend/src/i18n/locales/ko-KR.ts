@@ -57,7 +57,7 @@ export default {
     inviteSubmit: '초대 보내기',
     inviteSuccess: '초대가 전송되었습니다.',
     confirmInviteTitle: '초대를 보내시겠습니까?',
-    confirmInviteBody: '{email}에게 초대를 보냅니다(역할: {role}). 수락 후 멤버가 됩니다.',
+    confirmInviteBody: '{email}에게 학생 초대를 보냅니다. 수락한 뒤에만 이 워크스페이스에 참여합니다.',
     confirmSend: '보내기',
     copyLink: '초대 링크 복사',
     copied: '클립보드에 복사됨',
@@ -94,6 +94,7 @@ export default {
     columns: {
       invitee: '초대 대상',
       role: '역할',
+      identity: '신분',
       inviter: '초대자',
       expiresAt: '만료',
       status: '상태',
@@ -120,7 +121,7 @@ export default {
   },
   tenantMember: {
     title: '멤버 관리',
-    sectionDescription: '워크스페이스에 동료를 초대하고 역할을 관리합니다. 소유자만 멤버를 추가하거나 제거할 수 있습니다.',
+    sectionDescription: '현재 수업에 학생을 초대하거나 내보냅니다. 이 명단은 플랫폼 신분을 바꾸지 않습니다.',
     learnRbacGuide: 'RBAC 알아보기',
     listTitle: '워크스페이스 멤버',
     loading: '멤버를 불러오는 중…',
@@ -207,9 +208,18 @@ export default {
       contributor: '기여자',
       viewer: '뷰어'
     },
+    teaching: {
+      teacher: '교사',
+      superadmin: '슈퍼 관리자',
+      student: '학생',
+      legacyOwner: '소유자 (정리 필요)',
+      legacyWarning: '예전 높은 권한입니다. 수업 공간에서는 여기서 역할을 바꿀 수 없습니다.',
+      unknown: '알 수 없는 역할',
+    },
     columns: {
       member: '이름 · 이메일',
       role: '역할',
+      identity: '신분',
       joinedAt: '가입일',
       operations: '작업'
     },
@@ -5463,6 +5473,7 @@ export default {
     tenantInfo: '워크스페이스 정보',
     workspaceSettings: '워크스페이스 설정',
     system: '시스템 설정',
+    userManagement: '사용자 관리',
     storage: {
       title: '스토리지 엔진',
       description: '문서 및 이미지 저장 방식을 구성합니다. 엔진 파라미터를 설정하면 지식베이스에서 사용할 엔진만 선택합니다.',
@@ -6766,5 +6777,38 @@ export default {
     myChats: '내 대화',
     apiChats: 'API 세션',
     noSessions: '대화가 없습니다'
+  },
+  userDirectory: {
+    title: '사용자 관리',
+    description: '등록된 모든 사용자를 표시합니다. 신분 열에서 학생, 교사, 슈퍼 관리자로 바로 바꿉니다. 자신의 신분은 바꿀 수 없으며, 슈퍼 관리자는 최소 한 명 남아야 합니다.',
+    searchPlaceholder: '사용자 이름 또는 이메일 검색',
+    refresh: '새로고침',
+    retry: '다시 시도',
+    empty: '일치하는 사용자가 없습니다',
+    self: '현재 계정',
+    saveSuccess: '신분이 업데이트되었습니다',
+    saveFailed: '신분 업데이트 실패',
+    columns: {
+      username: '사용자 이름',
+      email: '이메일',
+      identity: '신분',
+      createdAt: '가입 시각'
+    },
+    identity: {
+      student: '학생',
+      teacher: '교사',
+      superadmin: '슈퍼 관리자'
+    },
+    confirm: {
+      header: '신분 변경',
+      body: '{email}을(를) {identity}(으)로 변경하시겠습니까?',
+      confirmBtn: '변경',
+      cancelBtn: '취소'
+    },
+    errors: {
+      self: '자신의 슈퍼 관리자 신분은 취소할 수 없습니다',
+      lastAdmin: '마지막 슈퍼 관리자는 취소할 수 없습니다',
+      notFound: '사용자를 찾을 수 없습니다'
+    }
   }
 }

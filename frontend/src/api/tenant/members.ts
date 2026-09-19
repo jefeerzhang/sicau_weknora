@@ -17,6 +17,8 @@ export interface TenantMember {
   status: TenantMemberStatus
   invited_by?: string | null
   joined_at: string
+  /** Course-roster label from the list API: student, teacher, or superadmin. */
+  roster_identity?: string
 }
 
 export interface ListMembersResponse {

@@ -1594,6 +1594,7 @@ export default {
       }
     },
     system: 'System Settings',
+    userManagement: 'Users',
     parser: {
       title: 'Parser Engine',
       description: 'Document parser engine status and configuration. Settings here take priority over server environment variables. Leave empty to use environment variable defaults.',
@@ -6628,7 +6629,7 @@ export default {
   },
   tenantMember: {
     title: 'Members',
-    sectionDescription: 'Invite students to this workspace. Only the workspace lead can add or remove members; teaching roles are fixed to workspace lead / student.',
+    sectionDescription: 'Invite students into this workspace, or remove them. This list is only the current course roster and does not change platform identity.',
     learnRbacGuide: 'Learn about RBAC',
     listTitle: 'Workspace members',
     loading: 'Loading members…',
@@ -6649,6 +6650,7 @@ export default {
     columns: {
       member: 'Name & email',
       role: 'Role',
+      identity: 'Identity',
       joinedAt: 'Joined',
       operations: 'Actions'
     },
@@ -6659,7 +6661,8 @@ export default {
       viewer: 'Viewer'
     },
     teaching: {
-      lead: 'Workspace lead',
+      teacher: 'Teacher',
+      superadmin: 'Super administrator',
       student: 'Student',
       legacyOwner: 'Owner (needs cleanup)',
       legacyWarning: 'Legacy elevated membership; teaching workspaces no longer allow role changes here',
@@ -6747,7 +6750,7 @@ export default {
     inviteSubmit: 'Send invitation',
     inviteSuccess: 'Invitation sent. Waiting for the invitee to accept.',
     confirmInviteTitle: 'Send invitation?',
-    confirmInviteBody: 'Send an invitation to {email} (role: {role}). They will join the workspace only after accepting.',
+    confirmInviteBody: 'Send a student invitation to {email}. They join this workspace only after accepting.',
     confirmSend: 'Send',
     copyLink: 'Copy invite link',
     copied: 'Copied to clipboard',
@@ -6773,6 +6776,7 @@ export default {
     columns: {
       invitee: 'Invitee',
       role: 'Role',
+      identity: 'Identity',
       inviter: 'Inviter',
       expiresAt: 'Expires',
       status: 'Status',
@@ -6857,5 +6861,38 @@ export default {
     capabilityRequired: 'Select at least one capability',
     loadFailed: 'Failed to load platform API keys',
     createFailed: 'Failed to create platform API key'
+  },
+  userDirectory: {
+    title: 'Users',
+    description: 'Every registered account. Change the identity column to student, teacher, or super administrator. You cannot change your own identity, and the platform must keep at least one super administrator.',
+    searchPlaceholder: 'Search username or email',
+    refresh: 'Refresh',
+    retry: 'Retry',
+    empty: 'No matching users',
+    self: 'You',
+    saveSuccess: 'Identity updated',
+    saveFailed: 'Failed to update identity',
+    columns: {
+      username: 'Username',
+      email: 'Email',
+      identity: 'Identity',
+      createdAt: 'Registered'
+    },
+    identity: {
+      student: 'Student',
+      teacher: 'Teacher',
+      superadmin: 'Super administrator'
+    },
+    confirm: {
+      header: 'Change identity',
+      body: 'Change {email} to {identity}?',
+      confirmBtn: 'Change',
+      cancelBtn: 'Cancel'
+    },
+    errors: {
+      self: 'You cannot revoke your own super-administrator identity',
+      lastAdmin: 'The last super administrator cannot be revoked',
+      notFound: 'User not found'
+    }
   }
 }

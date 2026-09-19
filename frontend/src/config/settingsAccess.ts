@@ -46,6 +46,7 @@ export const SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE = {
 } as const satisfies Record<string, SettingsRoleKey>
 
 export const SYSTEM_ADMIN_SETTINGS_SECTIONS = new Set([
+  'user-directory',
   'system-global',
   'runtime-queues',
   'platform-api-keys',

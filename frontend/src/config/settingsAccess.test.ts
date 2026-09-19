@@ -37,6 +37,6 @@ test('sicau-v1: personal sandbox secrets stay contributor+ (students sealed)', (
 test('system administration settings stay explicitly system-admin-only', () => {
   assert.deepEqual(
     [...SYSTEM_ADMIN_SETTINGS_SECTIONS],
-    ['system-global', 'runtime-queues', 'platform-api-keys', 'system-audit-log'],
+    ['user-directory', 'system-global', 'runtime-queues', 'platform-api-keys', 'system-audit-log'],
   )
 })

@@ -608,6 +608,13 @@ func (s *userService) ListTeachers(
 	return s.userRepo.ListTeachers(ctx, offset, limit)
 }
 
+// ListUsersPage lists registered accounts for the SuperAdmin user directory.
+func (s *userService) ListUsersPage(
+	ctx context.Context, query string, offset, limit int,
+) ([]*types.User, int64, error) {
+	return s.userRepo.ListUsersPage(ctx, query, offset, limit)
+}
+
 // RevokeSystemAdmin removes system-admin privileges through the
 // repository's transactional guard so concurrent revokes cannot remove
 // the final administrator.
@@ -1130,9 +1137,10 @@ func (s *userService) SwitchTenant(
 		return nil, errors.New("target workspace ID is required")
 	}
 
-	// Verify membership unless the caller is a cross-tenant superuser
-	// switching outside their home tenant.
-	if !user.CanAccessAllTenants || targetTenantID == user.TenantID {
+	// Verify membership unless the caller may enter any workspace.
+	// SuperAdmin always may. CanAccessAllTenants may only when leaving
+	// the home tenant; home still requires a real membership row.
+	if !user.ManagesEveryWorkspace() && (!user.CanAccessAllTenants || targetTenantID == user.TenantID) {
 		if s.memberService == nil {
 			return nil, errors.New("workspace membership service unavailable")
 		}
