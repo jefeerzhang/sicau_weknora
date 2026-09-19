@@ -2,41 +2,81 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE,
-  SETTINGS_SECTION_MIN_ROLE,
   SYSTEM_ADMIN_SETTINGS_SECTIONS,
+  canSeeSettingsSection,
+  shellIdentityOf,
+  sidebarShowsAgents,
+  visibleSettingsSections,
 } from './settingsAccess'
 
-test('management shortcuts are stricter than read-only settings pages', () => {
-  // sicau-v1 ticket 01: the roster itself is Admin+ (names/emails/student
-  // IDs), so the members section is no longer a viewer-readable page — the
-  // "stricter shortcut" rationale below keeps applying to models only.
-  assert.equal(SETTINGS_SECTION_MIN_ROLE.members, 'admin')
-  assert.equal(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.members, 'owner')
-  assert.equal(SETTINGS_SECTION_MIN_ROLE.models, 'viewer')
-  assert.equal(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.models, 'admin')
+const STUDENT = ['general', 'userprofile', 'mymemory']
+const TEACHER_EXTRA = ['tenant', 'members', 'chathistory', 'memory', 'models', 'envvars']
+const DEPLOYMENT = [
+  'ollama',
+  'weknoracloud',
+  'websearch',
+  'vectorstore',
+  'parser',
+  'storage',
+  'sandbox',
+  'skills',
+  'mcp',
+  'integration-im',
+  'integration-embed',
+  'integration-api',
+  'integration-chrome',
+  'integration-claw',
+]
+const SYSTEM_ADMIN = [
+  'user-directory',
+  'system-global',
+  'runtime-queues',
+  'platform-api-keys',
+  'system-audit-log',
+]
+
+function sorted(values: readonly string[]) {
+  return [...values].sort()
+}
+
+test('unset and student identities see only the account settings', () => {
+  assert.equal(shellIdentityOf(undefined), 'student')
+  assert.equal(shellIdentityOf({ platform_identity: 'unset' }), 'student')
+  assert.equal(shellIdentityOf({ platform_identity: 'student' }), 'student')
+  assert.deepEqual(sorted(visibleSettingsSections('student')), sorted(STUDENT))
+  assert.equal(sidebarShowsAgents('student'), false)
+  for (const hidden of [...TEACHER_EXTRA, ...DEPLOYMENT, ...SYSTEM_ADMIN]) {
+    assert.equal(canSeeSettingsSection('student', hidden), false, hidden)
+  }
 })
 
-test('the skill catalog is admin-only like the sandbox it installs into', () => {
-  assert.equal(SETTINGS_SECTION_MIN_ROLE.skills, 'admin')
-  assert.equal(SETTINGS_SECTION_MIN_ROLE.skills, SETTINGS_SECTION_MIN_ROLE.sandbox)
+test('a teacher sees course tools, not the deployment catalog or system admin', () => {
+  assert.equal(shellIdentityOf({ platform_identity: 'teacher' }), 'teacher')
+  assert.equal(shellIdentityOf({ is_teacher: true, platform_identity: 'unset' }), 'teacher')
+  assert.deepEqual(sorted(visibleSettingsSections('teacher')), sorted([...STUDENT, ...TEACHER_EXTRA]))
+  assert.equal(sidebarShowsAgents('teacher'), true)
+  assert.equal(canSeeSettingsSection('teacher', 'models'), true)
+  assert.equal(canSeeSettingsSection('teacher', 'envvars'), true)
+  assert.equal(canSeeSettingsSection('teacher', 'ollama'), false)
+  assert.equal(canSeeSettingsSection('teacher', 'sandbox'), false)
+  assert.equal(canSeeSettingsSection('teacher', 'user-directory'), false)
 })
 
-test('sicau-v1: personal sandbox secrets stay contributor+ (students sealed)', () => {
-  // ADR-009-7 / issue #4: viewers (students) must not see or manage
-  // settings.envvars; teachers/TAs remain contributor+.
-  assert.equal(SETTINGS_SECTION_MIN_ROLE.envvars, 'contributor')
-  // Workspace-wide skill env values live on the Admin+ skills page; a
-  // management shortcut on the avatar menu would only duplicate that entrance.
+test('a superadmin sees the teacher catalog plus system admin and deployment', () => {
+  assert.equal(shellIdentityOf({ platform_identity: 'superadmin' }), 'superadmin')
   assert.equal(
-    Object.prototype.hasOwnProperty.call(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE, 'envvars'),
-    false,
+    shellIdentityOf({ is_system_admin: true, is_teacher: true, platform_identity: 'teacher' }),
+    'superadmin',
   )
-})
-
-test('system administration settings stay explicitly system-admin-only', () => {
   assert.deepEqual(
-    [...SYSTEM_ADMIN_SETTINGS_SECTIONS],
-    ['user-directory', 'system-global', 'runtime-queues', 'platform-api-keys', 'system-audit-log'],
+    sorted(visibleSettingsSections('superadmin')),
+    sorted([...STUDENT, ...TEACHER_EXTRA, ...SYSTEM_ADMIN, ...DEPLOYMENT]),
   )
+  assert.equal(sidebarShowsAgents('superadmin'), true)
+  for (const key of SYSTEM_ADMIN) {
+    assert.equal(canSeeSettingsSection('superadmin', key), true, key)
+    assert.equal(SYSTEM_ADMIN_SETTINGS_SECTIONS.has(key), true, key)
+  }
+  assert.equal(canSeeSettingsSection('superadmin', 'ollama'), true)
+  assert.equal(canSeeSettingsSection('superadmin', 'integration-im'), true)
 })

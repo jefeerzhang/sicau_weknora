@@ -4,22 +4,27 @@ import test from 'node:test'
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8')
 
-test('login page uses SICAU brand, not upstream GitHub as logo', () => {
+test('login page speaks as 川农知识库, not a WeKnora product pitch', () => {
   const src = read('../views/auth/Login.vue')
+  const zh = read('../i18n/locales/zh-CN.ts')
   assert.match(src, /sicau\.edu\.cn/)
   assert.match(src, /sicau-crest\.png/)
   assert.match(src, /川农知识库/)
   assert.match(src, /jefeerzhang\.github\.io/)
   assert.match(src, /common\.teacherHome/)
-  // Logo uses SICAU URL (href may precede class); showcase attribution to Tencent/WeKnora is allowed.
   assert.match(
     src,
     /<a[^>]*href="https:\/\/www\.sicau\.edu\.cn"[^>]*class="header-logo"/,
   )
-  assert.doesNotMatch(
-    src,
-    /<a[^>]*href="https:\/\/github\.com\/Tencent\/WeKnora"[^>]*class="header-logo"/,
-  )
+  assert.doesNotMatch(src, /github\.com\/Tencent\/WeKnora/)
+  assert.doesNotMatch(src, /weknora\.weixin\.qq\.com/)
+  assert.doesNotMatch(src, /loginFeature/)
+  assert.doesNotMatch(src, /platform\.note/)
+  assert.doesNotMatch(src, /platform\.rag\b/)
+  assert.match(zh, /subtitle: '供校内课程检索教学与科研资料。通过邀请加入，不能自行注册。'/)
+  assert.match(zh, /subtitle: '使用已有账户登录。'/)
+  assert.doesNotMatch(zh, /firstTime: '[^']*WeKnora/)
+  assert.doesNotMatch(zh, /registerSubtitle: '[^']*WeKnora/)
 })
 
 test('user menu does not open upstream Tencent GitHub', () => {

@@ -78,21 +78,20 @@
           <t-icon name="user" class="menu-icon" />
           <span>{{ $t('general.personalSettings') }}</span>
         </div>
-        <div v-if="!authStore.isLiteMode" class="menu-item" @click="handleQuickNav('tenant')">
+        <div v-if="!authStore.isLiteMode && canOpenSection('tenant')" class="menu-item" @click="handleQuickNav('tenant')">
           <t-icon name="user-circle" class="menu-icon" />
           <span>{{ $t('settings.workspaceSettings') }}</span>
         </div>
-        <!-- “管理”类快捷入口只对真正具备写权限的人展示。只读名册和模型列表
-             仍可从「全部设置」进入，避免 viewer 看到名不副实的管理入口。 -->
-        <div v-if="canManageMembers" class="menu-item" @click="handleQuickNav('members')">
+        <!-- 快捷入口跟设置目录同一张身份表。 -->
+        <div v-if="canOpenSection('members')" class="menu-item" @click="handleQuickNav('members')">
           <t-icon name="usergroup" class="menu-icon" />
           <span>{{ $t('tenantMember.title') }}</span>
         </div>
-        <div v-if="canManageModels" class="menu-item" @click="handleQuickNav('models')">
+        <div v-if="canOpenSection('models')" class="menu-item" @click="handleQuickNav('models')">
           <t-icon name="control-platform" class="menu-icon" />
           <span>{{ $t('settings.modelManagement') }}</span>
         </div>
-        <div v-if="canManageSkills" class="menu-item" @click="handleQuickNav('skills')">
+        <div v-if="canOpenSection('skills')" class="menu-item" @click="handleQuickNav('skills')">
           <t-icon :name="SKILL_ICON" class="menu-icon" />
           <span>{{ $t('settings.skills.title') }}</span>
         </div>
@@ -107,7 +106,7 @@
           including tenant Owners. Real authorisation lives server-side
           (RequireSystemAdmin middleware); this is UI gating only.
         -->
-        <div v-if="authStore.isSystemAdmin" class="menu-item" @click="handleSystemAdmin">
+        <div v-if="shellIdentity === 'superadmin'" class="menu-item" @click="handleSystemAdmin">
           <t-icon name="server" class="menu-icon" />
           <span>{{ $t('settings.navGroups.systemAdministration') }}</span>
         </div>
@@ -196,7 +195,7 @@ import type { TenantInfo } from '@/api/tenant'
 import { useRoleLabel, useHomeTenant } from '@/composables/useRoleLabel'
 import { getRootZoom, rectToCssPx, cssViewportSize } from '@/utils/zoom'
 import { openNewUserGuide } from '@/config/contextualGuides'
-import { SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE } from '@/config/settingsAccess'
+import { canSeeSettingsSection, shellIdentityOf } from '@/config/settingsAccess'
 import { SKILL_ICON } from '@/types/mention'
 
 const { t } = useI18n()
@@ -229,21 +228,8 @@ const showTenantIdentityLine = computed(() => {
   return (authStore.memberships ?? []).length > 1
 })
 
-// 快捷入口使用“管理能力”而不是页面最低可见角色：成员名册和模型列表允许
-// viewer 浏览，但头像菜单里的“管理”入口只服务实际能执行管理操作的角色。
-const canManageMembers = computed(() =>
-  authStore.canAccessAllTenants || authStore.hasRole(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.members),
-)
-const canManageModels = computed(() =>
-  authStore.canAccessAllTenants ||
-  authStore.isSystemAdmin ||
-  authStore.hasRole(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.models),
-)
-const canManageSkills = computed(() =>
-  authStore.canAccessAllTenants ||
-  authStore.isSystemAdmin ||
-  authStore.hasRole(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.skills),
-)
+const shellIdentity = computed(() => shellIdentityOf(authStore.user))
+const canOpenSection = (section: string) => canSeeSettingsSection(shellIdentity.value, section)
 
 const menuRef = ref<HTMLElement>()
 const tenantMenuItemRef = ref<HTMLElement>()

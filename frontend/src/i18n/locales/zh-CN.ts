@@ -2315,7 +2315,7 @@ export default {
   },
 
   platform: {
-    subtitle: '大模型驱动的知识库',
+    subtitle: '供校内课程检索教学与科研资料。通过邀请加入，不能自行注册。',
     note: '本系统基于开源项目 ',
     noteSuffix: ' 构建，专为川农校内教学与科研资料检索场景定制。',
     loginFeature1: '真实资料',
@@ -4642,11 +4642,11 @@ export default {
     haveAccount: '已有账户？',
     backToLogin: '返回登录',
     loginHint: '登录以继续使用；首次使用请在下方创建账户。',
-    firstTime: '首次使用 WeKnora？',
+    firstTime: '还没有账户？',
     registerSuccess: '注册成功，请登录',
     registerFailed: '注册失败',
-    subtitle: 'RAG 问答、ReAct 智能体与 Wiki 知识库，大模型驱动的企业级知识框架',
-    registerSubtitle: '创建账户并开始使用 WeKnora',
+    subtitle: '使用已有账户登录。',
+    registerSubtitle: '填写信息完成注册',
     emailPlaceholder: '输入邮箱地址',
     passwordPlaceholder: '输入密码',
     confirmPasswordPlaceholder: '再次输入密码',

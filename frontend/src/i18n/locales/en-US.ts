@@ -2199,11 +2199,11 @@ export default {
     haveAccount: 'Already have an account?',
     backToLogin: 'Back to Login',
     loginHint: 'Sign in to continue, or create an account below if this is your first time.',
-    firstTime: 'New to WeKnora?',
+    firstTime: 'No account yet?',
     registerSuccess: 'Registration successful. Please sign in',
     registerFailed: 'Registration failed',
-    subtitle: 'RAG Q&A, ReAct Agent and Wiki — an LLM-powered enterprise knowledge framework',
-    registerSubtitle: 'Create your account and start using WeKnora',
+    subtitle: 'Sign in with an existing account.',
+    registerSubtitle: 'Fill in the form to register',
     emailPlaceholder: 'Enter email address',
     passwordPlaceholder: 'Enter password',
     confirmPasswordPlaceholder: 'Enter password again',
@@ -4570,7 +4570,7 @@ export default {
   },
 
   platform: {
-    subtitle: 'LLM-Powered Knowledge Base',
+    subtitle: 'Search teaching and research materials for campus courses. Join by invitation; you cannot register on your own.',
     note: 'This system is built on the open-source project ',
     noteSuffix: ', customized for Sichuan Agricultural University\'s teaching and research document retrieval.',
     loginFeature1: 'Real materials',

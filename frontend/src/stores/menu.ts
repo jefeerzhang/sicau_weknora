@@ -4,6 +4,7 @@ import i18n from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
 import type { DeploymentCapabilityKey } from '@/config/deploymentCapabilities'
+import { sidebarShowsAgents, shellIdentityOf } from '@/config/settingsAccess'
 
 type MenuChild = Record<string, any>
 
@@ -76,6 +77,9 @@ export const useMenuStore = defineStore('menuStore', () => {
         return false
       }
       if (item.path === 'organizations' && !authStore.hasRole('admin')) {
+        return false
+      }
+      if (item.path === 'agents' && !sidebarShowsAgents(shellIdentityOf(authStore.user))) {
         return false
       }
       if (!deploymentCapabilities.isSupported(item.requiredCapability)) {

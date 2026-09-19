@@ -262,10 +262,10 @@ import IntegrationSettingsSection from '@/views/integrations/IntegrationSettings
 import {
   INTEGRATION_PREVIEW_ITEMS,
   INTEGRATION_TAB_CAPABILITY,
-  INTEGRATION_TAB_MIN_ROLE,
 } from '@/config/integrations'
 import {
-  SETTINGS_SECTION_MIN_ROLE,
+  canSeeSettingsSection,
+  shellIdentityOf,
   SYSTEM_ADMIN_SETTINGS_SECTIONS,
 } from '@/config/settingsAccess'
 import { SETTINGS_SECTION_CAPABILITY } from '@/config/deploymentCapabilities'
@@ -304,22 +304,11 @@ type NavGroup = {
   items: NavItem[]
 }
 
-// 设置二级导航的最低可见角色来自 settingsAccess.ts，和
-// internal/router/router.go 的守卫矩阵对齐。
-// 以「页面里至少有 1 个有意义的写操作所要求的最低角色」为基准，把基础设
-// 施配置（models 写、ollama 下载、websearch 写、parser/storage/vector/mcp
-// CRUD、sandbox 连接、skills 安装、chat-history 配置）统一收到 admin；只读类（general / system info /
-// tenant-info / members 名册）保留 viewer 可见；最高敏感的 reset api
-// key 是 owner-only。改这张表前请在 router.go 里复核对应路由组。
-//
-// 特别说明：
-// - chathistory 页面唯一的「启用消息索引」开关 PUT /tenants/kv/chat-history-config
-//   后端走 g.Admin()。给 viewer/contributor 看到入口、点开开关、保存时
-//   403，体验很差，所以入口本身归 admin。
-// - models 列表 viewer 可读，页面内的「+ 添加模型 / 编辑 / 删除」按钮在
-//   ModelSettings.vue 里另用 hasRole('admin') 自己 gate，所以入口保留
-//   viewer 是合理的（contributor 也能浏览模型列表）。
+// 设置目录按平台身份收起，表在 settingsAccess.ts。藏菜单不是授权，
+// 后端路由守卫仍然有效。直接打开被藏的地址时走下面的无权限空态。
 const SYSTEM_ADMIN_SECTIONS = SYSTEM_ADMIN_SETTINGS_SECTIONS
+
+const shellIdentity = computed(() => shellIdentityOf(authStore.user))
 
 const normalizeSettingsSection = (section: string) => {
   return normalizeSettingsSectionFromQuery(section, route.query.tab as string | undefined)
@@ -345,26 +334,11 @@ const isSectionSupported = (key: string): boolean => {
 }
 
 const canSeeSection = (key: string): boolean => {
-  if (isIntegrationSection(key)) {
-    const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
-    if (!min) return true
-    if (authStore.canAccessAllTenants) return true
-    return authStore.hasRole(min)
-  }
-  if (SYSTEM_ADMIN_SECTIONS.has(key)) {
-    return authStore.isSystemAdmin
-  }
-  const min = SETTINGS_SECTION_MIN_ROLE[key] ?? 'viewer'
-  // canAccessAllTenants（superuser）和路由层一样必须 bypass，否则 cross-tenant
-  // 管理员看不到自己有权操作的入口（参考 TenantMembers.vue 的 canManage）。
-  if (authStore.canAccessAllTenants) return true
-  return authStore.hasRole(min)
+  return canSeeSettingsSection(shellIdentity.value, key)
 }
 
 const navItems = computed(() => {
-  // 一律走 SETTINGS_SECTION_MIN_ROLE 表，避免 ad-hoc isAdmin/isOwner 散落在多处。
-  // 服务端在每条路由上仍以 g.Viewer/Admin/Owner 为准，这里只决定 UI 是
-  // 否露入口；改动入口规则请同步更新 settingsAccess.ts 和对应后端路由。
+  // 一律走平台身份表。服务端路由守卫仍然是授权来源。
   const integrationItems: NavItem[] = INTEGRATION_PREVIEW_ITEMS.map((item) => ({
     key: integrationSectionKey(item.key),
     icon: item.icon.type === 'icon' ? item.icon.name : 'integration',
@@ -529,6 +503,11 @@ const handleClose = () => {
 watch(() => uiStore.settingsInitialSection, (section) => {
   if (section && visible.value) {
     const normalizedSection = normalizeSettingsSection(section)
+    if (!canSeeSection(normalizedSection)) {
+      currentSection.value = normalizedSection
+      currentSubSection.value = ''
+      return
+    }
     if (deploymentCapabilities.loaded && !isSectionSupported(normalizedSection)) {
       MessagePlugin.warning(t('settings.capabilityUnavailable'))
       currentSection.value = navItems.value[0]?.key || 'general'
@@ -579,6 +558,11 @@ watch(
       section,
       typeof route.query.tab === 'string' ? route.query.tab : undefined,
     )
+    if (!canSeeSection(normalizedSection)) {
+      currentSection.value = normalizedSection
+      currentSubSection.value = ''
+      return
+    }
     if (capabilitiesLoaded && !isSectionSupported(normalizedSection)) {
       MessagePlugin.warning(t('settings.capabilityUnavailable'))
       const fallback = navItems.value[0]?.key || 'general'
@@ -599,12 +583,14 @@ watch(
 // 切换空间后角色可能变化，原本可见的 admin-only 面板可能消失。
 // 如果 currentSection 落到了不再显示的 key 上，就回退到第一个可见项。
 watch(navItems, (items) => {
-  if (!items.some((item) => item.key === currentSection.value)) {
-    const fallback = items[0]?.key || 'general'
-    currentSection.value = fallback
-    currentSubSection.value = ''
-    syncSettingsRoute(fallback)
-  }
+  if (items.some((item) => item.key === currentSection.value)) return
+  // A section the identity cannot see stays on the no-permission state.
+  // Falling back would hide that state and render a different form.
+  if (!canSeeSection(currentSection.value)) return
+  const fallback = items[0]?.key || 'general'
+  currentSection.value = fallback
+  currentSubSection.value = ''
+  syncSettingsRoute(fallback)
 })
 
 // ESC 键关闭

@@ -1,49 +1,40 @@
-export type SettingsRoleKey = 'viewer' | 'contributor' | 'admin' | 'owner'
+export type ShellIdentity = 'student' | 'teacher' | 'superadmin'
 
 /**
- * Workspace-scoped settings access policy.
+ * Settings the signed-in person can see, by platform identity.
  *
- * Keep this as the single frontend source of truth for both the complete
- * Settings navigation and any shortcuts that lead into it. Backend route
- * guards remain authoritative.
+ * This is the frontend source of truth for the settings nav and the avatar
+ * shortcuts that lead into it. Workspace owner/admin/viewer stay on the
+ * server. Hiding a section is not authorization.
  */
-export const SETTINGS_SECTION_MIN_ROLE: Record<string, SettingsRoleKey> = {
-  general: 'viewer',
-  ollama: 'admin',
-  weknoracloud: 'admin',
-  models: 'viewer',
-  websearch: 'admin',
-  chathistory: 'admin',
-  vectorstore: 'admin',
-  parser: 'admin',
-  storage: 'admin',
-  sandbox: 'admin',
-  // Install writes a root shell into the sandbox image every session of
-  // that config boots. Same Admin+ bar as the sandbox editor itself.
-  skills: 'admin',
-  mcp: 'admin',
-  system: 'viewer',
-  userprofile: 'viewer',
-  tenant: 'viewer',
-  // sicau-v1 ticket 01: the member roster (names/emails/student IDs) is
-  // teacher-only. Mirrors the backend Admin+ guard on GET /tenants/:id/members.
-  members: 'admin',
-  mymemory: 'viewer',
-  memory: 'admin',
-  // sicau-v1 ADR-009-7 / issue #4: personal sandbox secrets are teacher-side
-  // (contributor+). Students (viewers) use pure Q&A and must not manage keys.
-  // Workspace-wide values stay on the Admin+ skills page.
-  envvars: 'contributor',
-}
+const STUDENT_SETTINGS = ['general', 'userprofile', 'mymemory'] as const
 
-/**
- * A management-labelled avatar shortcut has a stricter threshold than the
- * corresponding read-only Settings page.
- */
-export const SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE = {
-  members: 'owner',
-  models: 'admin',
-} as const satisfies Record<string, SettingsRoleKey>
+const TEACHER_SETTINGS = [
+  ...STUDENT_SETTINGS,
+  'tenant',
+  'members',
+  'chathistory',
+  'memory',
+  'models',
+  'envvars',
+] as const
+
+const DEPLOYMENT_SETTINGS = [
+  'ollama',
+  'weknoracloud',
+  'websearch',
+  'vectorstore',
+  'parser',
+  'storage',
+  'sandbox',
+  'skills',
+  'mcp',
+  'integration-im',
+  'integration-embed',
+  'integration-api',
+  'integration-chrome',
+  'integration-claw',
+] as const
 
 export const SYSTEM_ADMIN_SETTINGS_SECTIONS = new Set([
   'user-directory',
@@ -52,3 +43,38 @@ export const SYSTEM_ADMIN_SETTINGS_SECTIONS = new Set([
   'platform-api-keys',
   'system-audit-log',
 ])
+
+const SUPERADMIN_SETTINGS = [
+  ...TEACHER_SETTINGS,
+  ...SYSTEM_ADMIN_SETTINGS_SECTIONS,
+  ...DEPLOYMENT_SETTINGS,
+] as const
+
+export function shellIdentityOf(user?: {
+  platform_identity?: string
+  is_system_admin?: boolean
+  is_teacher?: boolean
+} | null): ShellIdentity {
+  if (user?.is_system_admin === true || user?.platform_identity === 'superadmin') {
+    return 'superadmin'
+  }
+  if (user?.is_teacher === true || user?.platform_identity === 'teacher') {
+    return 'teacher'
+  }
+  return 'student'
+}
+
+export function visibleSettingsSections(identity: ShellIdentity): readonly string[] {
+  if (identity === 'superadmin') return SUPERADMIN_SETTINGS
+  if (identity === 'teacher') return TEACHER_SETTINGS
+  return STUDENT_SETTINGS
+}
+
+export function canSeeSettingsSection(identity: ShellIdentity, section: string): boolean {
+  return visibleSettingsSections(identity).includes(section)
+}
+
+/** Students use 新对话. 智能体 stays on the teacher and superadmin sidebars. */
+export function sidebarShowsAgents(identity: ShellIdentity): boolean {
+  return identity !== 'student'
+}
