@@ -227,6 +227,8 @@ import {
 import {
   SETTINGS_SECTION_MIN_ROLE,
   SYSTEM_ADMIN_SETTINGS_SECTIONS,
+  canSeeSettingsSection,
+  shellIdentityOf,
 } from '@/config/settingsAccess'
 import { SETTINGS_SECTION_CAPABILITY } from '@/config/deploymentCapabilities'
 import { isToolboxSection, toolboxLocation } from '@/config/toolbox'
@@ -304,19 +306,31 @@ const isSectionSupported = (key: string): boolean => {
   return deploymentCapabilities.isSupported(SETTINGS_SECTION_CAPABILITY[key])
 }
 
+const shellIdentity = computed(() => shellIdentityOf(authStore.user))
+
 const canSeeSection = (key: string): boolean => {
+  // Platform identity is authoritative for the teaching lockdown. Students
+  // only see account settings even when they happen to be a workspace owner.
+  // Backend route guards remain the real authorization boundary.
   if (isIntegrationSection(key)) {
+    if (shellIdentity.value !== 'superadmin') return false
     const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
     if (!min) return true
     if (authStore.canAccessAllTenants) return true
     return authStore.hasRole(min)
   }
   if (SYSTEM_ADMIN_SECTIONS.has(key)) {
-    return authStore.isSystemAdmin
+    return shellIdentity.value === 'superadmin' && authStore.isSystemAdmin
+  }
+  if (canSeeSettingsSection(shellIdentity.value, key)) {
+    return true
+  }
+  // SuperAdmin may still need workspace-role floors for leftover keys that
+  // are not yet listed in the identity catalog (keep deployable).
+  if (shellIdentity.value !== 'superadmin') {
+    return false
   }
   const min = SETTINGS_SECTION_MIN_ROLE[key] ?? 'viewer'
-  // canAccessAllTenants（superuser）和路由层一样必须 bypass，否则 cross-tenant
-  // 管理员看不到自己有权操作的入口（参考 TenantMembers.vue 的 canManage）。
   if (authStore.canAccessAllTenants) return true
   return authStore.hasRole(min)
 }

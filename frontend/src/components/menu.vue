@@ -268,6 +268,7 @@ import { useSessionActivityStore } from '@/stores/sessionActivity';
 import { useAuthStore } from '@/stores/auth';
 import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities';
 import { TOOLBOX_ITEMS, canAccessToolboxSection } from '@/config/toolbox';
+import { shellIdentityOf } from '@/config/settingsAccess';
 import BrowserIcon from '@/components/icons/BrowserIcon.vue';
 import { useBrowserConnectionStore } from '@/stores/browserConnection';
 import { useOrganizationStore } from '@/stores/organization';
@@ -313,11 +314,14 @@ const { entries: sessionActivityEntries } = storeToRefs(sessionActivity);
 let sessionActivityTimer: ReturnType<typeof setInterval> | undefined;
 const authStore = useAuthStore();
 const deploymentCapabilities = useDeploymentCapabilitiesStore();
+const shellIdentity = computed(() => shellIdentityOf(authStore.user));
 const toolboxPreview = computed(() => TOOLBOX_ITEMS.filter((item) => canAccessToolboxSection(item.key, {
     currentTenantRole: authStore.currentTenantRole,
     canAccessAllTenants: authStore.canAccessAllTenants,
     hasRole: (role) => authStore.hasRole(role),
     isSupported: (capability) => deploymentCapabilities.isSupported(capability),
+    shellIdentity: shellIdentity.value,
+    user: authStore.user,
 })));
 const orgStore = useOrganizationStore();
 const uiStore = useUIStore();

@@ -4,6 +4,12 @@ import i18n from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
 import type { DeploymentCapabilityKey } from '@/config/deploymentCapabilities'
+import {
+  shellIdentityOf,
+  sidebarShowsAgents,
+  sidebarShowsArtifacts,
+  sidebarShowsToolbox,
+} from '@/config/settingsAccess'
 import type { QuestionOrigin } from '@/utils/questionOrigin'
 
 type MenuChild = Record<string, any>
@@ -74,11 +80,21 @@ export const useMenuStore = defineStore('menuStore', () => {
   const visibleMenuArr = computed(() => {
     const authStore = useAuthStore()
     const deploymentCapabilities = useDeploymentCapabilitiesStore()
+    const identity = shellIdentityOf(authStore.user)
     return menuArr.filter(item => {
       if (authStore.isLiteMode && liteHiddenPaths.has(item.path)) {
         return false
       }
       if (item.path === 'organizations' && !authStore.hasRole('admin')) {
+        return false
+      }
+      if (item.path === 'agents' && !sidebarShowsAgents(identity)) {
+        return false
+      }
+      if (item.path === 'artifacts' && !sidebarShowsArtifacts(identity)) {
+        return false
+      }
+      if (item.path === 'toolbox' && !sidebarShowsToolbox(identity)) {
         return false
       }
       if (!deploymentCapabilities.isSupported(item.requiredCapability)) {

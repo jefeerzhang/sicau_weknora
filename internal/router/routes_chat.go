@@ -58,11 +58,13 @@ func RegisterSessionRoutes(
 		sessions.DELETE("/:id", handler.DeleteSession)
 		sessions.DELETE("/:id/messages", handler.ClearSessionMessages)
 		sessions.POST("/:session_id/generate_title", handler.GenerateTitle)
-		sessions.POST("/:session_id/attachments", handler.UploadTemporaryDocument)
-		sessions.GET("/:id/attachments", handler.ListTemporaryDocuments)
-		sessions.GET("/:id/attachments/:attachment_id", handler.GetTemporaryDocument)
-		sessions.GET("/:id/attachments/:attachment_id/preview", handler.PreviewTemporaryDocument)
-		sessions.DELETE("/:id/attachments/:attachment_id", handler.DeleteTemporaryDocument)
+		// Course students (viewers) cannot upload chat attachments - pure
+		// Q&A deployment (ADR-009-6): backend-enforced, not frontend-only.
+		sessions.POST("/:session_id/attachments", g.Contributor(), handler.UploadTemporaryDocument)
+		sessions.GET("/:id/attachments", g.Contributor(), handler.ListTemporaryDocuments)
+		sessions.GET("/:id/attachments/:attachment_id", g.Contributor(), handler.GetTemporaryDocument)
+		sessions.GET("/:id/attachments/:attachment_id/preview", g.Contributor(), handler.PreviewTemporaryDocument)
+		sessions.DELETE("/:id/attachments/:attachment_id", g.Contributor(), handler.DeleteTemporaryDocument)
 		sessions.POST("/:session_id/stop", handler.StopSession)
 		sessions.POST("/:session_id/fork", handler.ForkSession)
 		sessions.POST("/:session_id/rewind", handler.RewindSession)
@@ -99,6 +101,10 @@ func RegisterSessionRoutes(
 		// metadata; the actual bytes are streamed via /artifacts/:index/download
 		// so the storage URL never appears on the wire.
 		//
+		// Artifact routes sit on the Viewer+ sessions group but carry an
+		// extra Contributor+ guard - course students must not list or
+		// download generated files.
+		//
 		// NOTE: gin builds a separate radix tree per HTTP verb but every
 		// path in the same tree must share the same wildcard name. The GET
 		// tree already binds :id via /sessions/:id (GetSession); reusing
@@ -106,18 +112,18 @@ func RegisterSessionRoutes(
 		// "wildcard conflicts" panic at route registration. The handlers
 		// read the URL param via c.Param("session_id") with a fallback to
 		// c.Param("id") for exactly this reason.
-		sessions.GET("/:id/artifacts", handler.ListSessionArtifacts)
-		sessions.GET("/:id/messages/:message_id/artifacts", handler.ListMessageArtifacts)
-		sessions.GET("/:id/messages/:message_id/artifacts/:index/download", handler.DownloadMessageArtifact)
-		// Deleting reclaims the stored bytes, so it is owner-only: unlike the
-		// download above it does not honour shared-agent read access.
-		sessions.DELETE("/:id/messages/:message_id/artifacts/:index", handler.DeleteMessageArtifact)
+		sessions.GET("/:id/artifacts", g.Contributor(), handler.ListSessionArtifacts)
+		sessions.GET("/:id/messages/:message_id/artifacts", g.Contributor(), handler.ListMessageArtifacts)
+		sessions.GET("/:id/messages/:message_id/artifacts/:index/download", g.Contributor(), handler.DownloadMessageArtifact)
+		// Deleting reclaims the stored bytes; keep Contributor+ so viewers
+		// cannot mutate either.
+		sessions.DELETE("/:id/messages/:message_id/artifacts/:index", g.Contributor(), handler.DeleteMessageArtifact)
 	}
 
-	// Cross-session artifact library. Same guards as /sessions: the rows come
-	// from the caller's own sessions, and downloads go back through the
-	// per-session endpoint above.
-	artifacts := g.apiKeyGroup(r.Group("/artifacts", g.Viewer()), apiKeyChat(apiKeyFullAccess()))
+	// Cross-session artifact library. Contributor+ so students have no
+	// library entry point; downloads still go through the per-session
+	// endpoint above.
+	artifacts := g.apiKeyGroup(r.Group("/artifacts", g.Contributor()), apiKeyChat(apiKeyFullAccess()))
 	{
 		artifacts.GET("", handler.ListArtifactLibrary)
 		// The artifact to delete is addressed by query parameters rather than a

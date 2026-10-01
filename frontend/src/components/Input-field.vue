@@ -31,6 +31,7 @@ import { type CustomAgent, BUILTIN_QUICK_ANSWER_ID, BUILTIN_SMART_REASONING_ID }
 import { useChatResourcesStore } from '@/stores/chatResources';
 import { useEditorResourcesStore } from '@/stores/editorResources';
 import { useI18n } from 'vue-i18n';
+import { useAuthStore } from '@/stores/auth';
 import AttachmentUpload, { type AttachmentFile } from './AttachmentUpload.vue';
 import {
   kbSatisfiesAgentRequirements,
@@ -59,6 +60,7 @@ const route = useRoute();
 const router = useRouter();
 const settingsStore = useSettingsStore();
 const browserConnection = useBrowserConnectionStore();
+const authStore = useAuthStore();
 const uiStore = useUIStore();
 const orgStore = useOrganizationStore();
 const menuStore = useMenuStore();
@@ -108,7 +110,9 @@ const handleDroppedFiles = (files: File[]) => {
     }
   }
 
-  if (attachmentFiles.length > 0) {
+  // Course students (viewer) cannot upload chat attachments; match the hidden upload button.
+  const attachmentsBlocked = !authStore.hasRole('contributor');
+  if (attachmentFiles.length > 0 && !attachmentsBlocked) {
     attachmentUploadRef.value?.addFiles(attachmentFiles);
   }
 };
@@ -2848,8 +2852,8 @@ defineExpose({
             </div>
           </t-tooltip>
 
-          <!-- 附件上传按钮 -->
-          <t-tooltip placement="top" theme="light" :popupProps="{ overlayClassName: 'input-field-tooltip' }">
+          <!-- 附件上传按钮：学生 (viewer) 不展示；后端同步拒绝 -->
+          <t-tooltip v-if="authStore.hasRole('contributor')" placement="top" theme="light" :popupProps="{ overlayClassName: 'input-field-tooltip' }">
             <template #content>
               <span>{{ uploadedAttachments.length > 0 ? $t('chat.attachmentWithCount', {
                 count: uploadedAttachments.length
