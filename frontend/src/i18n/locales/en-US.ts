@@ -199,6 +199,8 @@ export default {
   },
   menu: {
     sessionInProgress: 'Conversation in progress',
+    notes: 'My Notes',
+    announcements: 'Announcements',
     knowledgeBase: 'Knowledge Base',
     agents: 'Agents',
     artifacts: 'Artifacts',

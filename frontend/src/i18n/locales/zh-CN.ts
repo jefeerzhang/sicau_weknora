@@ -7455,6 +7455,8 @@ export default {
   },
   menu: {
     sessionInProgress: '会话进行中',
+    notes: '我的笔记',
+    announcements: '公告板',
     knowledgeBase: '知识库',
     agents: '智能体',
     artifacts: '产物',

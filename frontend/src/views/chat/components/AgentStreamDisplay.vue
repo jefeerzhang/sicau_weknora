@@ -405,10 +405,14 @@
                     </t-button>
                   </t-tooltip>
                 </t-popconfirm>
-                <t-button size="small" variant="outline" shape="round" @click.stop="handleCopyAnswer(event)"
+                <t-button size="small" variant="outline" shape="round" class="answer-toolbar__labeled" @click.stop="handleCopyAnswer(event)"
                   :title="$t('agent.copy')">
                   <t-icon name="copy" />
+                  <span>{{ $t('agent.copy') }}</span>
                 </t-button>
+                <template v-if="!embeddedMode">
+                  <SaveAnswerToNoteButton :question="userQuery" :answer="event.content" />
+                </template>
                 <t-button v-if="canMutateCourseFiles" size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge(event)"
                   :title="$t('agent.addToKnowledgeBase')">
                   <t-icon name="bookmark-add" />
@@ -697,6 +701,7 @@ import {
   type CachedMermaidSvgHtml,
 } from '@/utils/chatMessageShared';
 import { copyWithToast } from '@/utils/clipboard';
+import SaveAnswerToNoteButton from '@/components/SaveAnswerToNoteButton.vue';
 import {
   configureMarkedForChatMarkdown,
   renderChatMarkdown,

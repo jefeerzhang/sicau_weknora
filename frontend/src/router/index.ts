@@ -105,7 +105,20 @@ const router = createRouter({
           path: "tenant",
           redirect: "/platform/settings"
         },
-        {
+        
+          {
+            path: "notes",
+            name: "notes",
+            component: () => import("../views/notes/MyNotes.vue"),
+            meta: { requiresAuth: true },
+          },
+          {
+            path: "announcements",
+            name: "announcements",
+            component: () => import("../views/announcements/Announcements.vue"),
+            meta: { requiresAuth: true },
+          },
+{
           path: "settings",
           name: "settings",
           component: () => import("../views/settings/Settings.vue"),

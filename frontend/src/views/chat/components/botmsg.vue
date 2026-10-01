@@ -75,10 +75,13 @@
                         </t-button>
                     </t-tooltip>
                 </t-popconfirm>
-                <t-button size="small" variant="outline" shape="round" @click.stop="handleCopyAnswer"
+                <t-button size="small" variant="outline" shape="round" class="answer-toolbar__labeled" @click.stop="handleCopyAnswer"
                     :title="$t('agent.copy')">
                     <t-icon name="copy" />
+                    <span>{{ $t('agent.copy') }}</span>
                 </t-button>
+                <SaveAnswerToNoteButton v-if="!embeddedMode" :question="userQuery"
+                    :answer="content || session.content" />
                 <t-button v-if="canMutateCourseFiles" size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge"
                     :title="$t('agent.addToKnowledgeBase')">
                     <t-icon name="bookmark-add" />
@@ -166,6 +169,7 @@ import { useI18n } from 'vue-i18n';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useUIStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
+import SaveAnswerToNoteButton from '@/components/SaveAnswerToNoteButton.vue';
 import {
     buildManualMarkdown,
     formatManualTitle,
