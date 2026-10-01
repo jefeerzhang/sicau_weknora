@@ -5,6 +5,9 @@ import { getApiBaseUrl } from "@/utils/api-base";
 import { isAgentStreamAgentId } from "@/utils/agent-mode";
 import { loadAndReconcileSettings } from "@/stores/settingsStorage";
 import { isReasoningLevel, type ReasoningLevel } from "@/utils/reasoningEffort";
+export const EXPLICIT_AGENT_CHOSEN_KEY = 'weknora_agent_explicitly_chosen';
+export const markAgentExplicitlyChosen = () => { try { localStorage.setItem(EXPLICIT_AGENT_CHOSEN_KEY, '1'); } catch { /* ignore */ } };
+
 
 // 定义设置接口
 interface Settings {
@@ -459,6 +462,7 @@ export const useSettingsStore = defineStore("settings", {
     
     // 选择智能体（sourceTenantId 仅在使用共享智能体时传入）
     selectAgent(agentId: string, sourceTenantId?: string | null) {
+      markAgentExplicitlyChosen();
       this.reasoningEffortOverride = '';
       this.settings.selectedAgentId = agentId;
       this.settings.selectedAgentSourceTenantId = (sourceTenantId != null && sourceTenantId !== "") ? sourceTenantId : null;

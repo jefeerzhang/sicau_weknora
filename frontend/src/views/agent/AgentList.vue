@@ -181,6 +181,10 @@
                   <div v-else-if="agent.avatar" class="builtin-avatar agent-emoji">{{ agent.avatar }}</div>
                   <AgentAvatar v-else :name="agent.name" size="small" />
                   <span class="card-title" :title="agent.name">{{ agent.name }}</span>
+                  <t-tag v-if="defaultAgentId === agent.id" theme="success" variant="light" size="small"
+                    class="default-agent-badge">
+                    {{ t('agent.defaultBadge') }}
+                  </t-tag>
                 </div>
                 <t-popup
                   v-if="agent.isMine && (canManageAgent(agent) || authStore.hasRole('contributor') || authStore.hasRole('admin'))"
@@ -202,6 +206,11 @@
                         @click="handleToggleDisabled(agent)">
                         <t-icon class="menu-icon" name="poweroff" />
                         <span>{{ agent.disabled_by_me ? $t('agent.enable') : $t('agent.disable') }}</span>
+                      </div>
+                      <div v-if="authStore.hasRole('admin')" class="popup-menu-item"
+                        @click="handleSetDefaultAgent(agent)">
+                        <t-icon class="menu-icon" name="star" />
+                        <span>{{ defaultAgentId === agent.id ? t('agent.unsetAsDefault') : t('agent.setAsDefault') }}</span>
                       </div>
                       <div v-if="!agent.is_builtin && canManageAgent(agent)" class="popup-menu-item delete"
                         @click="handleDelete(agent)"><t-icon class="menu-icon" name="delete" /><span>{{
@@ -364,6 +373,10 @@
                   <div v-else-if="agent.avatar" class="builtin-avatar agent-emoji">{{ agent.avatar }}</div>
                   <AgentAvatar v-else :name="agent.name" size="small" />
                   <span class="card-title" :title="agent.name">{{ agent.name }}</span>
+                  <t-tag v-if="defaultAgentId === agent.id" theme="success" variant="light" size="small"
+                    class="default-agent-badge">
+                    {{ t('agent.defaultBadge') }}
+                  </t-tag>
                 </div>
                 <t-popup v-if="canManageAgent(agent) || authStore.hasRole('contributor') || authStore.hasRole('admin')"
                   :visible="openMoreAgentId === agent.id" trigger="click" overlayClassName="card-more-popup"
@@ -387,6 +400,11 @@
                         @click="handleToggleDisabled(agent)">
                         <t-icon class="menu-icon" name="poweroff" />
                         <span>{{ agent.disabled_by_me ? $t('agent.enable') : $t('agent.disable') }}</span>
+                      </div>
+                      <div v-if="authStore.hasRole('admin')" class="popup-menu-item"
+                        @click="handleSetDefaultAgent(agent)">
+                        <t-icon class="menu-icon" name="star" />
+                        <span>{{ defaultAgentId === agent.id ? t('agent.unsetAsDefault') : t('agent.setAsDefault') }}</span>
                       </div>
                       <div v-if="!agent.is_builtin && canManageAgent(agent)" class="popup-menu-item delete"
                         @click="handleDelete(agent)">
@@ -744,6 +762,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import ResourceIcon from '@/components/icons/ResourceIcon.vue'
 import { useConfirmDelete } from '@/components/settings/useConfirmDelete'
 import { deleteAgent, copyAgent, type CustomAgent } from '@/api/agent'
+import { getDefaultAgentId, putDefaultAgentId } from '@/api/tenant'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useI18n } from 'vue-i18n'
 import { createSessions } from '@/api/chat/index'
@@ -843,6 +862,33 @@ const agentRecentsCount = computed(
   () => pins.recents.value.filter((e) => e.type === 'agent').length
 )
 const agents = ref<AgentWithUI[]>([])
+const defaultAgentId = ref('')
+const defaultAgentLoading = ref(false)
+
+async function loadDefaultAgentId() {
+  if (defaultAgentLoading.value) return
+  defaultAgentLoading.value = true
+  try {
+    const res = await getDefaultAgentId()
+    defaultAgentId.value = res?.data?.agent_id || ''
+  } catch {
+    defaultAgentId.value = ''
+  } finally {
+    defaultAgentLoading.value = false
+  }
+}
+
+async function handleSetDefaultAgent(agent: CustomAgent) {
+  const target = defaultAgentId.value === agent.id ? '' : agent.id
+  const res = await putDefaultAgentId(target)
+  if (res?.success) {
+    defaultAgentId.value = target
+    MessagePlugin.success(target ? t('agent.defaultAgentSet') : t('agent.defaultAgentCleared'))
+  } else {
+    MessagePlugin.error(res?.message || t('agent.defaultAgentSetFailed'))
+  }
+}
+
 const sharedAgents = computed<SharedAgentInfo[]>(() => orgStore.sharedAgents || [])
 const allAgentsCount = computed(() => agents.value.length + sharedAgents.value.length)
 
@@ -1194,6 +1240,7 @@ watch(creatorFilter, () => {
 })
 
 onMounted(() => {
+  void loadDefaultAgentId()
   fetchList()
   window.addEventListener('openAgentEditor', handleOpenAgentEditor as EventListener)
 })

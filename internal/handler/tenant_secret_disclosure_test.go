@@ -23,6 +23,9 @@ func (s *stubTenantService) UpdateTenant(_ context.Context, tenant *types.Tenant
 	s.tenant = tenant
 	return tenant, nil
 }
+func (s *stubTenantService) UpdateTenantDefaultAgentID(context.Context, uint64, string) error {
+	return nil
+}
 
 func (s *stubTenantService) CreateTenant(context.Context, *types.Tenant) (*types.Tenant, error) {
 	return nil, nil

@@ -21,6 +21,9 @@ type TenantService interface {
 	ListTenants(ctx context.Context) ([]*types.Tenant, error)
 	// UpdateTenant updates a tenant
 	UpdateTenant(ctx context.Context, tenant *types.Tenant) (*types.Tenant, error)
+	// UpdateTenantDefaultAgentID sets or clears the workspace default agent
+	// (empty string clears). Used by course workspaces to pin students.
+	UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error
 	// DeleteTenant deletes a tenant
 	DeleteTenant(ctx context.Context, id uint64) error
 	// ListAllTenants lists all tenants (for users with cross-tenant access permission)
@@ -54,6 +57,9 @@ type TenantRepository interface {
 	SearchTenants(ctx context.Context, keyword string, tenantID uint64, page, pageSize int) ([]*types.Tenant, int64, error)
 	// UpdateTenant updates a tenant
 	UpdateTenant(ctx context.Context, tenant *types.Tenant) error
+	// UpdateTenantDefaultAgentID sets or clears (empty string) the workspace
+	// default agent column without zero-value skipping.
+	UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error
 	// DeleteTenant deletes a tenant
 	DeleteTenant(ctx context.Context, id uint64) error
 	// AdjustStorageUsed adjusts the storage used for a tenant

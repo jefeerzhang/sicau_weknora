@@ -2,8 +2,9 @@
     <div class="aside_box" :class="{ 'aside_box--collapsed': uiStore.sidebarCollapsed, 'aside_box--resizing': uiStore.sidebarResizing }">
         <!-- 展开时：Logo + 搜索/折叠按钮同行 -->
         <div class="logo_row" v-if="!uiStore.sidebarCollapsed">
-            <div class="logo_box" @click="router.push('/platform/knowledge-bases')" style="cursor: pointer;">
-                <img class="logo" src="@/assets/img/weknora.png" alt="">
+            <div class="logo_box" @click="router.push('/platform/creatChat')" style="cursor: pointer;">
+                <img class="logo_img" src="@/assets/img/sicau-crest.png" alt="四川农业大学" />
+                <span class="logo_txt">川农知识库</span>
                 <sup v-if="isLiteEdition" class="lite-badge">Lite</sup>
             </div>
             <div class="logo_actions">
@@ -1349,6 +1350,20 @@ const resizeSidebar = (delta: number, keyboard: boolean) => {
     }
 
     .logo_box {
+        .logo_img {
+            width: 28px;
+            height: 28px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+        .logo_txt {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--td-text-color-primary);
+            white-space: nowrap;
+            margin-left: 8px;
+        }
+
         display: flex;
         align-items: center;
         flex: 1;
@@ -1951,6 +1966,8 @@ const resizeSidebar = (delta: number, keyboard: boolean) => {
 </style>
 <style lang="less">
 // Dark mode: invert dark logo to light
+html[theme-mode="dark"] .aside_box .logo_box .logo_img {
+}
 html[theme-mode="dark"] .aside_box .logo_box .logo {
     filter: invert(1) hue-rotate(180deg);
 }

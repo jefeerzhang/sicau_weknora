@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	werrors "github.com/Tencent/WeKnora/internal/errors"
@@ -46,6 +47,12 @@ func (s *tenantService) CreateTenant(ctx context.Context, tenant *types.Tenant) 
 	tenant.Status = "active"
 	tenant.CreatedAt = time.Now()
 	tenant.UpdatedAt = time.Now()
+	// default_agent_id is NOT NULL DEFAULT ''. A nil *string becomes SQL NULL
+	// under GORM Create and trips that constraint.
+	if tenant.DefaultAgentID == nil {
+		empty := ""
+		tenant.DefaultAgentID = &empty
+	}
 
 	if err := s.validateStorageBucketUniqueness(ctx, tenant); err != nil {
 		logger.ErrorWithFields(ctx, err, map[string]interface{}{
@@ -70,6 +77,20 @@ func (s *tenantService) CreateTenant(ctx context.Context, tenant *types.Tenant) 
 
 	logger.Infof(ctx, "Tenant created successfully, ID: %d, name: %s", tenant.ID, tenant.Name)
 	return tenant, nil
+}
+
+// UpdateTenantDefaultAgentID sets or clears the workspace default agent.
+// Empty agentID clears the default. Existence inside the workspace is
+// enforced at apply time by the frontend.
+func (s *tenantService) UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error {
+	if tenantID == 0 {
+		return errors.New("tenant ID cannot be 0")
+	}
+	agentID = strings.TrimSpace(agentID)
+	if len(agentID) > 36 {
+		return errors.New("default agent id too long")
+	}
+	return s.repo.UpdateTenantDefaultAgentID(ctx, tenantID, agentID)
 }
 
 func (s *tenantService) createDefaultStorageBackend(ctx context.Context, tenant *types.Tenant) error {

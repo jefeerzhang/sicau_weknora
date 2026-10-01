@@ -66,6 +66,7 @@
                 </div>
                 <div class="artifact-drawer-header-title" :title="previewItem.file_name">{{ previewItem.file_name }}</div>
                 <t-button
+                    v-if="canDownloadFiles"
                     class="artifact-download"
                     variant="text"
                     shape="square"
@@ -78,7 +79,6 @@
                         <t-icon name="download" size="16px" />
                     </template>
                 </t-button>
-                <div ref="previewActions" class="artifact-preview-actions" />
             </div>
             <div v-else class="artifact-drawer-header">
                 <div class="artifact-drawer-header-icon">
@@ -89,7 +89,6 @@
         </template>
         <div v-if="previewItem" class="artifact-preview-body">
             <DocumentPreview
-                :toolbar-target="previewActions"
                 :session-id="sessionId"
                 :message-id="messageId"
                 :artifact-index="previewItem.index"
@@ -138,6 +137,7 @@
                     </template>
                 </t-button>
                 <t-button
+                    v-if="canDownloadFiles"
                     class="artifact-download"
                     variant="text"
                     shape="square"
@@ -182,6 +182,9 @@ import { downloadArtifact, listMessageArtifacts, type ArtifactMeta } from '@/api
 import { getFileIcon } from '@/utils/files'
 import { resolveFilePreviewExt } from '@/utils/filePreview'
 import DocumentPreview from '@/components/document-preview.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const httpForbiddenStatus = 403
 
 const LIST_WIDTH = 440
 const PREVIEW_WIDTH_KEY = 'weknora-chat-artifact-preview-width'
@@ -206,7 +209,13 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const previewActions = ref<HTMLElement | null>(null)
+
+const authStore = useAuthStore()
+// Artifact downloads are Contributor+ (backend enforces it); course students
+// get a read-only drawer, with a friendly notice if a stale client hits 403.
+const canDownloadFiles = computed(
+    () => authStore.canAccessAllTenants || authStore.hasRole('contributor'),
+)
 
 /** TDesign always follows @close with update:visible=false; swallow that when popping preview. */
 let suppressDrawerClose = false
@@ -416,6 +425,11 @@ async function handleDownload(item: ArtifactMeta) {
         setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err) {
         console.error('[ChatArtifactsDrawer] download failed:', err)
+        const status = (err as any)?.status ?? (err as any)?.response?.status
+        if (status === httpForbiddenStatus) {
+            MessagePlugin.warning(t('agent.artifactDrawer.downloadDisabled'))
+            return
+        }
         MessagePlugin.error(t('agent.artifactDrawer.downloadFailed'))
     } finally {
         downloading[item.index] = false
@@ -456,29 +470,25 @@ onUnmounted(() => {
     }
 }
 
-.artifact-preview-actions {
-    flex-shrink: 0;
-}
-
 .artifact-drawer-header-icon {
     flex-shrink: 0;
-    width: 24px;
-    height: 24px;
-    border-radius: var(--app-radius-sm);
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
+    background: rgba(7, 192, 95, 0.1);
     color: var(--td-brand-color);
-    font-size: var(--app-text-lg);
+    font-size: 16px;
 }
 
 .artifact-drawer-header-title {
     min-width: 0;
     flex: 1;
-    font-size: var(--app-text-base);
-    font-weight: 500;
-    line-height: 20px;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
     color: var(--td-text-color-primary);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -501,7 +511,7 @@ onUnmounted(() => {
     gap: 8px;
     padding: 48px 16px;
     color: var(--td-text-color-placeholder);
-    font-size: var(--app-text-md);
+    font-size: 13px;
 }
 
 .artifact-list {
@@ -516,7 +526,7 @@ onUnmounted(() => {
     gap: 10px;
     padding: 10px 4px;
     border-bottom: 1px solid var(--td-component-stroke);
-    border-radius: var(--app-radius-md);
+    border-radius: 8px;
 
     &:last-child {
         border-bottom: none;
@@ -539,14 +549,14 @@ onUnmounted(() => {
     flex-shrink: 0;
     width: 28px;
     height: 28px;
-    border-radius: var(--app-radius-sm);
+    border-radius: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: var(--app-text-xl);
+    font-size: 16px;
     background: var(--td-bg-color-secondarycontainer);
     color: var(--td-text-color-secondary);
-    transition: color var(--app-motion-fast) ease;
+    transition: color 0.15s ease;
 }
 
 .artifact-body {
@@ -555,7 +565,7 @@ onUnmounted(() => {
 }
 
 .artifact-name {
-    font-size: var(--app-text-base);
+    font-size: 14px;
     font-weight: 600;
     letter-spacing: 0.01em;
     line-height: 1.35;
@@ -567,7 +577,7 @@ onUnmounted(() => {
 
 .artifact-meta {
     margin-top: 2px;
-    font-size: var(--app-text-sm);
+    font-size: 12px;
     line-height: 1.3;
     color: var(--td-text-color-placeholder);
     display: flex;
@@ -615,7 +625,7 @@ onUnmounted(() => {
     border-radius: 1px;
     background: var(--td-component-border);
     opacity: 0.55;
-    transition: opacity var(--app-motion-fast) ease, background var(--app-motion-fast) ease;
+    transition: opacity 0.15s ease, background 0.15s ease;
 }
 
 .artifact-preview-resize-handle:hover .artifact-preview-resize-line,
@@ -628,18 +638,8 @@ onUnmounted(() => {
 <style lang="less">
 .chat-artifacts-drawer.t-drawer {
     .t-drawer__header {
-        height: var(--app-chat-header-height);
-        min-height: var(--app-chat-header-height);
-        padding: 0 12px;
-        border-bottom: 1px solid var(--td-component-stroke);
-        flex-shrink: 0;
+        padding: 16px 20px;
         font-weight: normal;
-    }
-
-    .t-drawer__close-btn {
-        top: calc((var(--app-chat-header-height) - 28px) / 2);
-        width: 28px;
-        height: 28px;
     }
 
     .t-drawer__body {
@@ -651,6 +651,12 @@ onUnmounted(() => {
     .t-drawer__content-wrapper,
     .t-drawer__content {
         height: 100%;
+    }
+
+    .t-drawer__header {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--td-component-stroke);
+        flex-shrink: 0;
     }
 
     .t-drawer__body {

@@ -1,4 +1,11 @@
-import { createRouter, createWebHistory } from 'vue-router'
+impo
+  {
+    path: "/force-change-password",
+    name: "forceChangePassword",
+    component: () => import("../views/auth/ForceChangePassword.vue"),
+    meta: { requiresAuth: true, requiresTenant: false },
+  },
+rt { createRouter, createWebHistory } from 'vue-router'
 import type { RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
@@ -424,6 +431,16 @@ router.beforeEach(async (to, from, next) => {
       next('/login')
       return
     }
+  }
+
+    if (
+    authStore.isLoggedIn &&
+    authStore.mustChangePassword &&
+    to.path !== '/force-change-password' &&
+    to.path !== '/login'
+  ) {
+    next('/force-change-password')
+    return
   }
 
   if (to.meta.requiresTenant !== false && !authStore.hasValidTenant) {

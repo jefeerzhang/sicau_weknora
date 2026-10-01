@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { getDefaultAgentId } from '@/api/tenant';
 import { ref, onMounted, onBeforeUnmount, onUnmounted, computed, watch, nextTick, h, type PropType } from "vue";
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
 import { onBeforeRouteUpdate } from 'vue-router';
 import { MessagePlugin } from "tdesign-vue-next";
 import type { SendMessageOptions } from '@/utils/questionOrigin';
-import { useSettingsStore } from '@/stores/settings';
+import { useSettingsStore, EXPLICIT_AGENT_CHOSEN_KEY } from '@/stores/settings';
 import { useBrowserConnectionStore } from '@/stores/browserConnection';
 import { useUIStore } from '@/stores/ui';
 import BrowserIcon from '@/components/icons/BrowserIcon.vue';
@@ -910,10 +911,28 @@ const loadAgents = async (force = false) => {
   try {
     await chatResources.ensureAgents(force);
     ensureSelectedAgentNotDisabled();
+    await applyWorkspaceDefaultAgent();
   } catch (error) {
     console.error('Failed to load agents:', error);
   }
 };
+
+// Apply workspace default agent so course students land ready to ask.
+// Skip when the member already picked an agent (localStorage flag) or local
+// state already holds a non-builtin selection. Missing/deleted defaults are ignored.
+async function applyWorkspaceDefaultAgent() {
+  try {
+    if (localStorage.getItem(EXPLICIT_AGENT_CHOSEN_KEY) === '1') return;
+    if ((settingsStore.settings.selectedAgentId || '') !== BUILTIN_QUICK_ANSWER_ID) return;
+    const res = await getDefaultAgentId();
+    const defaultId = res?.data?.agent_id;
+    if (!defaultId) return;
+    if (!agents.value.some(a => a.id === defaultId)) return;
+    settingsStore.selectAgent(defaultId);
+  } catch (error) {
+    console.warn('[InputField] apply workspace default agent failed:', error);
+  }
+}
 
 // 默认选中的 builtin（builtin-quick-answer）也可能被当前空间管理员停用。
 // 列表加载完后做一次纠偏：若当前选中的是本空间停用的 agent（仅限「我的/builtin」，
