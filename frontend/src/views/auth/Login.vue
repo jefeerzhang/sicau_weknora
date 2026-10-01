@@ -1073,6 +1073,39 @@ onMounted(async () => {
   margin-bottom: 60px;
 }
 
+.showcase-kicker {
+  margin: 0 0 18px 0;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: var(--app-font-family);
+}
+
+.showcase-motto-label {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  letter-spacing: 0.28em;
+  color: #e8c56a;
+  font-family: var(--app-font-family);
+}
+
+.showcase-motto {
+  margin: 0 0 12px 0;
+  font-size: 32px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: #f6e7b2;
+  font-family: var(--app-font-family);
+}
+
+.showcase-spirit {
+  margin: 0 0 22px 0;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--app-font-family);
+}
+
 .showcase-subtitle {
   margin-top: 0;
   font-size: 22px;
@@ -1081,6 +1114,14 @@ onMounted(async () => {
   font-family: var(--app-font-family);
   line-height: 1.4;
   font-weight: 500;
+}
+
+.showcase-campuses {
+  margin: 16px 0 0 0;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: var(--app-font-family);
 }
 
 .showcase-description {
@@ -1190,10 +1231,47 @@ onMounted(async () => {
   left: 50px;
   z-index: 100;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 18px 6px 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.2s ease;
+  text-decoration: none;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.28);
+  }
 
   .logo-image {
-    width: 120px;
-    height: auto;
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+
+  &__text {
+    display: inline-flex;
+    flex-direction: column;
+    line-height: 1.2;
+    color: var(--td-text-color-anti);
+  }
+
+  &__title {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  &__subtitle {
+    font-size: 10px;
+    font-weight: 500;
+    opacity: 0.8;
+    letter-spacing: 0.6px;
+    margin-top: 1px;
   }
 }
 
@@ -1639,12 +1717,17 @@ onMounted(async () => {
     font-size: var(--app-text-2xl);
   }
 
+  .showcase-motto {
+    font-size: 24px;
+  }
+
   .header-logo {
     top: 26px;
     left: 40px;
 
     .logo-image {
-      width: 100px;
+      width: 36px;
+      height: 36px;
     }
   }
 
@@ -1692,8 +1775,13 @@ onMounted(async () => {
     left: 30px;
 
     .logo-image {
-      width: 80px;
+      width: 32px;
+      height: 32px;
     }
+  }
+
+  .showcase-motto {
+    font-size: 22px;
   }
 
   .showcase-subtitle {
@@ -1752,8 +1840,13 @@ onMounted(async () => {
     left: 20px;
 
     .logo-image {
-      width: 70px;
+      width: 32px;
+      height: 32px;
     }
+  }
+
+  .showcase-motto {
+    font-size: 20px;
   }
 
   .showcase-subtitle {
