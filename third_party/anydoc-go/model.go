@@ -24,7 +24,7 @@ type Document struct {
 // which of the optional fields is populated; the rest are nil.
 type Block struct {
 	// "heading", "paragraph", "list", "table", "block_quote", "code_block",
-	// or "rule".
+	// "rule", or "math".
 	Kind    string
 	Level   *uint8   // heading: 1-based outline depth
 	Anchor  *string  // heading: stable anchor id when the document targets it
@@ -33,15 +33,16 @@ type Block struct {
 	Table   *Table   // table
 	Blocks  []Block  // block_quote
 	Lang    *string  // code_block
-	Text    *string  // code_block
+	Text    *string  // code_block, math
 }
 
 // Inline is one span of inline content. The Kind field selects which optional
 // fields are populated.
 type Inline struct {
-	// "text", "link", "image", "anchor", "note_ref", or "line_break".
+	// "text", "link", "image", "anchor", "note_ref", "line_break", "math", or
+	// "checkbox".
 	Kind    string
-	Text    *string      // text
+	Text    *string      // text, math
 	Style   *Style       // text
 	Content []Inline     // link
 	Target  *LinkTarget  // link
@@ -49,6 +50,7 @@ type Inline struct {
 	Source  *ImageSource // image
 	Anchor  *string      // anchor: the anchor id
 	NoteID  *string      // note_ref: the id of the note in Document.Notes
+	Checked *bool        // checkbox
 }
 
 // Style is a fully resolved character style.
@@ -358,6 +360,12 @@ func (d *decoder) block() (Block, error) {
 		return Block{Kind: "code_block", Lang: lang, Text: &text}, nil
 	case C.BLOCK_RULE:
 		return Block{Kind: "rule"}, nil
+	case C.BLOCK_MATH:
+		text, err := d.str()
+		if err != nil {
+			return Block{}, err
+		}
+		return Block{Kind: "math", Text: &text}, nil
 	default:
 		return Block{}, fmt.Errorf("anydoc: unknown block kind tag %d", tag)
 	}
@@ -429,6 +437,18 @@ func (d *decoder) inline() (Inline, error) {
 		return Inline{Kind: "note_ref", NoteID: &id}, nil
 	case C.INLINE_LINEBREAK:
 		return Inline{Kind: "line_break"}, nil
+	case C.INLINE_MATH:
+		text, err := d.str()
+		if err != nil {
+			return Inline{}, err
+		}
+		return Inline{Kind: "math", Text: &text}, nil
+	case C.INLINE_CHECKBOX:
+		checked, err := d.bool()
+		if err != nil {
+			return Inline{}, err
+		}
+		return Inline{Kind: "checkbox", Checked: &checked}, nil
 	default:
 		return Inline{}, fmt.Errorf("anydoc: unknown inline kind tag %d", tag)
 	}
@@ -533,28 +553,12 @@ func (d *decoder) listItem() (ListItem, error) {
 	if err != nil {
 		return ListItem{}, err
 	}
-	checkedTag, err := d.i32()
-	if err != nil {
-		return ListItem{}, err
-	}
-	var checked *bool
-	switch checkedTag {
-	case 0:
-		f := false
-		checked = &f
-	case 1:
-		t := true
-		checked = &t
-	case -1:
-		checked = nil
-	default:
-		return ListItem{}, fmt.Errorf("anydoc: unknown checked tag %d", checkedTag)
-	}
 	label, err := d.optStr()
 	if err != nil {
 		return ListItem{}, err
 	}
-	return ListItem{Blocks: blocks, Checked: checked, MarkerLabel: label}, nil
+	// Task-list state lives on Inline Kind=="checkbox" since anydoc 0.2.
+	return ListItem{Blocks: blocks, MarkerLabel: label}, nil
 }
 
 func (d *decoder) table() (*Table, error) {

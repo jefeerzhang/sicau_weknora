@@ -29,7 +29,7 @@ only `internal/infrastructure/docparser/anydoc/backend_cgo.go` imports it.
 | Upstream PR | firecrawl/anydoc#30 ("feat: add Go bindings") |
 | PR head | `1a7a6c0` |
 | Rebased onto | `4e3089b` (`chore: release v0.1.8`) |
-| anydoc crate | `0.1.9` (from crates.io, pinned with `=`) |
+| anydoc crate | `0.2.4` (from crates.io, pinned with `=`) |
 | License | MIT (see LICENSE) |
 
 The PR branched before anydoc 0.1.7, so it was rebased onto v0.1.8 before
@@ -106,7 +106,7 @@ required" and still fall back to the docreader.
 Keep this list current: it is the diff a future upgrade has to re-apply. Items
 2–4 are bugs in the upstream PR and are worth sending back to it.
 
-1. `Cargo.toml` — depends on the published `anydoc = "=0.1.9"` crate instead of
+1. `Cargo.toml` — depends on the published `anydoc = "=0.2.4"` crate instead of
    the workspace path dependency, declares its own empty `[workspace]`, and
    repeats the upstream release profile (`lto`, `strip`), which it would
    otherwise inherit from the anydoc workspace.

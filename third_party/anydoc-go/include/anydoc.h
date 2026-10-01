@@ -59,6 +59,11 @@
 #define ERR_UNKNOWN_FORMAT 9
 
 /**
+ * `ConvertError::NeedsOcr` (scanned / image-only PDF pages).
+ */
+#define ERR_NEEDS_OCR 10
+
+/**
  * C-side format tag. Stable; mirrors the Node/Python lowercase string names
  * via `format_name`. `ANYDOC_FORMAT_NONE` is the `Option::None` sentinel.
  */
@@ -106,6 +111,8 @@
 
 #define BLOCK_RULE 6
 
+#define BLOCK_MATH 7
+
 #define INLINE_TEXT 0
 
 #define INLINE_LINK 1
@@ -117,6 +124,10 @@
 #define INLINE_NOTEREF 4
 
 #define INLINE_LINEBREAK 5
+
+#define INLINE_MATH 6
+
+#define INLINE_CHECKBOX 7
 
 #define LINK_EXTERNAL 0
 

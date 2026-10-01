@@ -57,6 +57,12 @@ func TestPDFNeedsOCR(t *testing.T) {
 	if !PDFNeedsOCR(errors.New("PDF has no extractable text (Scanned, 5 pages): OCR is required")) {
 		t.Error("scanned-PDF error was not detected")
 	}
+	if !PDFNeedsOCR(errors.New("pages 1-3 need OCR to extract text")) {
+		t.Error("0.2.x need OCR wording was not detected")
+	}
+	if !PDFNeedsOCR(errors.New("NeedsOcr: scanned pdf")) {
+		t.Error("NeedsOcr kind was not detected")
+	}
 	if PDFNeedsOCR(errors.New("not a readable zip archive")) {
 		t.Error("unrelated error was treated as needing OCR")
 	}

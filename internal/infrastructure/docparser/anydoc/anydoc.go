@@ -167,8 +167,12 @@ func PDFNeedsOCR(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
+	// 0.1.x wording + 0.2.x NeedsOcr Display ("pages … need OCR") + ABI kind.
 	return strings.Contains(msg, "ocr is required") ||
-		strings.Contains(msg, "no extractable text")
+		strings.Contains(msg, "no extractable text") ||
+		strings.Contains(msg, "need ocr") ||
+		strings.Contains(msg, "needs_ocr") ||
+		strings.Contains(msg, "needsocr")
 }
 
 func normalizeExt(s string) string {
