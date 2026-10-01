@@ -246,7 +246,10 @@ func (s *tenantInvitationService) Accept(
 	// also enforces the (user, tenant) uniqueness invariant via the
 	// repo. If it fails here the invitation is already accepted —
 	// see comment above for why we don't rollback the invitation.
-	member, err := s.memberSvc.AddMember(ctx, inv.InviteeUserID, inv.TenantID, inv.Role, inv.InvitedBy)
+	// Teaching deployment: invitations only materialise students (viewer),
+	// even if a legacy pending row still carries an elevated role.
+	role := types.TenantRoleViewer
+	member, err := s.memberSvc.AddMember(ctx, inv.InviteeUserID, inv.TenantID, role, inv.InvitedBy)
 	if err != nil {
 		// Special-case "already a member": that's the idempotent
 		// outcome we want. Return the existing membership instead of
@@ -590,7 +593,10 @@ func (s *tenantInvitationService) AcceptByToken(
 	if err != nil {
 		return nil, err
 	}
-	member, err := s.memberSvc.AddMember(ctx, newUserID, inv.TenantID, inv.Role, inv.InvitedBy)
+	// Teaching deployment: share-link / register-by-invite joins are always
+	// students, never the role stored on a leaked or legacy invitation row.
+	role := types.TenantRoleViewer
+	member, err := s.memberSvc.AddMember(ctx, newUserID, inv.TenantID, role, inv.InvitedBy)
 	if err != nil {
 		if errors.Is(err, ErrMembershipAlreadyExists) {
 			existing, getErr := s.memberSvc.GetMembership(ctx, newUserID, inv.TenantID)

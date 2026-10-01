@@ -295,7 +295,7 @@ func TestInvitationService_Accept_HappyPath_CreatesMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("accept: %v", err)
 	}
-	if mb == nil || mb.UserID != "u-bob" || mb.Role != types.TenantRoleAdmin {
+	if mb == nil || mb.UserID != "u-bob" || mb.Role != types.TenantRoleViewer {
 		t.Fatalf("unexpected membership: %+v", mb)
 	}
 	// Re-acceptance must be a state-machine rejection, not silent
@@ -525,7 +525,7 @@ func TestInvitationService_AcceptByToken_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("accept-by-token: %v", err)
 	}
-	if mb == nil || mb.UserID != "u-alice" || mb.Role != types.TenantRoleAdmin {
+	if mb == nil || mb.UserID != "u-alice" || mb.Role != types.TenantRoleViewer {
 		t.Fatalf("unexpected membership: %+v", mb)
 	}
 	if got, _ := memberSvc.GetMembership(ctx, "u-alice", 1); got == nil {
