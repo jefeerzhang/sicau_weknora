@@ -1067,6 +1067,7 @@ export default {
       deleteFailed: 'Delete failed, please retry.',
       download: 'Download',
       downloadFailed: 'Download failed, please retry.',
+      downloadUnsupported: 'File download is not available in this edition',
       inlinePreviewHint: 'Click to preview',
       inlineMissing: 'File unavailable',
       inlineDeleted: 'File deleted',

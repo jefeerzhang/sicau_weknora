@@ -363,9 +363,14 @@ async function handleDownload(item: SessionArtifactItem) {
     a.click()
     document.body.removeChild(a)
     setTimeout(() => URL.revokeObjectURL(url), 1000)
-  } catch (err) {
+  } catch (err: any) {
     console.error('[ChatArtifactsPanel] download failed:', err)
-    MessagePlugin.error(t('agent.artifactDrawer.downloadFailed'))
+    const status = err?.response?.status ?? err?.status
+    if (status === 403) {
+      MessagePlugin.warning(t('agent.artifactDrawer.downloadUnsupported'))
+    } else {
+      MessagePlugin.error(t('agent.artifactDrawer.downloadFailed'))
+    }
   } finally {
     downloading[key] = false
   }

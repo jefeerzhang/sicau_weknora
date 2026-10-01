@@ -79,15 +79,16 @@
                     :title="$t('agent.copy')">
                     <t-icon name="copy" />
                 </t-button>
-                <t-button size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge"
+                <t-button v-if="canMutateCourseFiles" size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge"
                     :title="$t('agent.addToKnowledgeBase')">
                     <t-icon name="bookmark-add" />
                 </t-button>
                 <!-- Skill artifact download: only shown when this reply's
                      assistant message actually recorded any generated files.
                      Emptiness is the default: the button stays hidden for
-                     conversational messages that never touched a skill. -->
-                <span v-if="hasArtifacts || artifactsCollecting" class="answer-toolbar__artifact"
+                     conversational messages that never touched a skill.
+                     Course students (viewer) never see the entry. -->
+                <span v-if="canMutateCourseFiles && (hasArtifacts || artifactsCollecting)" class="answer-toolbar__artifact"
                     :class="{ 'is-collecting': artifactButtonCollecting, 'is-arrived': artifactArrived }"
                     @animationend="onArtifactArriveEnd">
                     <t-button size="small" variant="outline" shape="round"
@@ -164,6 +165,7 @@ import {
 import { useI18n } from 'vue-i18n';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useUIStore } from '@/stores/ui';
+import { useAuthStore } from '@/stores/auth';
 import {
     buildManualMarkdown,
     formatManualTitle,
@@ -202,6 +204,9 @@ const mentionTagIcon = (item) => {
 const emit = defineEmits(['scroll-bottom', 'render-complete-change', 'fork', 'rewind'])
 const { t } = useI18n()
 const uiStore = useUIStore();
+const authStore = useAuthStore();
+// Contributor+: students (viewer) cannot add-to-KB or open artifact downloads.
+const canMutateCourseFiles = computed(() => authStore.hasRole('contributor'));
 let parentMd = ref()
 const { float: citationFloat, rebind: rebindCitations, cancelClose: cancelCitationClose, scheduleClose: scheduleCitationClose } = useChatCitationPopover(parentMd, {
     getKnowledgeReferences: () => props.session?.knowledge_references,

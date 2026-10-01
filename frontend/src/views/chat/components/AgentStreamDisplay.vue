@@ -409,15 +409,16 @@
                   :title="$t('agent.copy')">
                   <t-icon name="copy" />
                 </t-button>
-                <t-button size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge(event)"
+                <t-button v-if="canMutateCourseFiles" size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge(event)"
                   :title="$t('agent.addToKnowledgeBase')">
                   <t-icon name="bookmark-add" />
                 </t-button>
                 <!-- Skill artifact download: only shown when the persisted
                      assistant message recorded any generated files. Agent
                      mode is the primary path for skills, so this is where
-                     the button is most likely to appear. -->
-                <span v-if="hasArtifacts || artifactsCollecting" class="answer-toolbar__artifact"
+                     the button is most likely to appear. Course students
+                     (viewer) never see the entry. -->
+                <span v-if="canMutateCourseFiles && (hasArtifacts || artifactsCollecting)" class="answer-toolbar__artifact"
                   :class="{ 'is-collecting': artifactButtonCollecting, 'is-arrived': artifactArrived }"
                   @animationend="onArtifactArriveEnd">
                   <t-button size="small" variant="outline" shape="round"
@@ -722,6 +723,7 @@ const uiStore = useUIStore();
 const settingsStore = useSettingsStore();
 const authStore = useAuthStore();
 const { t } = useI18n();
+const canMutateCourseFiles = computed(() => authStore.hasRole('contributor'));
 
 ensureMermaidInitialized();
 

@@ -6321,6 +6321,7 @@ export default {
       deleteFailed: '删除失败，请稍后重试',
       download: '下载',
       downloadFailed: '下载失败，请稍后重试',
+      downloadUnsupported: '当前版本不支持文件下载',
       inlinePreviewHint: '点击预览',
       inlineMissing: '文件不可用',
       inlineDeleted: '文件已删除',
