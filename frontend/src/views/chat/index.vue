@@ -45,51 +45,6 @@
                                     :row-col="[{ width: '70%', height: '16px' }, { width: '90%', height: '16px' }]" />
                             </div>
                         </div>
-                        <!-- 推荐问题卡片 - 仅在新会话（无消息）时展示 -->
-                        <div v-if="!embeddedMode && messagesList.length === 0 && !loading"
-                            class="suggested-questions-container"
-                            :class="{ 'has-questions': suggestedQuestions.length > 0 || suggestedQuestionsLoading }">
-                            <!-- 骨架屏占位 -->
-                            <div v-if="suggestedQuestionsLoading && suggestedQuestions.length === 0"
-                                class="suggested-questions-inner">
-                                <div class="suggested-questions-title"><t-skeleton animation="gradient"
-                                        :row-col="[{ width: '120px', height: '14px' }]" /></div>
-                                <div class="suggested-questions-grid">
-                                    <div v-for="n in 6" :key="'sq-skel-' + n"
-                                        class="suggested-question-card sq-card-skeleton">
-                                        <t-skeleton animation="gradient"
-                                            :row-col="[{ width: '100%', height: '14px', type: 'rect' }]" />
-                                    </div>
-                                </div>
-                            </div>
-                            <transition v-else appear name="sq-fade">
-                                <div v-if="suggestedQuestions.length > 0" class="suggested-questions-inner">
-                                    <div class="suggested-questions-title-row">
-                                        <p class="suggested-questions-caption">
-                                            <span class="suggested-questions-title">{{ t('chat.suggestedQuestions')
-                                                }}</span>
-                                            <button type="button" class="suggested-questions-refresh"
-                                                :disabled="suggestedQuestionsLoading"
-                                                :title="t('chat.refreshSuggestedQuestions')"
-                                                :aria-label="t('chat.refreshSuggestedQuestions')"
-                                                @click="fetchSuggestedQuestions">
-                                                <t-icon :name="suggestedQuestionsLoading ? 'loading' : 'refresh'"
-                                                    :class="{ 'sq-refresh-spin': suggestedQuestionsLoading }" />
-                                            </button>
-                                        </p>
-                                    </div>
-                                    <div class="suggested-questions-grid">
-                                        <div v-for="(item, index) in suggestedQuestions" :key="item.question"
-                                            class="suggested-question-card"
-                                            @click="handleSuggestedQuestionClick(item)">
-                                            <span class="suggested-question-text">{{ item.question }}</span>
-                                            <span v-if="item.source === 'faq'"
-                                                class="suggested-question-badge faq">FAQ</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </transition>
-                        </div>
                         <!--
                       关键：必须用 session.id 作为 key，不能用 v-for 的索引。
                       向上滚动加载历史时会插入一批消息（push/unshift）到列表，
@@ -153,6 +108,52 @@
             </div>
             <div ref="composerElement" class="chat_composer">
                 <div class="input-container" :class="{ 'is-embedded': embeddedMode }">
+
+                        <!-- 推荐问题贴着输入框，仅在还没有消息时出现 -->
+                        <div v-if="!embeddedMode && messagesList.length === 0 && !loading"
+                            class="suggested-questions-container"
+                            :class="{ 'has-questions': suggestedQuestions.length > 0 || suggestedQuestionsLoading }">
+                            <!-- 骨架屏占位 -->
+                            <div v-if="suggestedQuestionsLoading && suggestedQuestions.length === 0"
+                                class="suggested-questions-inner">
+                                <div class="suggested-questions-title"><t-skeleton animation="gradient"
+                                        :row-col="[{ width: '120px', height: '14px' }]" /></div>
+                                <div class="suggested-questions-grid">
+                                    <div v-for="n in 6" :key="'sq-skel-' + n"
+                                        class="suggested-question-card sq-card-skeleton">
+                                        <t-skeleton animation="gradient"
+                                            :row-col="[{ width: '100%', height: '14px', type: 'rect' }]" />
+                                    </div>
+                                </div>
+                            </div>
+                            <transition v-else appear name="sq-fade">
+                                <div v-if="suggestedQuestions.length > 0" class="suggested-questions-inner">
+                                    <div class="suggested-questions-title-row">
+                                        <p class="suggested-questions-caption">
+                                            <span class="suggested-questions-title">{{ t('chat.suggestedQuestions')
+                                                }}</span>
+                                            <button type="button" class="suggested-questions-refresh"
+                                                :disabled="suggestedQuestionsLoading"
+                                                :title="t('chat.refreshSuggestedQuestions')"
+                                                :aria-label="t('chat.refreshSuggestedQuestions')"
+                                                @click="fetchSuggestedQuestions">
+                                                <t-icon :name="suggestedQuestionsLoading ? 'loading' : 'refresh'"
+                                                    :class="{ 'sq-refresh-spin': suggestedQuestionsLoading }" />
+                                            </button>
+                                        </p>
+                                    </div>
+                                    <div class="suggested-questions-grid">
+                                        <div v-for="(item, index) in suggestedQuestions" :key="item.question"
+                                            class="suggested-question-card"
+                                            @click="handleSuggestedQuestionClick(item)">
+                                            <span class="suggested-question-text">{{ item.question }}</span>
+                                            <span v-if="item.source === 'faq'"
+                                                class="suggested-question-badge faq">FAQ</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </transition>
+                        </div>
                     <transition name="scroll-btn-fade">
                         <div v-show="userHasScrolledUp" class="scroll-to-bottom-btn" @click="onClickScrollToBottom">
                             <t-icon name="chevron-down" size="18px" />

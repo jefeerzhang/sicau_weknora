@@ -2800,7 +2800,7 @@ export default {
     goToAgentSettings: 'Go to agent settings'
   },
   createChat: {
-    title: 'Hi, I am WeKnora — your knowledge, within reach',
+    title: 'Your knowledge, at your fingertips',
     newSessionTitle: 'New Session',
     openProject: 'Select project',
     clearProject: 'Clear',

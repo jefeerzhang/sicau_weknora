@@ -1,9 +1,6 @@
 <template>
-    <div class="dialogue-wrap">
-        <div class="dialogue-answers">
-            <div class="dialogue-title" style="--wails-draggable: drag">
-                <span style="--wails-draggable: drag">{{ $t('createChat.title') }}</span>
-            </div>
+    <NewConversationEmptyState>
+        <template #questions>
             <!-- 推荐问题 -->
             <div ref="sqContainerRef" class="suggested-questions-container">
                 <!-- 骨架屏占位 -->
@@ -43,6 +40,8 @@
                     </div>
                 </transition>
             </div>
+        </template>
+        <template #composer>
             <div class="create-chat-composer">
                 <div v-if="hostSandboxEnabled" class="project-dir-bar">
                     <button type="button" class="project-dir-bar__btn"
@@ -59,8 +58,8 @@
                 </div>
                 <InputField ref="inputFieldRef" @send-msg="sendMsg"></InputField>
             </div>
-        </div>
-    </div>
+        </template>
+    </NewConversationEmptyState>
 
     <ContextualGuide tour="chat" :when="showChatContextualGuide" />
 
@@ -73,6 +72,7 @@
 import { ref, watch, onMounted, nextTick, computed } from 'vue';
 import ContextualGuide from '@/components/ContextualGuide.vue';
 import InputField from '@/components/Input-field.vue';
+import { NewConversationEmptyState } from './newConversationEmptyState';
 import { createSessions } from "@/api/chat/index";
 import { pickHostProjectDir } from '@/utils/desktopProjectDir';
 import { projectDirBasename, shouldRenderHostProjectSettings, withOptionalProjectDir } from '@/utils/hostWorkspace';
@@ -297,27 +297,7 @@ async function openProjectDir() {
 
 </script>
 <style lang="less" scoped>
-.dialogue-wrap {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    // position: relative;
-}
 
-.dialogue-answers {
-    display: flex;
-    flex-flow: column;
-    align-items: center;
-    width: 100%;
-    max-width: 960px;
-    gap: 24px;
-
-    :deep(.answers-input) {
-        position: static;
-        transform: translateX(0);
-    }
-}
 
 .create-chat-composer {
     display: flex;
@@ -380,34 +360,11 @@ async function openProjectDir() {
     cursor: pointer;
 }
 
-.dialogue-title {
-    display: flex;
-    color: var(--td-text-color-primary);
-    font-family: var(--app-font-family);
-    font-size: 28px;
-    font-weight: 600;
-    align-items: center;
-    margin-bottom: 0;
-
-    .icon {
-        display: flex;
-        width: 32px;
-        height: 32px;
-        justify-content: center;
-        align-items: center;
-        border-radius: var(--app-radius-sm);
-        background: var(--td-bg-color-container);
-        box-shadow: var(--td-shadow-1);
-        margin-right: 12px;
-
-        .logo_img {
-            height: 24px;
-            width: 24px;
-        }
     }
 }
 
 @import '../../components/css/suggested-questions.less';
+@import './newConversationEmptyState.less';
 
 @keyframes skeletonFadeIn {
     from {
