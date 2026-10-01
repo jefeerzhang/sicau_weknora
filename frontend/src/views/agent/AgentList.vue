@@ -784,7 +784,6 @@ import ResourceSortControl from '@/components/ResourceSortControl.vue'
 import ResourceOriginBadge from '@/components/ResourceOriginBadge.vue'
 import { shouldShowResourceOriginBadge } from '@/utils/card-list-badge'
 import { useAuthStore } from '@/stores/auth'
-import { getDefaultAgentId, putDefaultAgentId } from '@/api/tenant'
 import { useListUrlState } from '@/composables/useListUrlState'
 import { useResourcePins } from '@/composables/useResourcePins'
 import { integrationSectionKey } from '@/config/settingsRoute'
@@ -1239,34 +1238,6 @@ watch(spaceSelection, (val) => {
 watch(creatorFilter, () => {
   fetchList(true)
 })
-
-const defaultAgentId = ref('')
-const defaultAgentLoading = ref(false)
-
-async function loadDefaultAgentId() {
-  if (defaultAgentLoading.value) return
-  defaultAgentLoading.value = true
-  try {
-    const res = await getDefaultAgentId()
-    defaultAgentId.value = res?.data?.agent_id || ''
-  } catch {
-    defaultAgentId.value = ''
-  } finally {
-    defaultAgentLoading.value = false
-  }
-}
-
-/** Set/clear workspace default agent (Admin+; server enforces the same). */
-async function handleSetDefaultAgent(agent: CustomAgent) {
-  const target = defaultAgentId.value === agent.id ? '' : agent.id
-  const res = await putDefaultAgentId(target)
-  if (res?.success) {
-    defaultAgentId.value = target
-    MessagePlugin.success(target ? t('agent.defaultAgentSet') : t('agent.defaultAgentCleared'))
-  } else {
-    MessagePlugin.error(res?.message || t('agent.defaultAgentSetFailed'))
-  }
-}
 
 onMounted(() => {
   void loadDefaultAgentId()
