@@ -278,6 +278,14 @@ func (h *TenantInvitationHandler) CreateInvitation(c *gin.Context) {
 		c.Error(apperrors.NewValidationError("role must be one of owner/admin/contributor/viewer"))
 		return
 	}
+	// sicau-v1 ticket 02 (ADR-009-4) + teaching #17: invitations are
+	// viewer-only (Student). Elevated workspace roles are not mintable
+	// through invite or member-management teaching routes.
+	if req.Role != types.TenantRoleViewer {
+		c.Error(apperrors.NewValidationError(
+			"invitation role is fixed to viewer (student)"))
+		return
+	}
 
 	user, err := h.userService.GetUserByEmail(ctx, strings.TrimSpace(req.Email))
 	if err != nil {
@@ -357,6 +365,10 @@ func (h *TenantInvitationHandler) autoAcceptInvitationAndRespond(
 	role types.TenantRole,
 	invitedBy *string,
 ) {
+	// #21: the teaching model materialises invitation joins as students
+	// only. The creation guard already forces viewer; clamping here makes
+	// the boundary self-contained instead of trusting every caller.
+	role = types.TenantRoleViewer
 	member, err := h.memberService.AddMember(ctx, user.ID, tenantID, role, invitedBy)
 	if err != nil {
 		writeAddMemberError(c, ctx, user, tenantID, err)

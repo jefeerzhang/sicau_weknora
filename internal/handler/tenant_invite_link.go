@@ -81,6 +81,13 @@ func (h *TenantInvitationHandler) CreateInviteLink(c *gin.Context) {
 		c.Error(apperrors.NewValidationError("role must be one of owner/admin/contributor/viewer"))
 		return
 	}
+	// sicau-v1 ticket 02 (ADR-009-4) + teaching #17: share links are
+	// viewer-only (Student). Elevated roles are not mintable here.
+	if req.Role != types.TenantRoleViewer {
+		c.Error(apperrors.NewValidationError(
+			"share link role is fixed to viewer (student)"))
+		return
+	}
 
 	caller, _ := types.UserIDFromContext(ctx)
 	var invitedBy *string

@@ -147,6 +147,9 @@ func (h *TenantMemberHandler) ListMembers(c *gin.Context) {
 			row.Email = u.Email
 			row.Username = u.Username
 			row.Avatar = u.Avatar
+			row.RosterIdentity = teachingRosterIdentity(m.Role, u)
+		} else {
+			row.RosterIdentity = teachingRosterIdentity(m.Role, nil)
 		}
 		resp = append(resp, row)
 	}
@@ -160,6 +163,24 @@ func (h *TenantMemberHandler) ListMembers(c *gin.Context) {
 			"page_size": pageSize,
 		},
 	})
+}
+
+// teachingRosterIdentity labels a membership for the course roster.
+// The workspace owner is a teacher, or a super administrator when that
+// account already is one. Everyone else invited in is a student. Legacy
+// admin/contributor rows stay unlabeled so the UI can flag them.
+func teachingRosterIdentity(role types.TenantRole, user *types.User) string {
+	switch role {
+	case types.TenantRoleViewer:
+		return string(types.PlatformIdentityStudent)
+	case types.TenantRoleOwner:
+		if user != nil && user.IsSystemAdmin {
+			return string(types.PlatformIdentitySuperAdmin)
+		}
+		return string(types.PlatformIdentityTeacher)
+	default:
+		return ""
+	}
 }
 
 // AddMember godoc
@@ -204,6 +225,15 @@ func (h *TenantMemberHandler) AddMember(c *gin.Context) {
 	// sentinel-mapped 400.
 	if !req.Role.IsValid() {
 		c.Error(apperrors.NewValidationError("role must be one of owner/admin/contributor/viewer"))
+		return
+	}
+	// Teaching deployment (#17): member-add can only mint Student (viewer).
+	// Owner is established at workspace creation; admin/contributor are not
+	// assignable through teaching routes. Platform Teacher appointment stays
+	// on SuperAdmin-only endpoints.
+	if req.Role != types.TenantRoleViewer {
+		c.Error(apperrors.NewForbiddenError(
+			"teaching workspaces only admit student (viewer) memberships through this endpoint"))
 		return
 	}
 
@@ -270,14 +300,15 @@ func writeAddMemberSuccess(c *gin.Context, user *types.User, member *types.Tenan
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
 		"data": types.TenantMemberResponse{
-			UserID:    member.UserID,
-			Email:     user.Email,
-			Username:  user.Username,
-			Avatar:    user.Avatar,
-			Role:      member.Role,
-			Status:    member.Status,
-			InvitedBy: member.InvitedBy,
-			JoinedAt:  member.JoinedAt,
+			UserID:         member.UserID,
+			Email:          user.Email,
+			Username:       user.Username,
+			Avatar:         user.Avatar,
+			Role:           member.Role,
+			Status:         member.Status,
+			InvitedBy:      member.InvitedBy,
+			JoinedAt:       member.JoinedAt,
+			RosterIdentity: teachingRosterIdentity(member.Role, user),
 		},
 	})
 }
@@ -307,20 +338,18 @@ func addMemberAndRespond(
 
 // UpdateMemberRole godoc
 // @Summary      修改空间成员角色
-// @Description  Owner 修改某位成员在当前空间内的角色；不能将最后一位 Owner 降级
+// @Description  Teaching workspaces reject role changes (#17); owner/viewer are fixed at create / invite
 // @Tags         空间成员
 // @Accept       json
 // @Produce      json
 // @Param        id       path  string                  true  "空间 ID"
 // @Param        user_id  path  string                  true  "用户 ID"
 // @Param        request  body  updateMemberRoleRequest true  "目标角色"
-// @Success      200  {object}  map[string]interface{}
+// @Success      403  {object}  map[string]interface{}
 // @Security     Bearer
 // @Router       /tenants/{id}/members/{user_id} [put]
 func (h *TenantMemberHandler) UpdateMemberRole(c *gin.Context) {
-	ctx := c.Request.Context()
-	tenantID, ok := parseTenantIDFromPath(c)
-	if !ok {
+	if _, ok := parseTenantIDFromPath(c); !ok {
 		return
 	}
 	userID := strings.TrimSpace(c.Param("user_id"))
@@ -338,26 +367,14 @@ func (h *TenantMemberHandler) UpdateMemberRole(c *gin.Context) {
 		c.Error(apperrors.NewValidationError("role must be one of owner/admin/contributor/viewer"))
 		return
 	}
-
-	if err := h.memberService.UpdateRole(ctx, userID, tenantID, req.Role); err != nil {
-		switch {
-		case errors.Is(err, service.ErrMembershipNotFound):
-			c.Error(apperrors.NewNotFoundError("membership not found"))
-		case errors.Is(err, service.ErrLastOwner):
-			c.Error(apperrors.NewConflictError(err.Error()))
-		case errors.Is(err, service.ErrInvalidTenantRole):
-			c.Error(apperrors.NewValidationError(err.Error()))
-		case errors.Is(err, service.ErrAPIKeyCannotAssignOwner):
-			c.Error(apperrors.NewForbiddenError(err.Error()))
-		default:
-			logger.Errorf(ctx, "UpdateRole failed: user=%s tenant=%d err=%v",
-				userID, tenantID, err)
-			c.Error(apperrors.NewInternalServerError("failed to update member role").WithDetails(err.Error()))
-		}
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"success": true})
+	// Teaching deployment (#17): the education membership model is fixed to
+	// one workspace lead (internal owner, set at create) and students
+	// (viewer). This endpoint must not transfer, demote, duplicate, or
+	// promote roles - including granting admin/contributor. Legacy
+	// admin/contributor cleanup and ambiguous-owner recovery are separate
+	// SuperAdmin flows (#18/#19), not ordinary member mutations.
+	c.Error(apperrors.NewForbiddenError(
+		"teaching workspaces do not allow changing membership roles through this endpoint"))
 }
 
 // RemoveMember godoc

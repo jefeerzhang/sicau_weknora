@@ -233,7 +233,11 @@ func TestTenantMember_ListMembers_HappyPath(t *testing.T) {
 	}
 	us := &stubMemberUserService{
 		getByID: func(_ context.Context, id string) (*types.User, error) {
-			return &types.User{ID: id, Username: id, Email: id + "@x.com"}, nil
+			u := &types.User{ID: id, Username: id, Email: id + "@x.com"}
+			if id == "u-owner" {
+				u.IsSystemAdmin = true
+			}
+			return u, nil
 		},
 	}
 	h := newTestMemberHandler(ms, us)
@@ -258,6 +262,18 @@ func TestTenantMember_ListMembers_HappyPath(t *testing.T) {
 	// Hydration must have populated email so the UI can render avatars.
 	if resp.Data.Members[0].Email == "" {
 		t.Fatalf("expected hydrated email, got empty")
+	}
+	// The course roster labels the workspace owner as teacher or super
+	// administrator. It must not dump raw platform flags for every row.
+	body := w.Body.String()
+	if strings.Contains(body, "is_system_admin") || strings.Contains(body, "is_teacher") || strings.Contains(body, "platform_identity") {
+		t.Fatalf("member roster leaked raw platform flags: %s", body)
+	}
+	if resp.Data.Members[0].RosterIdentity != string(types.PlatformIdentitySuperAdmin) {
+		t.Fatalf("owner roster identity = %q", resp.Data.Members[0].RosterIdentity)
+	}
+	if resp.Data.Members[1].RosterIdentity != "" {
+		t.Fatalf("legacy role must stay unlabeled, got %q", resp.Data.Members[1].RosterIdentity)
 	}
 }
 
@@ -324,10 +340,41 @@ func TestTenantMember_AddMember_HappyPath(t *testing.T) {
 	}
 	h := newTestMemberHandler(ms, us)
 
-	body := map[string]any{"email": "bob@x.com", "role": "contributor"}
+	body := map[string]any{"email": "bob@x.com", "role": "viewer"}
 	w := doJSON(t, memberTestRouter(h), http.MethodPost, "/tenants/1/members", body, caller)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestTenantMember_AddMember_RejectsElevatedRoles(t *testing.T) {
+	// #17: direct add may only mint Student (viewer). Membership must stay
+	// unchanged — the service must never be reached for elevated roles.
+	for _, role := range []string{"owner", "admin", "contributor"} {
+		t.Run(role, func(t *testing.T) {
+			called := false
+			ms := &stubMemberService{
+				add: func(_ context.Context, _ string, _ uint64, _ types.TenantRole, _ *string) (*types.TenantMember, error) {
+					called = true
+					return nil, nil
+				},
+			}
+			us := &stubMemberUserService{
+				getByEmail: func(_ context.Context, _ string) (*types.User, error) {
+					called = true
+					return &types.User{ID: "u-bob", Email: "bob@x.com"}, nil
+				},
+			}
+			h := newTestMemberHandler(ms, us)
+			w := doJSON(t, memberTestRouter(h), http.MethodPost, "/tenants/1/members",
+				map[string]any{"email": "bob@x.com", "role": role}, "u-owner")
+			if w.Code != http.StatusForbidden {
+				t.Fatalf("role=%s status=%d body=%s, want 403", role, w.Code, w.Body.String())
+			}
+			if called {
+				t.Fatalf("role=%s must not reach user lookup or AddMember", role)
+			}
+		})
 	}
 }
 
@@ -362,7 +409,7 @@ func TestTenantMember_AddMember_DuplicateMaps409(t *testing.T) {
 	}
 	h := newTestMemberHandler(ms, us)
 
-	body := map[string]any{"email": "bob@x.com", "role": "contributor"}
+	body := map[string]any{"email": "bob@x.com", "role": "viewer"}
 	w := doJSON(t, memberTestRouter(h), http.MethodPost, "/tenants/1/members", body, "u-owner")
 	if w.Code != http.StatusConflict {
 		t.Fatalf("duplicate must surface as 409, got %d", w.Code)
@@ -392,54 +439,47 @@ func TestTenantMember_AddMember_InvalidRoleRejectedUpfront(t *testing.T) {
 
 // ---------- UpdateMemberRole ----------
 
-func TestTenantMember_UpdateRole_HappyPath(t *testing.T) {
-	ms := &stubMemberService{
-		updateRole: func(_ context.Context, userID string, tenantID uint64, newRole types.TenantRole) error {
-			if userID != "u-bob" || tenantID != 1 || newRole != types.TenantRoleAdmin {
-				t.Fatalf("unexpected args: user=%s tenant=%d role=%s", userID, tenantID, newRole)
+func TestTenantMember_UpdateRole_RejectedForTeachingDeployment(t *testing.T) {
+	// #17: teaching workspaces freeze membership roles — no promote, demote,
+	// transfer, or duplicate of owner/admin/contributor/viewer via this API.
+	for _, role := range []string{"owner", "admin", "contributor", "viewer"} {
+		t.Run(role, func(t *testing.T) {
+			called := false
+			ms := &stubMemberService{
+				updateRole: func(_ context.Context, _ string, _ uint64, _ types.TenantRole) error {
+					called = true
+					return nil
+				},
 			}
+			h := newTestMemberHandler(ms, &stubMemberUserService{})
+			w := doJSON(t, memberTestRouter(h), http.MethodPut, "/tenants/1/members/u-bob",
+				map[string]any{"role": role}, "u-owner")
+			if w.Code != http.StatusForbidden {
+				t.Fatalf("role=%s status=%d body=%s, want 403", role, w.Code, w.Body.String())
+			}
+			if called {
+				t.Fatalf("role=%s must not reach UpdateRole service", role)
+			}
+		})
+	}
+}
+
+func TestTenantMember_UpdateRole_InvalidRoleStill400(t *testing.T) {
+	called := false
+	ms := &stubMemberService{
+		updateRole: func(_ context.Context, _ string, _ uint64, _ types.TenantRole) error {
+			called = true
 			return nil
 		},
 	}
 	h := newTestMemberHandler(ms, &stubMemberUserService{})
-
-	body := map[string]any{"role": "admin"}
-	w := doJSON(t, memberTestRouter(h), http.MethodPut, "/tenants/1/members/u-bob", body, "u-owner")
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	w := doJSON(t, memberTestRouter(h), http.MethodPut, "/tenants/1/members/u-bob",
+		map[string]any{"role": "wizard"}, "u-owner")
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("invalid role must 400, got %d body=%s", w.Code, w.Body.String())
 	}
-}
-
-func TestTenantMember_UpdateRole_LastOwnerMaps409(t *testing.T) {
-	// Service-layer invariant: the last Owner cannot be demoted. Mapping
-	// ErrLastOwner to 409 lets the UI render the message inline rather
-	// than as a generic failure.
-	ms := &stubMemberService{
-		updateRole: func(_ context.Context, _ string, _ uint64, _ types.TenantRole) error {
-			return service.ErrLastOwner
-		},
-	}
-	h := newTestMemberHandler(ms, &stubMemberUserService{})
-
-	body := map[string]any{"role": "viewer"}
-	w := doJSON(t, memberTestRouter(h), http.MethodPut, "/tenants/1/members/u-only-owner", body, "u-only-owner")
-	if w.Code != http.StatusConflict {
-		t.Fatalf("last owner demote must 409, got %d", w.Code)
-	}
-}
-
-func TestTenantMember_UpdateRole_UnknownMembershipMaps404(t *testing.T) {
-	ms := &stubMemberService{
-		updateRole: func(_ context.Context, _ string, _ uint64, _ types.TenantRole) error {
-			return service.ErrMembershipNotFound
-		},
-	}
-	h := newTestMemberHandler(ms, &stubMemberUserService{})
-
-	body := map[string]any{"role": "admin"}
-	w := doJSON(t, memberTestRouter(h), http.MethodPut, "/tenants/1/members/u-ghost", body, "u-owner")
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("missing membership must 404, got %d", w.Code)
+	if called {
+		t.Fatalf("UpdateRole must not run for invalid role")
 	}
 }
 
@@ -583,7 +623,7 @@ func TestTenantMember_RejectsCrossTenantURL_Add(t *testing.T) {
 		},
 	}
 	h := newTestMemberHandler(ms, us)
-	body := map[string]any{"email": "bob@x.com", "role": "contributor"}
+	body := map[string]any{"email": "bob@x.com", "role": "viewer"}
 	w := doJSONWithCtx(t, memberTestRouter(h), http.MethodPost, "/tenants/5/members", body,
 		memberCtxOpts{callerID: "u1", tenantID: 1})
 	if w.Code != http.StatusForbidden {
@@ -755,7 +795,7 @@ func TestTenantMember_AddMember_SyntheticCallerLeavesInvitedByNull(t *testing.T)
 	ms := &stubMemberService{
 		add: func(_ context.Context, _ string, _ uint64, _ types.TenantRole, invitedBy *string) (*types.TenantMember, error) {
 			captured.invited = invitedBy
-			return &types.TenantMember{UserID: "u-bob", TenantID: 1, Role: types.TenantRoleContributor, Status: types.TenantMemberStatusActive, JoinedAt: time.Now()}, nil
+			return &types.TenantMember{UserID: "u-bob", TenantID: 1, Role: types.TenantRoleViewer, Status: types.TenantMemberStatusActive, JoinedAt: time.Now()}, nil
 		},
 	}
 	us := &stubMemberUserService{
@@ -764,7 +804,7 @@ func TestTenantMember_AddMember_SyntheticCallerLeavesInvitedByNull(t *testing.T)
 		},
 	}
 	h := newTestMemberHandler(ms, us)
-	body := map[string]any{"email": "bob@x.com", "role": "contributor"}
+	body := map[string]any{"email": "bob@x.com", "role": "viewer"}
 	w := doJSON(t, memberTestRouter(h), http.MethodPost, "/tenants/1/members", body, "system-1")
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d body=%s", w.Code, w.Body.String())
