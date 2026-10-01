@@ -1,11 +1,4 @@
-impo
-  {
-    path: "/force-change-password",
-    name: "forceChangePassword",
-    component: () => import("../views/auth/ForceChangePassword.vue"),
-    meta: { requiresAuth: true, requiresTenant: false },
-  },
-rt { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
