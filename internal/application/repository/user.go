@@ -197,6 +197,35 @@ func (r *userRepository) ListSystemAdmins(ctx context.Context, offset, limit int
 //     surfaced `user` is the unchanged DB row.
 //   - (nil, ErrCannotRevokeSelf | ErrLastSystemAdmin | ErrUserNotFound | …):
 //     hard rejection; no row written.
+// ListTeachers lists users with effective Teacher capability (#10/#13/#14):
+// either the explicitly appointed platform Teacher identity (is_teacher=true)
+// or the composite SuperAdmin that inherits the teacher capability without a
+// separate appointment (is_system_admin=true). This mirrors
+// types.User.HasTeacherCapability() so the SuperAdmin console's teacher list
+// reflects the full teaching-side membership.
+func (r *userRepository) ListTeachers(ctx context.Context, offset, limit int) ([]*types.User, int64, error) {
+	var users []*types.User
+	var total int64
+
+	base := r.db.WithContext(ctx).Model(&types.User{}).
+		Where("is_teacher = ? OR is_system_admin = ?", true, true)
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	query := base.Order("created_at DESC, id ASC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if err := query.Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
 func (r *userRepository) RevokeSystemAdmin(ctx context.Context, userID, actorID string) (*types.User, error) {
 	if userID == actorID {
 		return nil, ErrCannotRevokeSelf

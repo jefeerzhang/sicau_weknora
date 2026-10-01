@@ -603,6 +603,13 @@ func (s *userService) ListSystemAdmins(
 	return s.userRepo.ListSystemAdmins(ctx, offset, limit)
 }
 
+// ListTeachers lists appointed platform teachers and composite SuperAdmins.
+func (s *userService) ListTeachers(
+	ctx context.Context, offset, limit int,
+) ([]*types.User, int64, error) {
+	return s.userRepo.ListTeachers(ctx, offset, limit)
+}
+
 // RevokeSystemAdmin removes system-admin privileges through the
 // repository's transactional guard so concurrent revokes cannot remove
 // the final administrator.
@@ -700,6 +707,7 @@ func (s *userService) ChangePassword(ctx context.Context, userID, oldPassword, n
 
 	user.PasswordHash = string(hashedPassword)
 	user.UpdatedAt = time.Now()
+	user.MustChangePassword = false
 	if user.Preferences.OidcOnlyLogin != nil && *user.Preferences.OidcOnlyLogin {
 		cleared := false
 		user.Preferences.OidcOnlyLogin = &cleared

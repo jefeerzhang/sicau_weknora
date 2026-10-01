@@ -657,8 +657,11 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	// 同步返回当前用户的 memberships，让前端在页面刷新（仅命中 /auth/me）
 	// 后也能恢复 currentTenantRole，避免角色信息只在 login 那一刻可用。
 	memberships := h.userService.BuildLoginMemberships(ctx, user, tenant)
-	canCreateTenant := user.CanAccessAllTenants ||
-		resolveTenantSelfServiceCreationEnabled(ctx, h.configInfo, h.systemSettingSvc)
+	// Mirror tenant creation's authoritative gate so the capability
+	// reported to the frontend never disagrees with the backend check.
+	apiKeyScope, hasAPIKeyScope := types.TenantAPIKeyScopeFromContext(ctx)
+	platformCaller := hasAPIKeyScope && apiKeyScope.IsPlatform()
+	canCreateTenant := user.CanAccessAllTenants || platformCaller || user.HasTeacherCapability()
 	autoAcceptInvitation := h.systemSettingSvc != nil &&
 		h.systemSettingSvc.GetBool(ctx, "tenant.auto_accept_invitation", "WEKNORA_TENANT_AUTO_ACCEPT_INVITATION", false)
 	c.JSON(http.StatusOK, gin.H{

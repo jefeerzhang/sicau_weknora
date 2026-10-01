@@ -18,6 +18,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/application/service"
 	"github.com/Tencent/WeKnora/internal/application/service/file"
+	"github.com/Tencent/WeKnora/internal/bootstrap"
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/database"
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
@@ -1356,6 +1357,10 @@ func (h *SystemHandler) PromoteUserToSystemAdmin(c *gin.Context) {
 			"idempotent":      true,
 		})
 		c.JSON(http.StatusOK, user.ToUserInfo())
+		return
+	}
+	if err := bootstrap.AssertUniqueSuperAdminPromote(ctx, h.userSvc, user); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 	user.IsSystemAdmin = true
