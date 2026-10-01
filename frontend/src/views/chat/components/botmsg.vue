@@ -82,6 +82,10 @@
                 </t-button>
                 <SaveAnswerToNoteButton v-if="!embeddedMode" :question="userQuery"
                     :answer="content || session.content" />
+                <t-button v-if="canMutateCourseFiles" size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge"
+                    :title="$t('agent.addToKnowledgeBase')">
+                    <t-icon name="bookmark-add" />
+                </t-button>
                 <!-- Skill artifact download: only shown when this reply's
                      assistant message actually recorded any generated files.
                      Emptiness is the default: the button stays hidden for
@@ -450,6 +454,98 @@ const handleCopyAnswer = async () => {
 };
 
 // 添加到知识库
+const handleAddToKnowledge = () => {
+    const content = getActualContent();
+    if (!content) {
+        MessagePlugin.warning(t('chat.emptyContentWarning'));
+        return;
+    }
+
+    const question = (props.userQuery || '').trim();
+    const manualContent = buildManualMarkdown(question, content);
+    const manualTitle = formatManualTitle(question);
+    ``
+    uiStore.openManualEditor({
+        mode: 'create',
+        title: manualTitle,
+        content: manualContent,
+        status: 'draft',
+    });
+
+    MessagePlugin.info(t('chat.editorOpened'));
+};
+
+// 处理 markdown-content 中图片的点击事件
+const handleMarkdownImageClick = (e) => {
+    const target = e.target;
+    const artifactIndex = artifactIndexFromEventTarget(target);
+    if (artifactIndex !== null) {
+        e.preventDefault();
+        e.stopPropagation();
+        openArtifactDrawer(artifactIndex);
+        return;
+    }
+    if (target && target.tagName === 'IMG') {
+        const src = target.getAttribute('src');
+        if (src) {
+            e.preventDefault();
+            e.stopPropagation();
+            preview(src);
+        }
+    }
+};
+
+watch(renderedHTML, () => {
+    nextTick(() => {
+        rebindCitations();
+    });
+});
+
+// 渲染 Mermaid 图表的函数
+onUpdated(() => {
+    nextTick(async () => {
+        await hydrateProtectedFileImages(parentMd.value, protectedFileAccess.value);
+        await hydrateArtifactImages(parentMd.value, artifactRefContext.value);
+        refreshMarkdownEnhancements(parentMd.value);
+        if (props.session?.is_completed) {
+            await renderMermaidInContainer(parentMd.value);
+        }
+    });
+});
+
+onMounted(async () => {
+    // 为 markdown-content 中的图片添加点击事件
+    nextTick(async () => {
+        if (parentMd.value) {
+            parentMd.value.addEventListener('click', handleMarkdownImageClick, true);
+        }
+        rebindCitations();
+        await hydrateProtectedFileImages(parentMd.value, protectedFileAccess.value);
+        await hydrateArtifactImages(parentMd.value, artifactRefContext.value);
+        await enhanceMarkdownContainer(parentMd.value);
+    });
+});
+
+onBeforeUnmount(() => {
+    if (parentMd.value) {
+        parentMd.value.removeEventListener('click', handleMarkdownImageClick, true);
+    }
+});
+</script>
+<style lang="less" scoped>
+@import '../../../components/css/chat-markdown.less';
+@import '../../../components/css/chat-message-shared.less';
+@import '../../../components/css/chat-citations.less';
+
+.bot_msg {
+    &.is-embedded {
+        width: 100%;
+
+        :deep(.agent-stream-display) {
+            width: 100%;
+        }
+    }
+}
 
 .rag-answer-stack {
     display: flex;

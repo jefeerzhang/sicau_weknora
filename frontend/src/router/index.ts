@@ -57,6 +57,12 @@ const router = createRouter({
       component: () => import("../views/auth/Login.vue"),
       meta: { requiresAuth: false, requiresInit: false }
     },
+    {
+      path: "/force-change-password",
+      name: "forceChangePassword",
+      component: () => import("../views/auth/ForceChangePassword.vue"),
+      meta: { requiresAuth: true, requiresTenant: false },
+    },
     // Embed chat is a separate entry (embed.html + embed-main.ts), not this SPA.
     {
       path: "/register",
@@ -426,7 +432,7 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
-    if (
+  if (
     authStore.isLoggedIn &&
     authStore.mustChangePassword &&
     to.path !== '/force-change-password' &&
