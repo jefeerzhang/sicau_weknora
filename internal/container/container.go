@@ -554,6 +554,8 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(handler.NewEvaluationHandler))
 	must(container.Provide(handler.NewInitializationHandler))
 	must(container.Provide(handler.NewAuthHandler))
+	must(container.Provide(service.NewTeachingRoleMigrator))
+	must(container.Provide(service.NewTeachingMigrationPhase))
 	must(container.Provide(handler.NewSystemHandler))
 	// Dig resolves exact types; adapt the registered service to the handler's
 	// narrower SharedAgentLookup interface at the composition boundary.
