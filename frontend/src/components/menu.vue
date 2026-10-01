@@ -1126,6 +1126,8 @@ let agentIcon = ref('agent.svg');
 let artifactIcon = ref('artifact.svg');
 let toolboxIcon = ref('toolbox.svg');
 let organizationIcon = ref('organization.svg');
+let notesIcon = ref('notes.svg');
+let announcementsIcon = ref('announcements.svg');
 let pathPrefix = ref(route.name)
 const getIcon = (path: string) => {
     // 根据当前路由状态更新所有图标
@@ -1135,6 +1137,8 @@ const getIcon = (path: string) => {
     const agentsActiveState = route.name === 'agentList';
     const artifactsActiveState = route.name === 'artifactLibrary';
     const organizationsActiveState = route.name === 'organizationList';
+    const notesActiveState = route.name === 'notes';
+    const announcementsActiveState = route.name === 'announcements';
 
     // 知识库图标：只在知识库页面显示绿色
     knowledgeIcon.value = kbActiveState.isKbActive ? 'zhishiku-green.svg' : 'zhishiku.svg';
@@ -1149,6 +1153,9 @@ const getIcon = (path: string) => {
 
     // 组织图标：只在组织页面显示绿色
     organizationIcon.value = organizationsActiveState ? 'organization-green.svg' : 'organization.svg';
+
+    notesIcon.value = notesActiveState ? 'notes-green.svg' : 'notes.svg';
+    announcementsIcon.value = announcementsActiveState ? 'announcements-green.svg' : 'announcements.svg';
 
     // 对话图标：只在对话创建页面显示绿色，其他情况显示默认
     prefixIcon.value = creatChatActiveState.isCreatChatActive ? 'prefixIcon-green.svg' : 'prefixIcon.svg';
@@ -1228,8 +1235,15 @@ const gotopage = async (path: string) => {
     getIcon(path)
 }
 
-const getImgSrc = (url: string) => {
-    return new URL(`/src/assets/img/${url}`, import.meta.url).href;
+const menuIconModules = import.meta.glob('@/assets/img/*.svg', {
+    eager: true,
+    import: 'default',
+}) as Record<string, string>
+
+const getImgSrc = (url: string | undefined) => {
+    if (!url) return ''
+    const key = Object.keys(menuIconModules).find((path) => path.endsWith(`/img/${url}`) || path.endsWith(`/${url}`))
+    return key ? menuIconModules[key] : ''
 }
 
 const mouseenteMenu = (path: string) => {
