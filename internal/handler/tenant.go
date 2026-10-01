@@ -248,14 +248,14 @@ func (h *TenantHandler) CreateTenant(c *gin.Context) {
 	// composite SuperAdmin) and cross-tenant superusers always pass - the
 	// flag only selects the refusal a non-teacher-capability caller gets
 	// (2005 "creation disabled" vs 403 "not a teacher"), never whether a
-	// teacher may create (#10/#13).
+	// teacher may create.
 	if !catalogManager && !caller.HasTeacherCapability() &&
 		!resolveTenantSelfServiceCreationEnabled(ctx, h.config, h.systemSettingSvc) {
 		logger.Warnf(ctx, "Self-service tenant creation denied by policy for user %s", caller.ID)
 		c.Error(errors.NewTenantCreationDisabledError())
 		return
 	}
-	// #10/#13: only effective Teachers may create teaching workspaces. The
+	// Only effective Teachers may create teaching workspaces. The
 	// composite SuperAdmin satisfies this via inherited teacher capability
 	// without a separate appointment; students, unappointed accounts and
 	// non-platform API keys do not (catalogManager bypass remains).
@@ -1633,15 +1633,16 @@ func (h *TenantHandler) GetPromptTemplates(c *gin.Context) {
 
 	// Build a localized copy so the original config is never mutated
 	localized := &config.PromptTemplatesConfig{
-		SystemPrompt:         config.LocalizeTemplates(templates.SystemPrompt, lang),
-		ContextTemplate:      config.LocalizeTemplates(templates.ContextTemplate, lang),
-		Rewrite:              config.LocalizeTemplates(templates.Rewrite, lang),
-		Fallback:             config.LocalizeTemplates(templates.Fallback, lang),
-		GenerateSessionTitle: templates.GenerateSessionTitle,
-		GenerateSummary:      templates.GenerateSummary,
-		KeywordsExtraction:   templates.KeywordsExtraction,
-		AgentSystemPrompt:    config.LocalizeTemplates(templates.AgentSystemPrompt, lang),
-		IntentPrompts:        config.LocalizeTemplates(templates.IntentPrompts, lang),
+		SystemPrompt:          config.LocalizeTemplates(templates.SystemPrompt, lang),
+		ContextTemplate:       config.LocalizeTemplates(templates.ContextTemplate, lang),
+		Rewrite:               config.LocalizeTemplates(templates.Rewrite, lang),
+		Fallback:              config.LocalizeTemplates(templates.Fallback, lang),
+		GenerateSessionTitle:  templates.GenerateSessionTitle,
+		GenerateSummary:       templates.GenerateSummary,
+		GenerateKBDescription: templates.GenerateKBDescription,
+		KeywordsExtraction:    templates.KeywordsExtraction,
+		AgentSystemPrompt:     config.LocalizeTemplates(templates.AgentSystemPrompt, lang),
+		IntentPrompts:         config.LocalizeTemplates(templates.IntentPrompts, lang),
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -1747,8 +1748,9 @@ func (h *TenantHandler) updateTenantChatHistoryConfigInternal(c *gin.Context) {
 	})
 }
 
-// GetTenantDefaultAgent returns the workspace default agent id
-// (sicau-v1 ticket 04). Empty string means no default is set.
+// GetTenantRetrievalConfig returns the tenant's global retrieval configuration.
+
+// GetTenantDefaultAgent returns the workspace default agent id (may be empty).
 func (h *TenantHandler) GetTenantDefaultAgent(c *gin.Context) {
 	tenant, _ := types.TenantInfoFromContext(c.Request.Context())
 	if tenant == nil {
@@ -1804,7 +1806,6 @@ func (h *TenantHandler) updateTenantDefaultAgentInternal(c *gin.Context) {
 	})
 }
 
-// GetTenantRetrievalConfig returns the tenant's global retrieval configuration.
 func (h *TenantHandler) GetTenantRetrievalConfig(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenant, _ := types.TenantInfoFromContext(ctx)

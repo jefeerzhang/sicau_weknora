@@ -58,15 +58,29 @@ func RegisterSessionRoutes(
 		sessions.DELETE("/:id", handler.DeleteSession)
 		sessions.DELETE("/:id/messages", handler.ClearSessionMessages)
 		sessions.POST("/:session_id/generate_title", handler.GenerateTitle)
-		// sicau-v1: course students (viewers) cannot upload chat
-		// attachments - pure Q&A deployment (design ADR-009-6 pattern,
-		// backend-enforced rather than frontend-hidden only).
+		// Course students (viewers) cannot upload chat attachments - pure
+		// Q&A deployment (ADR-009-6): backend-enforced, not frontend-only.
 		sessions.POST("/:session_id/attachments", g.Contributor(), handler.UploadTemporaryDocument)
 		sessions.GET("/:id/attachments", g.Contributor(), handler.ListTemporaryDocuments)
 		sessions.GET("/:id/attachments/:attachment_id", g.Contributor(), handler.GetTemporaryDocument)
 		sessions.GET("/:id/attachments/:attachment_id/preview", g.Contributor(), handler.PreviewTemporaryDocument)
 		sessions.DELETE("/:id/attachments/:attachment_id", g.Contributor(), handler.DeleteTemporaryDocument)
 		sessions.POST("/:session_id/stop", handler.StopSession)
+		sessions.POST("/:session_id/fork", handler.ForkSession)
+		sessions.POST("/:session_id/rewind", handler.RewindSession)
+		sessions.POST("/:session_id/sandbox/terminal-ticket", handler.IssueSandboxTerminalTicket)
+		sessions.POST("/:session_id/sandbox/desktop-ticket", handler.IssueSandboxDesktopTicket)
+		sessions.POST("/:session_id/sandbox/desktop/activity", handler.ReportSandboxDesktopActivity)
+		sessions.GET("/:id/local-browser", handler.BrowserSkillConnection)
+		sessions.POST("/:session_id/local-browser", handler.BrowserSkillConnection)
+		// Mid-run message injection: append a user message to the turn that is
+		// currently generating. Accepts even when no run is live (the client
+		// then falls back to a normal send), mirroring StopSession's ownership
+		// rules.
+		sessions.POST("/:session_id/steer", handler.SteerMessage)
+		sessions.GET("/:id/steer", handler.ListSteerMessages)
+		sessions.DELETE("/:id/steer/:steer_id", handler.DeleteSteerMessage)
+		sessions.POST("/:session_id/steer/:steer_id/inject", handler.PromoteSteerMessage)
 		// POST and DELETE share this path but gin maintains a separate radix tree
 		// per HTTP verb, and the existing trees use different wildcard names
 		// (POST uses :session_id, DELETE uses :id). Use whatever matches each
@@ -87,11 +101,9 @@ func RegisterSessionRoutes(
 		// metadata; the actual bytes are streamed via /artifacts/:index/download
 		// so the storage URL never appears on the wire.
 		//
-		// sicau-v1 ticket 03: artifact routes sit on the Viewer+ sessions
-		// group but carry an extra Contributor+ guard - course students
-		// (viewers) are pure Q&A and must not fetch generated files. The
-		// frontend hides the download surface for viewers and shows a
-		// friendly notice if a stale client still hits a 403.
+		// Artifact routes sit on the Viewer+ sessions group but carry an
+		// extra Contributor+ guard - course students must not list or
+		// download generated files.
 		//
 		// NOTE: gin builds a separate radix tree per HTTP verb but every
 		// path in the same tree must share the same wildcard name. The GET
@@ -103,6 +115,21 @@ func RegisterSessionRoutes(
 		sessions.GET("/:id/artifacts", g.Contributor(), handler.ListSessionArtifacts)
 		sessions.GET("/:id/messages/:message_id/artifacts", g.Contributor(), handler.ListMessageArtifacts)
 		sessions.GET("/:id/messages/:message_id/artifacts/:index/download", g.Contributor(), handler.DownloadMessageArtifact)
+		// Deleting reclaims the stored bytes; keep Contributor+ so viewers
+		// cannot mutate either.
+		sessions.DELETE("/:id/messages/:message_id/artifacts/:index", g.Contributor(), handler.DeleteMessageArtifact)
+	}
+
+	// Cross-session artifact library. Contributor+ so students have no
+	// library entry point; downloads still go through the per-session
+	// endpoint above.
+	artifacts := g.apiKeyGroup(r.Group("/artifacts", g.Contributor()), apiKeyChat(apiKeyFullAccess()))
+	{
+		artifacts.GET("", handler.ListArtifactLibrary)
+		// The artifact to delete is addressed by query parameters rather than a
+		// path: the library row already carries session_id/message_id/index, and
+		// a path would have to repeat the /sessions tree under a second prefix.
+		artifacts.DELETE("", handler.DeleteLibraryArtifact)
 	}
 }
 
@@ -128,4 +155,34 @@ func RegisterChatRoutes(r *gin.RouterGroup, handler *session.Handler, g *rbacGua
 	{
 		knowledgeSearch.POST("", handler.SearchKnowledge)
 	}
+}
+
+// RegisterSandboxTerminalRoutes registers the interactive-terminal WebSocket.
+//
+// Like the IM callback routes this is registered BEFORE the global auth
+// middleware: a browser WebSocket handshake cannot carry the
+// Authorization / X-API-Key headers, so a short-lived session-bound ticket
+// travels in the ticket query parameter. The handler authenticates itself
+// via service.ParseSandboxTerminalTicket + CheckSandboxTerminalAuth +
+// middleware.AttachAuthenticatedUser (not the 24h access JWT). The ticket
+// is bound to the minting access-token id; the open PTY rechecks that
+// token, user, membership, and session ownership about once a minute.
+//
+// The wildcard is :id because this GET joins the same radix tree as
+// /sessions/:id (gin requires identical wildcard names per tree).
+func RegisterSandboxTerminalRoutes(r *gin.Engine, sessionHandler *session.Handler) {
+	r.GET("/api/v1/sessions/:id/sandbox/terminal", sessionHandler.SandboxTerminalWS)
+}
+
+// RegisterSandboxDesktopRoutes registers the desktop relay WebSocket.
+//
+// Registered BEFORE the global auth middleware for the same reason as the
+// terminal: a browser WebSocket handshake cannot carry Authorization, so a
+// one-shot session-bound ticket travels in the query string. Unlike the
+// terminal's JWT the desktop ticket is an opaque random string consumed with
+// GETDEL, so a leaked URL is worth one handshake at most.
+//
+// The wildcard is :id to match /sessions/:id in the same radix tree.
+func RegisterSandboxDesktopRoutes(r *gin.Engine, sessionHandler *session.Handler) {
+	r.GET("/api/v1/sessions/:id/sandbox/desktop", sessionHandler.SandboxDesktopWS)
 }

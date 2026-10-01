@@ -21,6 +21,9 @@ type TenantService interface {
 	ListTenants(ctx context.Context) ([]*types.Tenant, error)
 	// UpdateTenant updates a tenant
 	UpdateTenant(ctx context.Context, tenant *types.Tenant) (*types.Tenant, error)
+	// UpdateTenantDefaultAgentID sets or clears the workspace default agent
+	// (empty string clears). Used by course workspaces to pin students.
+	UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error
 	// DeleteTenant deletes a tenant
 	DeleteTenant(ctx context.Context, id uint64) error
 	// ListAllTenants lists all tenants (for users with cross-tenant access permission)
@@ -38,9 +41,6 @@ type TenantService interface {
 	GetTenantByIDForUser(ctx context.Context, tenantID uint64, userID string) (*types.Tenant, error)
 	// GetWeKnoraCloudCredentials returns the decrypted WeKnoraCloud credentials for the current tenant.
 	GetWeKnoraCloudCredentials(ctx context.Context) *types.WeKnoraCloudCredentials
-	// UpdateTenantDefaultAgentID sets or clears the workspace default agent
-	// (sicau-v1 ticket 04). Empty agentID clears the default.
-	UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error
 }
 
 // TenantRepository defines the tenant repository interface
@@ -58,8 +58,7 @@ type TenantRepository interface {
 	// UpdateTenant updates a tenant
 	UpdateTenant(ctx context.Context, tenant *types.Tenant) error
 	// UpdateTenantDefaultAgentID sets or clears (empty string) the workspace
-	// default agent (sicau-v1 ticket 04). Map-based on purpose: the generic
-	// struct Updates() skips zero values, so clearing would never persist.
+	// default agent column without zero-value skipping.
 	UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error
 	// DeleteTenant deletes a tenant
 	DeleteTenant(ctx context.Context, id uint64) error

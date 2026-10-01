@@ -22,14 +22,20 @@ import (
 //
 // No DB DDL is required — preferences is a single jsonb column.
 type UserPreferences struct {
+	// BrowserSearchInstructions customizes browser search for this user. Nil/empty uses the platform default.
+	BrowserSearchInstructions *string `json:"browser_search_instructions,omitempty"`
+
 	// LastActiveTenantID remembers the last workspace the user actively
 	// switched into, so a fresh login (new device, cleared browser, new
 	// refresh token) lands them back in that workspace instead of always
-	// bouncing to their home workspace. Login / RefreshToken validate that
+	// bouncing to their home workspace. Written by the SPA's preferences
+	// PUT and by service-level SwitchTenant (including when switching
+	// home, which stores the home ID). Login / RefreshToken validate that
 	// the workspace still exists and the user still has an active membership
 	// (or CanAccessAllTenants) before honouring this preference; an
 	// invalid pointer is best-effort cleared and the user falls back to
-	// home.
+	// home. Refresh JWT claims have no tenant_id, so RefreshToken
+	// re-resolves from this field.
 	//
 	// nil  = no preference (use user.TenantID, i.e. home)
 	// *0   = "clear preference" sentinel for the partial-update endpoint
@@ -118,8 +124,8 @@ type User struct {
 }
 
 // HasTeacherCapability reports whether the user has effective teacher
-// capability. SuperAdmin is a composite identity — platform governance
-// plus inherited teacher capability — so it satisfies this without being
+// capability. SuperAdmin is a composite identity - platform governance
+// plus inherited teacher capability - so it satisfies this without being
 // separately appointed as a Teacher.
 func (u *User) HasTeacherCapability() bool {
 	return u != nil && (u.IsTeacher || u.IsSystemAdmin)
@@ -132,6 +138,25 @@ func (u *User) HasTeacherCapability() bool {
 // operators; it must not be required for SuperAdmin.
 func (u *User) ManagesEveryWorkspace() bool {
 	return u != nil && u.IsSystemAdmin
+}
+
+// PlatformIdentity returns the unified platform identity classification.
+// SuperAdmin wins over Teacher: an account with IsSystemAdmin=true is a
+// SuperAdmin even if IsTeacher=false. An appointed teacher
+// (IsTeacher=true, IsSystemAdmin=false) is a Teacher. A nil user
+// (or missing) yields PlatformIdentityUnset, which callers must render
+// carefully rather than defaulting to student.
+func (u *User) PlatformIdentity() PlatformIdentity {
+	if u == nil {
+		return PlatformIdentityUnset
+	}
+	if u.IsSystemAdmin {
+		return PlatformIdentitySuperAdmin
+	}
+	if u.IsTeacher {
+		return PlatformIdentityTeacher
+	}
+	return PlatformIdentityStudent
 }
 
 // AuthToken represents an authentication token
@@ -274,48 +299,6 @@ type RegisterResponse struct {
 }
 
 // UserInfo represents user information for API responses
-// PlatformIdentity is the unified platform identity classification shown as
-// the user identity label (see CONTEXT.md "用户身份标签"). It is independent
-// of any workspace membership role (Owner/Admin/Contributor/Viewer).
-type PlatformIdentity string
-
-const (
-	// PlatformIdentitySuperAdmin marks the composite platform authority that
-	// automatically satisfies the Teacher capability floor (CONTEXT.md
-	// "复合身份"). It wins over the teacher flag.
-	PlatformIdentitySuperAdmin PlatformIdentity = "superadmin"
-	// PlatformIdentityTeacher marks an appointed teaching identity.
-	PlatformIdentityTeacher PlatformIdentity = "teacher"
-	// PlatformIdentityStudent is the default non-teaching identity.
-	PlatformIdentityStudent PlatformIdentity = "student"
-	// PlatformIdentityUnset marks an abnormal state where identity data is
-	// missing or unrecognizable (CONTEXT.md "身份未设置"). It is never a
-	// grantable business identity and must not be inferred as Teacher or
-	// SuperAdmin.
-	PlatformIdentityUnset PlatformIdentity = "unset"
-)
-
-// PlatformIdentity returns the unified platform identity classification.
-//
-// SuperAdmin is a composite identity that wins over the teacher flag: an
-// account with IsSystemAdmin=true is a SuperAdmin even if IsTeacher=false.
-// An appointed teacher (IsTeacher=true, IsSystemAdmin=false) is a Teacher.
-// Any other account defaults to Student. A nil receiver (identity data
-// missing) yields PlatformIdentityUnset, which callers must render
-// defensively rather than inferring a teaching privilege.
-func (u *User) PlatformIdentity() PlatformIdentity {
-	if u == nil {
-		return PlatformIdentityUnset
-	}
-	if u.IsSystemAdmin {
-		return PlatformIdentitySuperAdmin
-	}
-	if u.IsTeacher {
-		return PlatformIdentityTeacher
-	}
-	return PlatformIdentityStudent
-}
-
 type UserInfo struct {
 	ID                  string           `json:"id"`
 	Username            string           `json:"username"`
@@ -342,7 +325,7 @@ func (u *User) ToUserInfo() *UserInfo {
 		Avatar:              u.Avatar,
 		TenantID:            u.TenantID,
 		IsActive:            u.IsActive,
-		CanAccessAllTenants: u.CanAccessAllTenants || u.IsSystemAdmin,
+		CanAccessAllTenants: u.CanAccessAllTenants,
 		IsSystemAdmin:       u.IsSystemAdmin,
 		MustChangePassword:  u.MustChangePassword,
 		IsTeacher:           u.IsTeacher,

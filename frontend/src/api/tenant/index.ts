@@ -359,8 +359,6 @@ export async function searchTenants(params: SearchTenantsParams = {}): Promise<S
   }
 }
 
-// Workspace default agent. GET is member-readable; PUT is Admin+
-// (mirrored from the backend tenant-KV guards).
 export async function getDefaultAgentId(): Promise<{ success: boolean; data?: { agent_id: string }; message?: string }> {
   try {
     const response = await get('/api/v1/tenants/kv/default-agent-id')

@@ -7,6 +7,7 @@ import type { DeploymentCapabilityKey } from '@/config/deploymentCapabilities'
 import { MessagePlugin } from 'tdesign-vue-next'
 import i18n from '@/i18n'
 import { normalizeSettingsSection } from '@/config/settingsRoute'
+import { isToolboxSection, toolboxLocation } from '@/config/toolbox'
 
 /** Lite /桌面 WebView 硬刷新时可能只打开 `/`，用 session 记住上次页面以便恢复 */
 const LITE_LAST_PATH_KEY = 'weknora_lite_last_path'
@@ -56,6 +57,12 @@ const router = createRouter({
       component: () => import("../views/auth/Login.vue"),
       meta: { requiresAuth: false, requiresInit: false }
     },
+    {
+      path: "/force-change-password",
+      name: "forceChangePassword",
+      component: () => import("../views/auth/ForceChangePassword.vue"),
+      meta: { requiresAuth: true, requiresTenant: false },
+    },
     // Embed chat is a separate entry (embed.html + embed-main.ts), not this SPA.
     {
       path: "/register",
@@ -104,7 +111,20 @@ const router = createRouter({
           path: "tenant",
           redirect: "/platform/settings"
         },
-        {
+        
+          {
+            path: "notes",
+            name: "notes",
+            component: () => import("../views/notes/MyNotes.vue"),
+            meta: { requiresAuth: true },
+          },
+          {
+            path: "announcements",
+            name: "announcements",
+            component: () => import("../views/announcements/Announcements.vue"),
+            meta: { requiresAuth: true },
+          },
+{
           path: "settings",
           name: "settings",
           component: () => import("../views/settings/Settings.vue"),
@@ -132,6 +152,18 @@ const router = createRouter({
               query: typeof q === 'string' ? { cmdk: q } : { cmdk: '' },
             }
           },
+        },
+        {
+          path: "artifacts",
+          name: "artifactLibrary",
+          component: () => import("../views/artifacts/ArtifactLibrary.vue"),
+          meta: { requiresInit: true, requiresAuth: true, requiredCapability: 'settings.sandbox' }
+        },
+        {
+          path: "toolbox/:section?",
+          name: "toolbox",
+          component: () => import("../views/toolbox/Toolbox.vue"),
+          meta: { requiresInit: true, requiresAuth: true }
         },
         {
           path: "agents",
@@ -328,6 +360,13 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
+  // Preserve bookmarks for tools that have moved out of Settings.
+  if (to.path === '/platform/settings' && isToolboxSection(to.query.section)) {
+    next({ ...toolboxLocation(to.query.section,
+      typeof to.query.sandboxId === 'string' ? to.query.sandboxId : undefined), replace: true })
+    return
+  }
+
   // Lite：硬刷新后若落在默认首页，恢复本次会话中最后访问的 /platform 子路径
   if (!liteDeepLinkRestoreDone) {
     liteDeepLinkRestoreDone = true
@@ -403,6 +442,16 @@ router.beforeEach(async (to, from, next) => {
       next('/login')
       return
     }
+  }
+
+  if (
+    authStore.isLoggedIn &&
+    authStore.mustChangePassword &&
+    to.path !== '/force-change-password' &&
+    to.path !== '/login'
+  ) {
+    next('/force-change-password')
+    return
   }
 
   if (to.meta.requiresTenant !== false && !authStore.hasValidTenant) {

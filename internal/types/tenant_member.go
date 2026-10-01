@@ -139,12 +139,3 @@ type TenantMemberResponse struct {
 	// teacher elsewhere. Empty for legacy admin/contributor rows.
 	RosterIdentity string `json:"roster_identity,omitempty"`
 }
-
-// TenantMemberUsageStat is one member's teaching-usage aggregate
-// (sicau-v1 ticket 05). Count granularity by design: no message content
-// ever leaves the aggregation - the teacher sees how much, not what.
-type TenantMemberUsageStat struct {
-	UserID        string     `json:"user_id"`
-	QuestionCount int64      `json:"question_count"`
-	LastActiveAt  *time.Time `json:"last_active_at"`
-}

@@ -116,7 +116,7 @@
         <span class="link-text">{{ $t('common.website') }}</span>
       </a>
 
-      <!-- 教师主页（个人站） -->
+      <!-- 教师主页（个人站点） -->
       <a href="https://jefeerzhang.github.io/" target="_blank" class="header-link" :title="$t('common.teacherHome')">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
           <path
@@ -202,7 +202,7 @@
                 {{ loading ? $t('auth.loggingIn') : $t('auth.login') }}
               </t-button>
 
-              <div class="register-cta" v-if="registrationEnabled || inviteLookup">
+              <div class="register-cta" v-if="registrationEnabled">
                 <div class="register-cta__divider">
                   <span>{{ $t('auth.firstTime') }}</span>
                 </div>
@@ -221,6 +221,22 @@
                 {{ oidcLoading ? $t('auth.redirectingToOIDC') : oidcLoginText }}
               </t-button>
             </t-form>
+
+            <!-- Features list -->
+            <div class="login-features">
+              <div class="feature-item">
+                <span class="feature-icon">✓</span>
+                <span class="feature-text">{{ $t('platform.multimodalParsing') }}</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">✓</span>
+                <span class="feature-text">{{ $t('platform.hybridSearchEngine') }}</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">✓</span>
+                <span class="feature-text">{{ $t('platform.ragQandA') }}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -272,7 +288,8 @@
 
               <t-form-item :label="$t('auth.confirmPassword')" name="confirmPassword">
                 <t-input v-model="registerData.confirmPassword" :placeholder="$t('auth.confirmPasswordPlaceholder')"
-                  type="password" autocomplete="new-password" size="large" :disabled="loading" @enter="handleRegister" />
+                  type="password" autocomplete="new-password" size="large" :disabled="loading"
+                  @enter="handleRegister" />
               </t-form-item>
 
               <t-button type="submit" theme="primary" size="large" block :loading="loading" class="submit-button">
@@ -287,6 +304,21 @@
               </a>
             </div>
 
+            <!-- Features list for register -->
+            <div class="login-features">
+              <div class="feature-item">
+                <span class="feature-icon">✓</span>
+                <span class="feature-text">{{ $t('platform.independentTenant') }}</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">✓</span>
+                <span class="feature-text">{{ $t('platform.fullApiAccess') }}</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">✓</span>
+                <span class="feature-text">{{ $t('platform.knowledgeBaseManagement') }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -301,6 +333,11 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { useRoleLabel } from '@/composables/useRoleLabel'
 import { notifyLoginSuccess } from '@/utils/loginNotify'
 import { newPasswordRules } from '@/utils/passwordPolicy'
+import { Swiper, SwiperSlide } from 'swiper/vue'
+import { Autoplay, EffectFade, Pagination } from 'swiper/modules'
+import 'swiper/css'
+import 'swiper/css/effect-fade'
+import 'swiper/css/pagination'
 import {
   login,
   register,
@@ -316,11 +353,44 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
 
+// Import screenshot images
+import screenshot1 from '@/assets/img/screenshot-1.svg'
+import screenshot2 from '@/assets/img/screenshot-2.svg'
+import screenshot3 from '@/assets/img/screenshot-3.svg'
+import screenshot4 from '@/assets/img/screenshot-4.svg'
+
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const { t, tm, locale } = useI18n()
 const { formatRole, roleIcon } = useRoleLabel()
+
+// Swiper modules
+const modules = [Autoplay, EffectFade, Pagination]
+
+// Carousel slides data
+const slides = [
+  {
+    image: screenshot4,
+    title: t('platform.carousel.agenticRagTitle'),
+    description: t('platform.carousel.agenticRagDesc')
+  },
+  {
+    image: screenshot2,
+    title: t('platform.carousel.hybridSearchTitle'),
+    description: t('platform.carousel.hybridSearchDesc')
+  },
+  {
+    image: screenshot3,
+    title: t('platform.carousel.wikiTitle'),
+    description: t('platform.carousel.wikiDesc')
+  },
+  {
+    image: screenshot1,
+    title: t('platform.carousel.smartDocRetrievalTitle'),
+    description: t('platform.carousel.smartDocRetrievalDesc')
+  }
+]
 
 // Form references
 const formRef = ref()
@@ -355,7 +425,8 @@ const languageOptions = [
   { value: 'zh-CN', label: '简体中文', shortLabel: '中文', flag: '🇨🇳' },
   { value: 'en-US', label: 'English', shortLabel: 'EN', flag: '🇺🇸' },
   { value: 'ru-RU', label: 'Русский', shortLabel: 'RU', flag: '🇷🇺' },
-  { value: 'ko-KR', label: '한국어', shortLabel: '한국어', flag: '🇰🇷' }
+  { value: 'ko-KR', label: '한국어', shortLabel: '한국어', flag: '🇰🇷' },
+  { value: 'ja-JP', label: '日本語', shortLabel: '日本語', flag: '🇯🇵' }
 ]
 
 const currentLanguage = computed(() => locale.value)
@@ -716,13 +787,11 @@ onMounted(async () => {
       return
     }
 
-    // 3. 未登录：分享链接落地始终进入「邀请注册」表单。
-    // register-by-invite 不受 invite_only 门禁；若只停在登录卡，新学生无法建号。
-    // 已有账号可切回登录卡再兑换 token。
+    // 3. 未登录：按注册模式决定界面。invite_only 停在登录页、登录后再兑换；self_serve 保持注册流程。
     const cfg = await getAuthConfig()
     const inviteOnly = cfg.registration_mode === 'invite_only'
     registrationEnabled.value = !inviteOnly
-    isRegisterMode.value = true
+    isRegisterMode.value = !inviteOnly
     loadOIDCConfig()
     return
   }
@@ -1004,39 +1073,6 @@ onMounted(async () => {
   margin-bottom: 60px;
 }
 
-.showcase-kicker {
-  margin: 0 0 18px 0;
-  font-size: 15px;
-  letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.82);
-  font-family: var(--app-font-family);
-}
-
-.showcase-motto-label {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-  letter-spacing: 0.28em;
-  color: #e8c56a;
-  font-family: var(--app-font-family);
-}
-
-.showcase-motto {
-  margin: 0 0 12px 0;
-  font-size: 32px;
-  line-height: 1.35;
-  font-weight: 600;
-  color: #f6e7b2;
-  font-family: var(--app-font-family);
-}
-
-.showcase-spirit {
-  margin: 0 0 22px 0;
-  font-size: 15px;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.78);
-  font-family: var(--app-font-family);
-}
-
 .showcase-subtitle {
   margin-top: 0;
   font-size: 22px;
@@ -1047,34 +1083,12 @@ onMounted(async () => {
   font-weight: 500;
 }
 
-.showcase-campuses {
-  margin: 16px 0 0 0;
-  font-size: 14px;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.72);
+.showcase-description {
+  font-size: var(--app-text-lg);
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 28px 0;
   font-family: var(--app-font-family);
-}
-
-.showcase-note {
-  font-size: 14px;
-  line-height: 1.7;
-  color: rgba(255, 255, 255, 0.78);
-  margin: 12px 0 18px 0;
-  font-family: var(--app-font-family);
-  text-align: center;
-
-  &__link {
-    color: rgba(255, 255, 255, 0.95);
-    font-weight: 600;
-    text-decoration: none;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.4);
-    transition: border-color 0.2s ease, color 0.2s ease;
-
-    &:hover {
-      color: #fff;
-      border-bottom-color: #fff;
-    }
-  }
+  line-height: 1.5;
 }
 
 .feature-tags {
@@ -1090,7 +1104,7 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 20px;
   color: var(--td-text-color-anti);
-  font-size: 14px;
+  font-size: var(--app-text-base);
   font-weight: 500;
   font-family: var(--app-font-family);
 }
@@ -1122,7 +1136,7 @@ onMounted(async () => {
     height: 10px;
     background: rgba(255, 255, 255, 0.5);
     opacity: 1;
-    transition: all 0.3s ease;
+    transition: all var(--app-motion-slow) ease;
     margin: 0 6px !important;
   }
 
@@ -1157,7 +1171,7 @@ onMounted(async () => {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 40px 50px 100px 30px;
+  padding: 112px 50px 100px 30px;
   box-sizing: border-box;
   position: relative;
 }
@@ -1176,47 +1190,10 @@ onMounted(async () => {
   left: 50px;
   z-index: 100;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 18px 6px 8px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: background 0.2s ease;
-  text-decoration: none;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.28);
-  }
 
   .logo-image {
-    width: 40px;
-    height: 40px;
-    object-fit: contain;
-    flex-shrink: 0;
-  }
-
-  &__text {
-    display: inline-flex;
-    flex-direction: column;
-    line-height: 1.2;
-    color: var(--td-text-color-anti);
-  }
-
-  &__title {
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: 1px;
-  }
-
-  &__subtitle {
-    font-size: 10px;
-    font-weight: 500;
-    opacity: 0.8;
-    letter-spacing: 0.6px;
-    margin-top: 1px;
+    width: 120px;
+    height: auto;
   }
 }
 
@@ -1240,7 +1217,7 @@ onMounted(async () => {
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: var(--td-text-color-anti);
   text-decoration: none;
-  font-size: 13px;
+  font-size: var(--app-text-md);
   font-weight: 600;
   font-family: var(--app-font-family);
   letter-spacing: 0.2px;
@@ -1271,7 +1248,7 @@ onMounted(async () => {
     color: var(--td-text-color-anti);
 
     .lang-flag-icon {
-      font-size: 16px;
+      font-size: var(--app-text-xl);
       line-height: 1;
       flex-shrink: 0;
     }
@@ -1295,7 +1272,7 @@ onMounted(async () => {
   min-width: 160px;
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid var(--td-component-stroke);
-  border-radius: 8px;
+  border-radius: var(--app-radius-md);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   overflow: hidden;
   z-index: 1000;
@@ -1307,12 +1284,12 @@ onMounted(async () => {
   gap: 10px;
   padding: 10px 14px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--app-text-md);
   font-family: var(--app-font-family);
   color: var(--td-text-color-primary);
 
   .lang-flag {
-    font-size: 16px;
+    font-size: var(--app-text-xl);
     flex-shrink: 0;
   }
 
@@ -1323,7 +1300,7 @@ onMounted(async () => {
   .check-icon {
     color: var(--td-success-color);
     font-weight: 700;
-    font-size: 14px;
+    font-size: var(--app-text-base);
     flex-shrink: 0;
   }
 
@@ -1358,15 +1335,15 @@ onMounted(async () => {
   gap: 10px;
   padding: 12px 14px;
   margin-bottom: 20px;
-  border-radius: 10px;
-  background: var(--td-bg-color-container-hover, rgba(0, 0, 0, 0.03));
+  border-radius: var(--app-radius-lg);
+  background: var(--td-bg-color-container-hover);
   border: 1px solid var(--td-component-stroke);
   color: var(--td-text-color-primary);
 }
 
 .invite-banner__icon {
   margin-top: 2px;
-  font-size: 18px;
+  font-size: var(--app-text-2xl);
   flex-shrink: 0;
   color: var(--td-text-color-secondary);
 }
@@ -1379,23 +1356,23 @@ onMounted(async () => {
 }
 
 .invite-banner__title {
-  font-size: 14px;
+  font-size: var(--app-text-base);
   font-weight: 600;
   line-height: 1.4;
   color: var(--td-text-color-primary);
 }
 
 .invite-banner__hint {
-  font-size: 12px;
+  font-size: var(--app-text-sm);
   color: var(--td-text-color-secondary);
   line-height: 1.5;
 }
 
 .invite-banner--error {
-  background: var(--td-error-color-1, rgba(220, 38, 38, 0.06));
-  border-color: var(--td-error-color-3, rgba(220, 38, 38, 0.2));
-  color: var(--td-error-color, #b91c1c);
-  font-size: 13px;
+  background: var(--td-error-color-1);
+  border-color: var(--td-error-color-3);
+  color: var(--td-error-color);
+  font-size: var(--app-text-md);
 }
 
 .form-header {
@@ -1404,7 +1381,7 @@ onMounted(async () => {
 }
 
 .form-title {
-  font-size: 24px;
+  font-size: var(--app-text-4xl);
   font-weight: 600;
   color: var(--td-text-color-primary);
   margin: 0 0 6px 0;
@@ -1412,7 +1389,7 @@ onMounted(async () => {
 }
 
 .form-welcome {
-  font-size: 13px;
+  font-size: var(--app-text-md);
   color: var(--td-text-color-secondary);
   margin: 0;
   font-family: var(--app-font-family);
@@ -1421,8 +1398,8 @@ onMounted(async () => {
 .form-hint {
   margin: 10px 0 0;
   padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--td-success-color-light, rgba(7, 192, 95, 0.08));
+  border-radius: var(--app-radius-md);
+  background: var(--td-success-color-light);
   color: var(--td-brand-color-active);
   font-size: 12.5px;
   line-height: 1.5;
@@ -1439,7 +1416,7 @@ onMounted(async () => {
     text-align: center;
     margin: 4px 0 14px;
     color: var(--td-text-color-secondary);
-    font-size: 13px;
+    font-size: var(--app-text-md);
     font-family: var(--app-font-family);
 
     span {
@@ -1461,8 +1438,8 @@ onMounted(async () => {
 
   &__button {
     height: 46px;
-    border-radius: 8px;
-    font-size: 15px;
+    border-radius: var(--app-radius-md);
+    font-size: var(--app-text-lg);
     font-weight: 500;
     border-color: var(--td-brand-color);
     color: var(--td-brand-color);
@@ -1470,13 +1447,13 @@ onMounted(async () => {
     &:hover {
       border-color: var(--td-brand-color-active);
       color: var(--td-brand-color-active);
-      background: var(--td-success-color-light, rgba(7, 192, 95, 0.08));
+      background: var(--td-success-color-light);
     }
   }
 }
 
 .form-subtitle {
-  font-size: 13px;
+  font-size: var(--app-text-md);
   color: var(--td-text-color-secondary);
   margin: 0;
   font-family: var(--app-font-family);
@@ -1484,7 +1461,7 @@ onMounted(async () => {
 
 .form-content {
   :deep(.t-form-item__label) {
-    font-size: 14px;
+    font-size: var(--app-text-base);
     color: var(--td-text-color-primary);
     font-weight: 500;
     margin-bottom: 8px;
@@ -1495,13 +1472,13 @@ onMounted(async () => {
 
   :deep(.t-input) {
     border: 1px solid var(--td-component-stroke);
-    border-radius: 8px;
+    border-radius: var(--app-radius-md);
     background: var(--td-bg-color-container);
-    transition: all 0.2s;
+    transition: all var(--app-motion-base);
 
     &:focus-within {
       border-color: var(--td-brand-color);
-      box-shadow: 0 0 0 3px rgba(7, 192, 95, 0.1);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--td-brand-color) 10%, transparent);
     }
 
     &:hover {
@@ -1513,7 +1490,7 @@ onMounted(async () => {
       box-shadow: none !important;
       outline: none !important;
       background: transparent;
-      font-size: 15px;
+      font-size: var(--app-text-lg);
       font-family: var(--app-font-family);
 
       &:focus {
@@ -1544,8 +1521,8 @@ onMounted(async () => {
 
 .submit-button {
   height: 46px;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: var(--app-radius-md);
+  font-size: var(--app-text-xl);
   font-weight: 500;
   font-family: var(--app-font-family);
   margin: 20px 0 16px 0;
@@ -1556,7 +1533,7 @@ onMounted(async () => {
   margin: 4px 0 6px;
   text-align: center;
   color: var(--td-text-color-placeholder);
-  font-size: 12px;
+  font-size: var(--app-text-sm);
 
   span {
     position: relative;
@@ -1577,14 +1554,14 @@ onMounted(async () => {
 
 .oidc-button {
   height: 46px;
-  border-radius: 8px;
-  font-size: 15px;
+  border-radius: var(--app-radius-md);
+  font-size: var(--app-text-lg);
   font-weight: 500;
 }
 
 .form-footer {
   text-align: center;
-  font-size: 14px;
+  font-size: var(--app-text-base);
   color: var(--td-text-color-secondary);
   font-family: var(--app-font-family);
   margin-top: 16px;
@@ -1596,7 +1573,7 @@ onMounted(async () => {
     text-decoration: none;
     margin-left: 4px;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: all var(--app-motion-base);
 
     &:hover {
       color: var(--td-brand-color);
@@ -1619,7 +1596,7 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     margin-bottom: 12px;
-    font-size: 13px;
+    font-size: var(--app-text-md);
     color: var(--td-text-color-secondary);
     font-family: var(--app-font-family);
 
@@ -1636,7 +1613,7 @@ onMounted(async () => {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: var(--app-text-sm);
       font-weight: 700;
       margin-right: 10px;
       flex-shrink: 0;
@@ -1658,12 +1635,8 @@ onMounted(async () => {
     display: none;
   }
 
-  .showcase-motto {
-    font-size: 24px;
-  }
-
   .showcase-subtitle {
-    font-size: 18px;
+    font-size: var(--app-text-2xl);
   }
 
   .header-logo {
@@ -1671,8 +1644,7 @@ onMounted(async () => {
     left: 40px;
 
     .logo-image {
-      width: 36px;
-      height: 36px;
+      width: 100px;
     }
   }
 
@@ -1720,17 +1692,12 @@ onMounted(async () => {
     left: 30px;
 
     .logo-image {
-      width: 32px;
-      height: 32px;
+      width: 80px;
     }
   }
 
-  .showcase-motto {
-    font-size: 22px;
-  }
-
   .showcase-subtitle {
-    font-size: 16px;
+    font-size: var(--app-text-xl);
     margin-bottom: 24px;
   }
 
@@ -1758,7 +1725,7 @@ onMounted(async () => {
 
     .header-link {
       padding: 8px 12px;
-      font-size: 12px;
+      font-size: var(--app-text-sm);
     }
   }
 
@@ -1789,16 +1756,12 @@ onMounted(async () => {
     }
   }
 
-  .showcase-motto {
-    font-size: 20px;
-  }
-
   .showcase-subtitle {
-    font-size: 14px;
+    font-size: var(--app-text-base);
   }
 
   .tag {
-    font-size: 12px;
+    font-size: var(--app-text-sm);
     padding: 6px 16px;
   }
 
@@ -1814,7 +1777,7 @@ onMounted(async () => {
 
     .header-link {
       padding: 7px 10px;
-      font-size: 11px;
+      font-size: var(--app-text-xs);
     }
   }
 
@@ -1855,6 +1818,10 @@ html[theme-mode="dark"] {
 
   .connection-line {
     stroke: rgba(255, 255, 255, 0.25);
+  }
+
+  .header-logo .logo-image {
+    filter: invert(1) hue-rotate(180deg) brightness(1.1);
   }
 
   .header-link {

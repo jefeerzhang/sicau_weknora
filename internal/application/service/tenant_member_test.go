@@ -248,19 +248,6 @@ func (r *fakeTenantMemberRepo) RemoveOwnerAtomically(
 	return nil
 }
 
-// MemberUsageStats — sicau-v1 ticket 05 interface surface; these tests
-// exercise membership invariants only, so the aggregate is a stub.
-func (r *fakeTenantMemberRepo) MemberUsageStats(context.Context, uint64) ([]types.TenantMemberUsageStat, error) {
-	return nil, nil
-}
-
-// WithTx is the transaction seam: the in-memory fake has no real
-// transactions, so it returns itself regardless of tx (nil in unit tests
-// without a gorm handle).
-func (r *fakeTenantMemberRepo) WithTx(_ *gorm.DB) interfaces.TenantMemberRepository {
-	return r
-}
-
 // Compile-time guard so the test stays in sync with the interface.
 var _ interfaces.TenantMemberRepository = (*fakeTenantMemberRepo)(nil)
 
@@ -309,13 +296,10 @@ func (r *cleanupUserRepo) DeleteUser(context.Context, string) error { return nil
 func (r *cleanupUserRepo) ListUsers(context.Context, int, int) ([]*types.User, error) {
 	return nil, nil
 }
-func (r *cleanupUserRepo) ListUsersPage(context.Context, string, int, int) ([]*types.User, int64, error) {
+func (r *cleanupUserRepo) ListTeachers(context.Context, int, int) ([]*types.User, int64, error) {
 	return nil, 0, nil
 }
 func (r *cleanupUserRepo) ListSystemAdmins(context.Context, int, int) ([]*types.User, int64, error) {
-	return nil, 0, nil
-}
-func (r *cleanupUserRepo) ListTeachers(context.Context, int, int) ([]*types.User, int64, error) {
 	return nil, 0, nil
 }
 func (r *cleanupUserRepo) RevokeSystemAdmin(context.Context, string, string) (*types.User, error) {
@@ -331,6 +315,9 @@ type cleanupTokenRepo struct {
 
 func (r *cleanupTokenRepo) CreateToken(context.Context, *types.AuthToken) error { return nil }
 func (r *cleanupTokenRepo) GetTokenByValue(context.Context, string) (*types.AuthToken, error) {
+	return nil, errors.New("not found")
+}
+func (r *cleanupTokenRepo) GetTokenByID(context.Context, string) (*types.AuthToken, error) {
 	return nil, errors.New("not found")
 }
 func (r *cleanupTokenRepo) GetTokensByUserID(context.Context, string) ([]*types.AuthToken, error) {

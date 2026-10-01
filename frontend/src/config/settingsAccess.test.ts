@@ -22,6 +22,7 @@ const DEPLOYMENT = [
   'sandbox',
   'skills',
   'mcp',
+  'browserconnection',
   'integration-im',
   'integration-embed',
   'integration-api',

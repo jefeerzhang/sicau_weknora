@@ -14,7 +14,7 @@ import (
 )
 
 // runStartupBootstrap consults the env and applies one-shot bootstrap
-// actions. SuperAdmin ensure (#8) is fail-closed: a non-nil error aborts
+// actions. SuperAdmin ensure is fail-closed: a non-nil error aborts
 // process startup so the deployment never runs without a clear authority root.
 func runStartupBootstrap(c *dig.Container) error {
 	ctx := context.Background()

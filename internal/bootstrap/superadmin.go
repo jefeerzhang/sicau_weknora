@@ -151,8 +151,14 @@ func deriveUsername(email string) string {
 	return local
 }
 
+// SuperAdminCounter is the narrow surface AssertUniqueSuperAdminPromote needs.
+// UserService and UserRepository both satisfy it.
+type SuperAdminCounter interface {
+	ListSystemAdmins(ctx context.Context, offset, limit int) ([]*types.User, int64, error)
+}
+
 // AssertUniqueSuperAdminPromote rejects creating a second SystemAdmin.
-func AssertUniqueSuperAdminPromote(ctx context.Context, store UserStore, target *types.User) error {
+func AssertUniqueSuperAdminPromote(ctx context.Context, store SuperAdminCounter, target *types.User) error {
 	if target == nil {
 		return errors.New("user is nil")
 	}

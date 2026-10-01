@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -79,7 +80,8 @@ const (
 // getJwtSecret retrieves the JWT secret from the environment, falling back to a securely generated random secret.
 func getJwtSecret() string {
 	jwtSecretOnce.Do(func() {
-		if envSecret := strings.TrimSpace(os.Getenv("JWT_SECRET")); envSecret != "" {
+		envSecret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+		if envSecret != "" && envSecret != "weknora-jwt-secret" && envSecret != "CHANGE-ME-jwt-secret" {
 			jwtSecret = envSecret
 			return
 		}
@@ -608,13 +610,6 @@ func (s *userService) ListTeachers(
 	return s.userRepo.ListTeachers(ctx, offset, limit)
 }
 
-// ListUsersPage lists registered accounts for the SuperAdmin user directory.
-func (s *userService) ListUsersPage(
-	ctx context.Context, query string, offset, limit int,
-) ([]*types.User, int64, error) {
-	return s.userRepo.ListUsersPage(ctx, query, offset, limit)
-}
-
 // RevokeSystemAdmin removes system-admin privileges through the
 // repository's transactional guard so concurrent revokes cannot remove
 // the final administrator.
@@ -640,6 +635,19 @@ func (s *userService) UpdateUserPreferences(
 	}
 
 	merged := user.Preferences
+	if patch.BrowserSearchInstructions != nil {
+		value := strings.TrimSpace(*patch.BrowserSearchInstructions)
+		if utf8.RuneCountInString(value) > types.MaxBrowserSearchInstructionsLength {
+			return types.UserPreferences{}, fmt.Errorf(
+				"browser search instructions must not exceed %d characters",
+				types.MaxBrowserSearchInstructionsLength,
+			)
+		}
+		merged.BrowserSearchInstructions = nil
+		if value != "" && value != types.DefaultBrowserSearchInstructions {
+			merged.BrowserSearchInstructions = &value
+		}
+	}
 	if patch.LastActiveTenantID != nil {
 		// *0 = "forget my preference, fall back to home on next login";
 		// any positive value = set/replace. We do not validate membership
@@ -699,6 +707,7 @@ func (s *userService) ChangePassword(ctx context.Context, userID, oldPassword, n
 
 	user.PasswordHash = string(hashedPassword)
 	user.UpdatedAt = time.Now()
+	user.MustChangePassword = false
 	if user.Preferences.OidcOnlyLogin != nil && *user.Preferences.OidcOnlyLogin {
 		cleared := false
 		user.Preferences.OidcOnlyLogin = &cleared
@@ -1137,10 +1146,9 @@ func (s *userService) SwitchTenant(
 		return nil, errors.New("target workspace ID is required")
 	}
 
-	// Verify membership unless the caller may enter any workspace.
-	// SuperAdmin always may. CanAccessAllTenants may only when leaving
-	// the home tenant; home still requires a real membership row.
-	if !user.ManagesEveryWorkspace() && (!user.CanAccessAllTenants || targetTenantID == user.TenantID) {
+	// Verify membership unless the caller is a cross-tenant superuser
+	// switching outside their home tenant.
+	if !user.CanAccessAllTenants || targetTenantID == user.TenantID {
 		if s.memberService == nil {
 			return nil, errors.New("workspace membership service unavailable")
 		}
@@ -1244,6 +1252,9 @@ func (s *userService) ValidateToken(ctx context.Context, tokenString string) (*t
 	if isRefreshTokenClaims(claims) {
 		return nil, 0, errors.New("refresh token cannot be used as access token")
 	}
+	if isSandboxTerminalTicketClaims(claims) {
+		return nil, 0, errors.New("terminal ticket cannot be used as access token")
+	}
 
 	// Check if token is revoked
 	tokenRecord, err := s.tokenRepo.GetTokenByValue(ctx, tokenString)
@@ -1267,9 +1278,50 @@ func (s *userService) ValidateToken(ctx context.Context, tokenString string) (*t
 	return user, activeTenantID, nil
 }
 
+func redactAuthToken(token *types.AuthToken) *types.AuthToken {
+	if token == nil {
+		return nil
+	}
+	cp := *token
+	cp.Token = ""
+	return &cp
+}
+
+// GetAccessTokenByValue looks up the stored token row for a JWT string.
+// The JWT itself is stripped so callers cannot log or re-play it.
+func (s *userService) GetAccessTokenByValue(ctx context.Context, tokenString string) (*types.AuthToken, error) {
+	tokenString = strings.TrimSpace(tokenString)
+	if tokenString == "" {
+		return nil, apprepo.ErrTokenNotFound
+	}
+	token, err := s.tokenRepo.GetTokenByValue(ctx, tokenString)
+	if err != nil {
+		return nil, err
+	}
+	return redactAuthToken(token), nil
+}
+
+// GetAccessTokenByID looks up a stored token row by primary key.
+func (s *userService) GetAccessTokenByID(ctx context.Context, id string) (*types.AuthToken, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, apprepo.ErrTokenNotFound
+	}
+	token, err := s.tokenRepo.GetTokenByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return redactAuthToken(token), nil
+}
+
 func isRefreshTokenClaims(claims jwt.MapClaims) bool {
 	tokenType, ok := claims["type"].(string)
 	return ok && tokenType == "refresh"
+}
+
+func isSandboxTerminalTicketClaims(claims jwt.MapClaims) bool {
+	tokenType, ok := claims["type"].(string)
+	return ok && tokenType == sandboxTerminalTicketType
 }
 
 func userIDFromSignedToken(tokenString string) (string, error) {

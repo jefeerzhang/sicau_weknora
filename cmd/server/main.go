@@ -57,6 +57,8 @@ func main() {
 	// Build dependency injection container
 	c := container.BuildContainer(runtime.GetContainer())
 
+	// One-shot bootstrap hooks (e.g. promote env-named user to system
+	// admin). Best-effort: never aborts startup — see bootstrap.go.
 	// One-shot bootstrap hooks. SuperAdmin ensure is fail-closed.
 	if err := runStartupBootstrap(c); err != nil {
 		logger.Fatalf(context.Background(), "startup bootstrap failed: %v", err)

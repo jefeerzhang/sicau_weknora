@@ -17,7 +17,7 @@ import (
 //   - PUT   /:id          Owner+ (mutate tenant config)
 //   - DELETE /:id         Owner+ (also normally a CanAccessAllTenants op)
 //   - GET/POST/PUT/DELETE /:id/api-keys   Owner+ (scoped API key management)
-//   - GET    /:id/members            Viewer+ (any member can see who else is in)
+//   - GET    /:id/members            Admin+ (sicau-v1: students must not see roster)
 //   - POST   /:id/members            Owner+ (only Owner can add new members)
 //   - PUT    /:id/members/:user_id   Owner+ (only Owner can change roles)
 //   - DELETE /:id/members/:user_id   Owner+ (only Owner can remove members)
@@ -111,9 +111,6 @@ func RegisterTenantRoutes(
 			// the tenant without an Owner.
 			if memberHandler != nil {
 				g.apiKeyRoute(tenantByID, http.MethodGet, "/members", apiKeyManageMembers(apiKeyFullAccess()), g.Admin(), memberHandler.ListMembers)
-				// sicau-v1 ticket 05: per-member usage aggregates ride the
-				// same Admin+ gate as the roster (ticket 01).
-				g.apiKeyRoute(tenantByID, http.MethodGet, "/member-stats", apiKeyManageMembers(apiKeyFullAccess()), g.Admin(), memberHandler.GetMemberUsageStats)
 				g.apiKeyRoute(tenantByID, http.MethodPost, "/members", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), memberHandler.AddMember)
 				g.apiKeyRoute(tenantByID, http.MethodPut, "/members/:user_id", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), memberHandler.UpdateMemberRole)
 				g.apiKeyRoute(tenantByID, http.MethodDelete, "/members/:user_id", apiKeyManageMembers(apiKeyFullAccess()), g.Owner(), memberHandler.RemoveMember)
@@ -206,11 +203,8 @@ func RegisterMyEnvVarRoutes(r *gin.RouterGroup, h *handler.MeEnvVarHandler, g *r
 	}
 }
 
-// RegisterMyNoteRoutes registers the per-user notes CRUD surface
-// (sicau-v1 notes, /me/notes). Web JWT path ONLY - see notes design §7:
-// IM synthetic accounts share a user_id, so this must never hang off IM
-// auth. No role gate: every authenticated member manages their own notes;
-// isolation is structural (owner-scoped queries, no cross-user endpoint).
+// RegisterMyNoteRoutes registers the personal notes surface
+// (sicau-v1 notes, /me/notes). Web JWT path ONLY.
 func RegisterMyNoteRoutes(r *gin.RouterGroup, h *handler.MeNoteHandler) {
 	if h == nil {
 		return
@@ -230,7 +224,7 @@ func RegisterMyNoteRoutes(r *gin.RouterGroup, h *handler.MeNoteHandler) {
 
 // RegisterAnnouncementRoutes registers the course announcement board
 // (sicau-v1). Reads Viewer+; posting Contributor+; deletes author-or-admin
-// (service-enforced). Web JWT path only - notes design §7 applies.
+// (service-enforced). Web JWT path only.
 func RegisterAnnouncementRoutes(r *gin.RouterGroup, h *handler.MeAnnouncementHandler, g *rbacGuards) {
 	if h == nil {
 		return
@@ -291,6 +285,10 @@ func RegisterSystemRoutes(
 	handler *handler.SystemHandler,
 	g *rbacGuards,
 ) {
+	// JWT-only: this pops a native dialog on the Lite machine. API keys must
+	// not trigger it. Undeclared for the API-key gate, so keys are denied.
+	r.POST("/system/host-project-dir", g.Viewer(), handler.PickHostProjectDir)
+
 	systemRoutes := g.apiKeyGroup(r.Group("/system"), apiKeyManageVectorStores(apiKeyFullAccess()))
 	{
 		systemRoutes.With(apiKeyAny()).GET("/capabilities", g.Viewer(), handler.GetDeploymentCapabilities)
@@ -334,15 +332,10 @@ func RegisterSystemAdminRoutes(
 		adminRoutes.POST("/promote", handler.PromoteUserToSystemAdmin)
 		adminRoutes.POST("/revoke", handler.RevokeSystemAdmin)
 		adminRoutes.GET("/list", handler.ListSystemAdmins)
-		// #9: platform Teacher appointment
+		// Platform Teacher appointment
 		adminRoutes.POST("/teachers/appoint", handler.AppointTeacher)
 		adminRoutes.POST("/teachers/revoke", handler.RevokeTeacher)
 		adminRoutes.GET("/teachers", handler.ListTeachers)
-		adminRoutes.GET("/users", handler.ListRegisteredUsers)
-		// #18/#19: teaching membership migration + ownership anomaly recovery
-		adminRoutes.POST("/migrations/teaching-roles", handler.RunTeachingRoleMigration)
-		adminRoutes.GET("/workspace-anomalies", handler.ListWorkspaceOwnershipAnomalies)
-		adminRoutes.POST("/workspace-anomalies/:tenant_id/resolve", handler.ResolveWorkspaceOwnershipAnomaly)
 		adminRoutes.POST("/users/reset-password", handler.ResetUserPassword)
 		adminRoutes.POST("/users/create", handler.CreateSystemUser)
 		adminRoutes.GET("/api-keys", handler.ListPlatformAPIKeys)

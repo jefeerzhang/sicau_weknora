@@ -4,6 +4,9 @@
 # (with default core.autocrlf=true) don't trip byte-equal comparisons in
 # acceptance/contract envelope tests.
 *.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+licenses/sources/modules.tsv text eol=lf
 cli/acceptance/testdata/**/*.json text eol=lf
 
 # Trellis: append-only developer journals should merge cleanly across
@@ -15,3 +18,6 @@ cli/acceptance/testdata/**/*.json text eol=lf
 # picking either side (task state lives in task.json, not index.md). See
 # .trellis/spec/cli/backend/directory-structure.md for details.
 .trellis/workspace/*/journal-*.md merge=union
+
+# Unified diffs use a space to mark empty context lines.
+patches/browserskill/*.patch whitespace=-blank-at-eol

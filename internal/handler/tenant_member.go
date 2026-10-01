@@ -85,40 +85,6 @@ func parseTenantIDFromPath(c *gin.Context) (uint64, bool) {
 	return v, true
 }
 
-// GetMemberUsageStats godoc
-// @Summary      成员使用统计
-// @Description  每位成员的提问数与最后活跃时间（sicau-v1 ticket 05）；Admin+ 可见，与成员名单同门槛（ticket 01）
-// @Tags         空间成员
-// @Produce      json
-// @Param        id  path  string  true  "空间 ID"
-// @Success      200  {object}  map[string]interface{}
-// @Security     Bearer
-// @Router       /tenants/{id}/member-stats [get]
-// GetMemberUsageStats returns per-member question counts and last activity
-// (sicau-v1 ticket 05). Registered Admin+ — same gate as the roster itself
-// (ticket 01): students never see who is in the workspace, let alone how
-// active each member is.
-func (h *TenantMemberHandler) GetMemberUsageStats(c *gin.Context) {
-	ctx := c.Request.Context()
-	tenantID, ok := parseTenantIDFromPath(c)
-	if !ok {
-		return
-	}
-
-	stats, err := h.memberService.MemberUsageStats(ctx, tenantID)
-	if err != nil {
-		c.Error(apperrors.NewInternalServerError("Failed to load member usage stats").WithDetails(err.Error()))
-		return
-	}
-	if stats == nil {
-		stats = []types.TenantMemberUsageStat{}
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    gin.H{"stats": stats},
-	})
-}
-
 // ListMembers godoc
 // @Summary      列出空间成员
 // @Description  分页返回当前空间内 active 成员（含每位成员的角色、邮箱、头像）；支持 q 按邮箱/用户名筛选
@@ -334,10 +300,10 @@ func writeAddMemberSuccess(c *gin.Context, user *types.User, member *types.Tenan
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
 		"data": types.TenantMemberResponse{
-			UserID:    member.UserID,
-			Email:     user.Email,
-			Username:  user.Username,
-			Avatar:    user.Avatar,
+			UserID:         member.UserID,
+			Email:          user.Email,
+			Username:       user.Username,
+			Avatar:         user.Avatar,
 			Role:           member.Role,
 			Status:         member.Status,
 			InvitedBy:      member.InvitedBy,
@@ -404,7 +370,7 @@ func (h *TenantMemberHandler) UpdateMemberRole(c *gin.Context) {
 	// Teaching deployment (#17): the education membership model is fixed to
 	// one workspace lead (internal owner, set at create) and students
 	// (viewer). This endpoint must not transfer, demote, duplicate, or
-	// promote roles — including granting admin/contributor. Legacy
+	// promote roles - including granting admin/contributor. Legacy
 	// admin/contributor cleanup and ambiguous-owner recovery are separate
 	// SuperAdmin flows (#18/#19), not ordinary member mutations.
 	c.Error(apperrors.NewForbiddenError(

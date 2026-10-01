@@ -47,8 +47,8 @@ func (s *tenantService) CreateTenant(ctx context.Context, tenant *types.Tenant) 
 	tenant.Status = "active"
 	tenant.CreatedAt = time.Now()
 	tenant.UpdatedAt = time.Now()
-	// Migration 000091 made default_agent_id NOT NULL DEFAULT ''. A nil
-	// *string becomes SQL NULL under GORM Create and trips that constraint.
+	// default_agent_id is NOT NULL DEFAULT ''. A nil *string becomes SQL NULL
+	// under GORM Create and trips that constraint.
 	if tenant.DefaultAgentID == nil {
 		empty := ""
 		tenant.DefaultAgentID = &empty
@@ -77,6 +77,20 @@ func (s *tenantService) CreateTenant(ctx context.Context, tenant *types.Tenant) 
 
 	logger.Infof(ctx, "Tenant created successfully, ID: %d, name: %s", tenant.ID, tenant.Name)
 	return tenant, nil
+}
+
+// UpdateTenantDefaultAgentID sets or clears the workspace default agent.
+// Empty agentID clears the default. Existence inside the workspace is
+// enforced at apply time by the frontend.
+func (s *tenantService) UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error {
+	if tenantID == 0 {
+		return errors.New("tenant ID cannot be 0")
+	}
+	agentID = strings.TrimSpace(agentID)
+	if len(agentID) > 36 {
+		return errors.New("default agent id too long")
+	}
+	return s.repo.UpdateTenantDefaultAgentID(ctx, tenantID, agentID)
 }
 
 func (s *tenantService) createDefaultStorageBackend(ctx context.Context, tenant *types.Tenant) error {
@@ -169,22 +183,6 @@ func (s *tenantService) UpdateTenant(ctx context.Context, tenant *types.Tenant) 
 
 	logger.Infof(ctx, "Tenant updated successfully, ID: %d", tenant.ID)
 	return tenant, nil
-}
-
-// UpdateTenantDefaultAgentID sets or clears the workspace default agent
-// (sicau-v1 ticket 04). Empty agentID clears the default. The agent's
-// existence inside the workspace is enforced at apply time by the
-// frontend (a stale id pointing at a deleted agent is ignored there),
-// so this stays a length-and-format pass-through.
-func (s *tenantService) UpdateTenantDefaultAgentID(ctx context.Context, tenantID uint64, agentID string) error {
-	if tenantID == 0 {
-		return errors.New("tenant ID cannot be 0")
-	}
-	agentID = strings.TrimSpace(agentID)
-	if len(agentID) > 36 {
-		return errors.New("default agent id too long")
-	}
-	return s.repo.UpdateTenantDefaultAgentID(ctx, tenantID, agentID)
 }
 
 // DeleteTenant removes a tenant by their ID

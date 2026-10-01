@@ -1,0 +1,2 @@
+-- rollback default agent
+-- SQLite cannot DROP COLUMN portably in older versions; no-op leave column.
