@@ -360,9 +360,6 @@ async function openProjectDir() {
     cursor: pointer;
 }
 
-    }
-}
-
 @import '../../components/css/suggested-questions.less';
 @import './newConversationEmptyState.less';
 
