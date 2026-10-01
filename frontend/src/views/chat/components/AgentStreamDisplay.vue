@@ -413,6 +413,10 @@
                 <template v-if="!embeddedMode">
                   <SaveAnswerToNoteButton :question="userQuery" :answer="event.content" />
                 </template>
+                <t-button v-if="canMutateCourseFiles" size="small" variant="outline" shape="round" @click.stop="handleAddToKnowledge(event)"
+                  :title="$t('agent.addToKnowledgeBase')">
+                  <t-icon name="bookmark-add" />
+                </t-button>
                 <!-- Skill artifact download: only shown when the persisted
                      assistant message recorded any generated files. Agent
                      mode is the primary path for skills, so this is where
@@ -3145,6 +3149,68 @@ const handleCopyAnswer = async (answerEvent: any) => {
   await copyWithToast(content, 'agentStream.copy.success', 'agentStream.copy.failed');
 };
 
+const handleAddToKnowledge = (answerEvent: any) => {
+  const content = getActualContent(answerEvent);
+  if (!content) {
+    MessagePlugin.warning(t('agentStream.saveToKb.emptyContent'));
+    return;
+  }
+
+  const question = (props.userQuery || '').trim();
+  const manualContent = buildManualMarkdown(question, content);
+  const manualTitle = formatManualTitle(question);
+
+  uiStore.openManualEditor({
+    mode: 'create',
+    title: manualTitle,
+    content: manualContent,
+    status: 'draft',
+  });
+
+  MessagePlugin.info(t('agentStream.saveToKb.editorOpened'));
+};
+</script>
+
+<style lang="less" scoped>
+@import '../../../components/css/chat-markdown.less';
+@import '../../../components/css/chat-message-shared.less';
+@import '../../../components/css/chat-citations.less';
+@import '../../../components/css/chat-timeline-loading.less';
+
+.agent-stream-display {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 10px;
+  position: relative;
+  --agent-step-text-size: 14px;
+  --agent-step-summary-size: 13px;
+  --agent-step-line-color: color-mix(in srgb, var(--td-text-color-primary) 16%, transparent);
+  --agent-step-icon-color: var(--td-text-color-placeholder);
+  --stream-brand-2: color-mix(in srgb, var(--td-brand-color) 2%, transparent);
+  --stream-brand-3: color-mix(in srgb, var(--td-brand-color) 3%, transparent);
+  --stream-brand-4: color-mix(in srgb, var(--td-brand-color) 4%, transparent);
+  --stream-brand-5: color-mix(in srgb, var(--td-brand-color) 5%, transparent);
+  --stream-brand-6: color-mix(in srgb, var(--td-brand-color) 6%, transparent);
+  --stream-brand-8: color-mix(in srgb, var(--td-brand-color) 8%, transparent);
+  --stream-brand-10: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
+  --stream-brand-12: color-mix(in srgb, var(--td-brand-color) 12%, transparent);
+  --stream-brand-15: color-mix(in srgb, var(--td-brand-color) 15%, transparent);
+  --stream-brand-20: color-mix(in srgb, var(--td-brand-color) 20%, transparent);
+
+  &.is-steer-prefix {
+    margin-bottom: 0;
+    .tree-container { margin-bottom: 0; }
+  }
+
+  &.is-rag-mode {
+    margin-top: 0;
+  }
+
+  &.is-embedded {
+    margin-bottom: 0;
+  }
+}
 
 // Streaming steps container
 .streaming-steps-container {
