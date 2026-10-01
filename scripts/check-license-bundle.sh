@@ -16,9 +16,14 @@ if grep -Eq 'github.com/(longbridgeapp/opencc|liuzl/(da|cedar-go)|adamzy/cedar-g
 fi
 
 test -s licenses/sources/modules.tsv
+# Strip CR so Windows checkouts (CRLF) still match Linux build containers.
 while read -r module_name module_version checksum; do
+    module_name="${module_name%$'\r'}"
+    module_version="${module_version%$'\r'}"
+    checksum="${checksum%$'\r'}"
     [[ "${checksum}" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid source checksum for ${module_name}" >&2; exit 1; }
     actual_version="$(awk -v name="${module_name}" '$1 == name { print $2 }' go.mod)"
+    actual_version="${actual_version%$'\r'}"
     if [ "${actual_version}" != "${module_version}" ]; then
         echo "Update the source manifest for ${module_name}: expected ${module_version}, got ${actual_version}" >&2
         exit 1
