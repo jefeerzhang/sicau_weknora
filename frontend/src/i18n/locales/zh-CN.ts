@@ -358,9 +358,18 @@ export default {
       contributor: '编辑',
       viewer: '访客'
     },
+    teaching: {
+      teacher: '教师',
+      superadmin: '超级管理员',
+      student: '学生',
+      legacyOwner: '所有者（待整理）',
+      legacyWarning: '这是历史高权限成员。课程空间里不再在这里改角色。',
+      unknown: '未知角色',
+    },
     columns: {
       member: '姓名与邮箱',
       role: '角色',
+      identity: '身份',
       joinedAt: '加入时间',
       operations: '操作'
     },

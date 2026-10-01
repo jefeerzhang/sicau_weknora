@@ -188,6 +188,9 @@ func (r *fakeTenantMemberRepo) HasAnyMembers(ctx context.Context, tenantID uint6
 	return false, nil
 }
 
+func (r *fakeTenantMemberRepo) WithTx(*gorm.DB) interfaces.TenantMemberRepository { return r }
+
+
 // DemoteOwnerAtomically and RemoveOwnerAtomically mimic the production
 // repo's transactional invariants: count other active Owners, fail
 // closed when there are none, otherwise apply the role change /
@@ -248,6 +251,10 @@ func (r *fakeTenantMemberRepo) RemoveOwnerAtomically(
 	return nil
 }
 
+func (r *fakeTenantMemberRepo) MemberUsageStats(context.Context, uint64) ([]types.TenantMemberUsageStat, error) {
+	return nil, nil
+}
+
 // Compile-time guard so the test stays in sync with the interface.
 var _ interfaces.TenantMemberRepository = (*fakeTenantMemberRepo)(nil)
 
@@ -297,6 +304,9 @@ func (r *cleanupUserRepo) ListUsers(context.Context, int, int) ([]*types.User, e
 	return nil, nil
 }
 func (r *cleanupUserRepo) ListTeachers(context.Context, int, int) ([]*types.User, int64, error) {
+	return nil, 0, nil
+}
+func (r *cleanupUserRepo) ListUsersPage(context.Context, string, int, int) ([]*types.User, int64, error) {
 	return nil, 0, nil
 }
 func (r *cleanupUserRepo) ListSystemAdmins(context.Context, int, int) ([]*types.User, int64, error) {

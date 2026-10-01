@@ -13,11 +13,13 @@ test('viewer cannot see chat attachment upload control', () => {
   assert.match(src, /getDefaultAgentId/)
 })
 
-test('answer toolbars do not offer add-to-knowledge', () => {
+test('answer toolbars hide add-to-knowledge for students', () => {
   const bot = read('../views/chat/components/botmsg.vue')
   const stream = read('../views/chat/components/AgentStreamDisplay.vue')
-  assert.doesNotMatch(bot, /handleAddToKnowledge|addToKnowledgeBase|bookmark-add/)
-  assert.doesNotMatch(stream, /handleAddToKnowledge|addToKnowledgeBase|bookmark-add/)
+  assert.match(bot, /canMutateCourseFiles/)
+  assert.match(stream, /canMutateCourseFiles/)
+  assert.match(bot, /v-if="canMutateCourseFiles"[^>]*handleAddToKnowledge/)
+  assert.match(stream, /v-if="canMutateCourseFiles"[^>]*handleAddToKnowledge/)
 })
 
 test('artifact drawer gates downloads to contributor+', () => {

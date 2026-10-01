@@ -7298,6 +7298,7 @@ export default {
     columns: {
       member: 'Name & email',
       role: 'Role',
+      identity: 'Identity',
       joinedAt: 'Joined',
       operations: 'Actions'
     },
@@ -7306,6 +7307,14 @@ export default {
       admin: 'Admin',
       contributor: 'Contributor',
       viewer: 'Viewer'
+    },
+    teaching: {
+      teacher: 'Teacher',
+      superadmin: 'Super administrator',
+      student: 'Student',
+      legacyOwner: 'Owner (needs cleanup)',
+      legacyWarning: 'This is a legacy elevated membership. Course spaces no longer change this role here.',
+      unknown: 'Unknown role',
     },
     add: {
       button: 'Add Member',

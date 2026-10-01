@@ -610,6 +610,12 @@ func (s *userService) ListTeachers(
 	return s.userRepo.ListTeachers(ctx, offset, limit)
 }
 
+func (s *userService) ListUsersPage(
+	ctx context.Context, query string, offset, limit int,
+) ([]*types.User, int64, error) {
+	return s.userRepo.ListUsersPage(ctx, query, offset, limit)
+}
+
 // RevokeSystemAdmin removes system-admin privileges through the
 // repository's transactional guard so concurrent revokes cannot remove
 // the final administrator.

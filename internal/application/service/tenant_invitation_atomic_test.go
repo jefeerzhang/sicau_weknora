@@ -69,7 +69,7 @@ func newAtomicFixture(t *testing.T) *atomicFixture {
 	audit := &flakyAudit{AuditLogService: realAudit}
 	memberSvc := NewTenantMemberService(apprepo.NewTenantMemberRepository(db), audit, nil, nil)
 	invRepo := apprepo.NewTenantInvitationRepository(db)
-	svc := NewTenantInvitationService(db, invRepo, memberSvc, audit)
+	svc := NewTenantInvitationService(invRepo, memberSvc, audit)
 	return &atomicFixture{db: db, svc: svc, memberSvc: memberSvc, audit: audit}
 }
 

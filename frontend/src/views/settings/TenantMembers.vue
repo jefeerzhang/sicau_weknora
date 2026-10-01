@@ -1,67 +1,17 @@
 <template>
   <div class="tenant-members">
-    <!-- Section header. The (i) permission speed-look popover lives
-         next to the title so it reads as meta-info about *this
-         section*. The audit-log entry sits on the right of the header
-         row — secondary navigation that opens the audit drawer; gated
-         to Admin+ so non-managers don't see a button they can't use. -->
+    <!-- Course roster: who is in this workspace, plus invite and remove. -->
     <div class="section-header">
       <div class="section-header-row">
         <div class="section-header-titlewrap">
           <h2>{{ $t('tenantMember.title') }}</h2>
-          <t-popup placement="bottom-start" trigger="hover" overlay-class-name="wk-popover permissions-popup-overlay"
-            :overlay-inner-style="permissionsPopupInnerStyle">
-            <button type="button" class="permissions-trigger-btn" :aria-label="$t('tenantMember.permissions.title')"
-              :title="$t('tenantMember.permissions.iconHint')">
-              <t-icon name="info-circle" size="16px" />
-            </button>
-            <template #content>
-              <div class="permissions-compact permissions-compact--popover">
-                <div class="permissions-compact-header">
-                  <span class="permissions-compact-title">{{ $t('tenantMember.permissions.title') }}</span>
-                  <span class="permissions-compact-desc">{{ $t('tenantMember.permissions.desc') }}</span>
-                </div>
-                <div class="permissions-compact-grid">
-                  <div v-for="r in roleMatrixOrder" :key="r"
-                    :class="['perm-role-block', r, { 'is-me': currentRole === r }]">
-                    <div class="perm-role-tag">
-                      <t-icon :name="roleMatrixIcon(r)" size="12px" />
-                      <span>{{ $t('tenantMember.role.' + r) }}</span>
-                      <span v-if="currentRole === r" class="me-badge">{{ $t('common.me') }}</span>
-                    </div>
-                    <div class="perm-items">
-                      <span v-for="(perm, i) in roleMatrix[r]" :key="i" :class="['perm-item', perm.has ? 'has' : 'no']">
-                        <t-icon :name="perm.has ? 'check' : 'close'" size="12px" />
-                        {{ $t('tenantMember.permissions.' + perm.key) }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-          </t-popup>
-          <!-- Audit log entry sits inline with the title: title (i)
-               [审计日志]. Keeping all section-level affordances on the
-               left edge avoids the "lonely right-aligned button"
-               pattern in narrow settings panels. -->
           <t-button v-if="canViewAudit" variant="text" size="small" class="header-audit-btn" @click="openAuditDrawer">
             <template #icon><t-icon name="history" /></template>
             {{ $t('tenantMember.audit.tabLabel') }}
           </t-button>
         </div>
       </div>
-      <p class="section-description">
-        {{ $t('tenantMember.sectionDescription') }}
-        <a
-          class="doc-link"
-          href="https://github.com/Tencent/WeKnora/blob/main/website-docs/03-features/01-tenant-auth.md"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {{ $t('tenantMember.learnRbacGuide') }}
-          <t-icon name="link" class="link-icon" />
-        </a>
-      </p>
+      <p class="section-description">{{ $t('tenantMember.sectionDescription') }}</p>
     </div>
 
     <div class="members-tab-layout">
@@ -127,7 +77,7 @@
               </template>
               <template #role="{ row }">
                 <t-tag :theme="roleTagTheme(row.role)" size="small">
-                  {{ $t('tenantMember.role.' + row.role) }}
+                  {{ teachingRoleLabel(row.role) }}
                 </t-tag>
               </template>
               <template #inviter="{ row }">
@@ -198,7 +148,7 @@
               </t-input>
             </div>
             <t-popup v-if="canManage" v-model="invitePopupVisible" trigger="click" placement="bottom-end"
-              destroy-on-close overlay-class-name="wk-popover member-invite-popup-overlay">
+              destroy-on-close overlay-class-name="member-invite-popup-overlay">
               <t-button theme="primary" variant="outline" shape="square" size="small" class="members-list-add-btn"
                 :title="$t('tenantMember.add.button')" :aria-label="$t('tenantMember.add.button')">
                 <template #icon><t-icon name="user-add" /></template>
@@ -218,15 +168,9 @@
                       <t-input v-model="addForm.email" :placeholder="$t('tenantMember.add.emailPlaceholder')"
                         clearable />
                     </t-form-item>
-                    <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
-                      <t-select v-model="addForm.role" :options="roleOptions" :popup-props="roleSelectPopupProps" />
-                    </t-form-item>
                   </t-form>
                   <div v-else class="invite-confirm-body">
-                    {{ $t('tenantInvitation.confirmInviteBody', {
-                      email: addConfirmEmail,
-                      role: addConfirmRoleLabel,
-                    }) }}
+                    {{ $t('tenantInvitation.confirmInviteBody', { email: addConfirmEmail }) }}
                   </div>
                   <div class="invite-popup-footer">
                     <t-button v-if="addDialogStep === 'form'" variant="outline" :disabled="adding"
@@ -247,7 +191,7 @@
                  popup so the two flows live side-by-side: "I know who"
                  (email input) vs "I don't" (one link, group chat). -->
             <t-popup v-if="canManage" v-model="shareLinkPopupVisible" trigger="click" placement="bottom-end"
-              destroy-on-close overlay-class-name="wk-popover member-invite-popup-overlay">
+              destroy-on-close overlay-class-name="member-invite-popup-overlay">
               <t-button theme="default" variant="outline" shape="square" size="small" class="members-list-add-btn"
                 :title="$t('tenantInvitation.shareLink.button')"
                 :aria-label="$t('tenantInvitation.shareLink.button')">
@@ -266,12 +210,6 @@
                     <p class="invite-confirm-body">
                       {{ $t('tenantInvitation.shareLink.description', { days: INVITATION_TTL_DAYS }) }}
                     </p>
-                    <t-form :data="shareLinkForm" :label-width="80">
-                      <t-form-item :label="$t('tenantMember.add.roleLabel')" name="role">
-                        <t-select v-model="shareLinkForm.role" :options="roleOptions"
-                          :popup-props="roleSelectPopupProps" />
-                      </t-form-item>
-                    </t-form>
                   </div>
                   <div v-else class="share-link-result">
                     <p class="invite-confirm-body">
@@ -334,19 +272,13 @@
               </template>
               <template #role="{ row }">
                 <div class="role-cell">
-                  <t-select v-if="canManage && row.user_id !== currentUserId" :model-value="row.role"
-                    class="member-role-select" size="small" :popup-props="roleSelectPopupProps"
-                    @change="(val: string) => onRoleChange(row, val)">
-                    <t-option v-for="opt in roleOptions" :key="opt.value" :value="opt.value" :label="opt.label">
-                      <span class="role-option">
-                        <t-icon :name="roleIcon(opt.value)" class="role-option-icon" />
-                        <span>{{ opt.label }}</span>
-                      </span>
-                    </t-option>
-                  </t-select>
-                  <t-tag v-else :theme="roleTagTheme(row.role)" size="small">
-                    {{ $t('tenantMember.role.' + row.role) }}
+                  <t-tag :theme="roleTagTheme(row.role)" size="small">
+                    {{ teachingRoleLabel(row.role, row.roster_identity) }}
                   </t-tag>
+                  <span
+                    v-if="teachingRoleWarning(row.role)"
+                    class="role-legacy-hint"
+                  >{{ teachingRoleWarning(row.role) }}</span>
                 </div>
               </template>
               <template #joined_at="{ row }">{{ formatDate(row.joined_at) }}</template>
@@ -380,10 +312,8 @@
     <!-- Audit log drawer. Only rendered for Admin+ because the backend
          route is g.Admin()-gated; rendering it for lower roles would
          just produce an unhelpful 403. Lazy-loaded on first open. -->
-    <SettingDrawer v-if="canViewAudit" v-model:visible="auditDrawerVisible"
-      :title="$t('tenantMember.audit.tabLabel')" width="1120px" :min-width="720" :max-width="1600"
-      storage-key="setting-drawer:width:tenant-members-audit" :hide-footer="true"
-      drawer-class-name="tenant-members-audit-drawer">
+    <t-drawer v-if="canViewAudit" v-model:visible="auditDrawerVisible" :header="$t('tenantMember.audit.tabLabel')"
+      drawer-class-name="tenant-members-audit-drawer" size="880px" :footer="false" placement="right" destroy-on-close>
       <div class="audit-drawer-inner audit-panel audit-panel--drawer">
         <div class="audit-header">
           <span class="audit-desc">{{ $t('tenantMember.audit.description') }}</span>
@@ -508,7 +438,7 @@
           </div>
         </div>
       </div>
-    </SettingDrawer>
+    </t-drawer>
   </div>
 </template>
 
@@ -516,18 +446,18 @@
 import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MessagePlugin } from 'tdesign-vue-next'
-import SettingDrawer from '@/components/settings/SettingDrawer.vue'
 import { copyWithToast } from '@/utils/clipboard'
 import { useAuthStore } from '@/stores/auth'
 import { AUDIT_ACTION_I18N_ROOTS } from '@/i18n/auditActionRegistry'
 import { auditActionLabel } from '@/i18n/auditActionLabel'
 import {
   listMembers,
-  updateMemberRole,
   removeMember,
   type TenantMember,
   type TenantRole,
 } from '@/api/tenant/members'
+import { formatRoleLabel } from '@/composables/formatRoleLabel'
+import { teachingMembershipView } from '@/utils/teachingMembership'
 import {
   listTenantInvitations,
   createInvitation,
@@ -545,16 +475,6 @@ import {
 const { t, tm, locale } = useI18n()
 const authStore = useAuthStore()
 
-/** 悬停层限制在视口内，内容由内部滚动 */
-const permissionsPopupInnerStyle = {
-  boxSizing: 'border-box' as const,
-  padding: '0',
-  width: 'min(520px, calc(100vw - 24px))',
-  maxWidth: 'min(520px, calc(100vw - 24px))',
-  maxHeight: 'min(400px, 65vh)',
-  overflow: 'hidden',
-}
-
 // State
 const members = ref<TenantMember[]>([])
 const loading = ref(false)
@@ -566,7 +486,9 @@ const invitePopupVisible = ref(false)
 // invite). shareLinkResult is non-null after a successful create —
 // the popup then switches into "here's your link, copy it" mode.
 const shareLinkPopupVisible = ref(false)
-const shareLinkForm = reactive<{ role: TenantRole }>({ role: 'contributor' })
+// Teaching invariant (viewer-only invites): share links mint students only.
+// Backend CreateInviteLink rejects any role above viewer — keep the FE default aligned.
+const shareLinkForm = reactive<{ role: TenantRole }>({ role: 'viewer' })
 const creatingShareLink = ref(false)
 const shareLinkResult = ref<TenantInvitation | null>(null)
 // Two-step invite inside the popup: 'form' renders the email/role inputs;
@@ -631,13 +553,11 @@ const auditScrollRoot = ref<HTMLElement | null>(null)
 const auditLoadSentinelEl = ref<HTMLElement | null>(null)
 let auditScrollObserver: IntersectionObserver | null = null
 
-// Add dialog model — reset on each open. Default role is contributor:
-// inviting a fresh member with viewer is too restrictive for the
-// expected "let them collaborate on KBs" use case, and admin/owner
-// should be a deliberate promote step after the user accepts.
+// Add dialog model — reset on each open. Teaching invites are viewer-only
+// (Student); backend CreateInvitation / CreateInviteLink reject elevated roles.
 const addForm = reactive<{ email: string; role: TenantRole }>({
   email: '',
-  role: 'contributor',
+  role: 'viewer',
 })
 
 // Role-aware gates. The server enforces every mutation; UI gates here
@@ -667,73 +587,19 @@ const currentUserId = computed(() => authStore.user?.id ?? '')
 // don't expose a tenant picker here.
 const activeTenantId = computed(() => Number(authStore.currentTenantId ?? 0))
 
-const roleOptions = computed(() => [
-  { label: t('tenantMember.role.owner'), value: 'owner' },
-  { label: t('tenantMember.role.admin'), value: 'admin' },
-  { label: t('tenantMember.role.contributor'), value: 'contributor' },
-  { label: t('tenantMember.role.viewer'), value: 'viewer' },
-])
-
-/** 下拉层须高于邀请浮层（3050）与组织设置全屏遮罩，否则会被压住 */
-const roleSelectPopupProps = {
-  zIndex: 6200,
-  overlayClassName: 'tenant-members-role-select-popup',
+function teachingRoleLabel(role: string | null | undefined, rosterIdentity?: string | null): string {
+  return formatRoleLabel(t, role, rosterIdentity)
 }
-
-// Static role-permissions matrix. The keys reference i18n strings under
-// `tenantMember.permissions.*` so each locale can rephrase per culture.
-// Keep this aligned with the design-doc §4.3 matrix and the actual
-// PR 2 enforcement; if a permission moves between roles, update both
-// sides in the same PR.
-type RolePerm = { key: string; has: boolean }
-const roleMatrixOrder: TenantRole[] = ['owner', 'admin', 'contributor', 'viewer']
-const roleMatrix: Record<TenantRole, RolePerm[]> = {
-  owner: [
-    { key: 'manageMembers', has: true },
-    { key: 'manageTenantConfig', has: true },
-    { key: 'manageInfra', has: true },
-    { key: 'createOwnKB', has: true },
-    { key: 'readAll', has: true },
-  ],
-  admin: [
-    { key: 'manageMembers', has: false },
-    { key: 'manageTenantConfig', has: false },
-    { key: 'manageInfra', has: true },
-    { key: 'createOwnKB', has: true },
-    { key: 'readAll', has: true },
-  ],
-  contributor: [
-    { key: 'manageMembers', has: false },
-    { key: 'manageTenantConfig', has: false },
-    { key: 'manageInfra', has: false },
-    { key: 'createOwnKB', has: true },
-    { key: 'readAll', has: true },
-  ],
-  viewer: [
-    { key: 'manageMembers', has: false },
-    { key: 'manageTenantConfig', has: false },
-    { key: 'manageInfra', has: false },
-    { key: 'createOwnKB', has: false },
-    { key: 'readAll', has: true },
-  ],
-}
-
-function roleMatrixIcon(role: TenantRole): string {
-  switch (role) {
-    case 'owner':
-      return 'user-vip-filled'
-    case 'admin':
-      return 'user-safety'
-    case 'contributor':
-      return 'edit'
-    default:
-      return 'browse'
-  }
+function teachingRoleWarning(role: string | null | undefined): string {
+  const view = teachingMembershipView(role)
+  if (!view.warningKey) return ''
+  const label = t(view.warningKey)
+  return label === view.warningKey ? '' : label
 }
 
 const columns = computed(() => [
   { colKey: 'member', title: t('tenantMember.columns.member'), ellipsis: true, minWidth: 132 },
-  { colKey: 'role', title: t('tenantMember.columns.role'), width: 128 },
+  { colKey: 'role', title: t('tenantMember.columns.identity'), width: 140 },
   { colKey: 'joined_at', title: t('tenantMember.columns.joinedAt'), width: 154 },
   { colKey: 'actions', title: t('tenantMember.columns.operations'), width: 88, align: 'left' },
 ])
@@ -754,7 +620,6 @@ const addFormRules = {
     { required: true, message: t('tenantMember.errors.emailRequired'), trigger: 'blur' },
     { email: true, message: t('tenantMember.errors.emailFormat'), trigger: 'blur' },
   ],
-  role: [{ required: true, message: t('tenantMember.errors.roleRequired'), trigger: 'change' }],
 }
 
 // Pretty role tag colour: Owner stands out, Admin is warning, the rest
@@ -773,13 +638,6 @@ function roleTagTheme(role: TenantRole): 'primary' | 'warning' | 'success' | 'de
 }
 
 /** 成员表/下拉与权限矩阵共用图标（crown 不在 tdesign-icons-vue-next 中）。 */
-function roleIcon(role: TenantRole | string): string {
-  if (role === 'owner' || role === 'admin' || role === 'contributor' || role === 'viewer') {
-    return roleMatrixIcon(role as TenantRole)
-  }
-  return 'user'
-}
-
 function formatDate(s: string | undefined): string {
   if (!s) return '-'
   try {
@@ -862,7 +720,7 @@ watch(searchQuery, () => {
 
 const invitationColumns = computed(() => [
   { colKey: 'invitee', title: t('tenantInvitation.columns.invitee'), ellipsis: true, minWidth: 160 },
-  { colKey: 'role', title: t('tenantInvitation.columns.role'), width: 110 },
+  { colKey: 'role', title: t('tenantInvitation.columns.identity'), width: 110 },
   { colKey: 'inviter', title: t('tenantInvitation.columns.inviter'), ellipsis: true, minWidth: 140 },
   { colKey: 'expires_at', title: t('tenantInvitation.columns.expiresAt'), width: 160 },
   { colKey: 'status', title: t('tenantInvitation.columns.status'), width: 100 },
@@ -1245,7 +1103,7 @@ onUnmounted(() => detachAuditInfiniteScroll())
 watch(invitePopupVisible, (open) => {
   if (!open) return
   addForm.email = ''
-  addForm.role = 'contributor'
+  addForm.role = 'viewer'
   addDialogStep.value = 'form'
 })
 
@@ -1253,7 +1111,7 @@ watch(invitePopupVisible, (open) => {
 // the previous result on a fresh click.
 watch(shareLinkPopupVisible, (open) => {
   if (!open) return
-  shareLinkForm.role = 'contributor'
+  shareLinkForm.role = 'viewer'
   shareLinkResult.value = null
 })
 
@@ -1294,7 +1152,6 @@ async function submitShareLink() {
 // every time the user goes Back, tweaks the form, and re-advances —
 // the summary always mirrors the current form state.
 const addConfirmEmail = computed(() => addForm.email.trim())
-const addConfirmRoleLabel = computed(() => t('tenantMember.role.' + addForm.role))
 
 // submitAdd is wired to the popup footer primary CTA. On step='form' it
 // validates and swaps to summary; on step='confirm' it fires the API.
@@ -1373,49 +1230,6 @@ async function sendInvitation(email: string, role: TenantRole) {
   }
 }
 
-async function onRoleChange(row: TenantMember, newRole: string) {
-  const prev = row.role
-  const next = newRole as TenantRole
-  if (prev === next) return
-
-  try {
-    const resp = await updateMemberRole(activeTenantId.value, row.user_id, next)
-    if (resp.success) {
-      // Mutate the row by replacing it in `members.value` instead of
-      // assigning `row.role = next` in place. The `row` argument here
-      // is the row object handed in by t-table's slot scope, which in
-      // some TDesign versions is a shallow copy that doesn't share
-      // reactivity with the `members` array — assigning `row.role`
-      // updates the local handle but not the rendered cell, so the
-      // select keeps showing the previous value until a refresh.
-      // Splicing a fresh object into the source array guarantees the
-      // table re-renders.
-      const idx = members.value.findIndex((m) => m.user_id === row.user_id)
-      if (idx >= 0) {
-        const merged = { ...members.value[idx], role: next }
-        members.value.splice(idx, 1, merged)
-        rememberMembersForAudit([merged])
-      } else {
-        row.role = next
-      }
-      MessagePlugin.success(t('tenantMember.roleChange.success'))
-      return
-    }
-    MessagePlugin.error(resp.message || t('tenantMember.errors.generic'))
-  } catch (err: any) {
-    const status = err?.status
-    if (status === 409) {
-      MessagePlugin.error(t('tenantMember.errors.lastOwner'))
-    } else if (status === 404) {
-      MessagePlugin.error(t('tenantMember.errors.notFound'))
-    } else {
-      MessagePlugin.error(err?.message || t('tenantMember.errors.generic'))
-    }
-    // The t-select is bound via :model-value (one-way), so its rendered
-    // value stays at `prev` automatically — no DOM hack needed.
-  }
-}
-
 // 原地 popconfirm 替代 DialogPlugin 模态确认：与"共享资源删除"等其它列表内
 // 的删除入口风格统一，避免一个简单的二次确认打断成员管理表格的浏览节奏。
 // 错误分支保持与旧实现一致（409 last-owner / 404 not-found / 兜底）。
@@ -1466,8 +1280,6 @@ watch(
 </script>
 
 <style lang="less" scoped>
-@import (reference) '@/components/css/settings-section.less';
-
 .tenant-members {
   width: 100%;
 }
@@ -1481,7 +1293,7 @@ watch(
 
   .member-name {
     font-weight: 500;
-    font-size: var(--app-text-base);
+    font-size: 14px;
     color: var(--td-text-color-primary);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1489,7 +1301,7 @@ watch(
   }
 
   .member-email {
-    font-size: var(--app-text-sm);
+    font-size: 12px;
     line-height: 1.35;
     color: var(--td-text-color-secondary);
     overflow: hidden;
@@ -1499,7 +1311,23 @@ watch(
 }
 
 .section-header {
-  .settings-section-header();
+  margin-bottom: 20px;
+
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--td-text-color-primary);
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+
+  .section-description {
+    color: var(--td-text-color-secondary);
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 8px 0 0;
+    max-width: 52rem;
+  }
 }
 
 .section-header-row {
@@ -1579,12 +1407,12 @@ watch(
   margin: 0;
   padding: 0;
   border: none;
-  border-radius: var(--app-radius-sm);
+  border-radius: 6px;
   background: transparent;
   color: var(--td-text-color-secondary);
   cursor: pointer;
   line-height: 0;
-  transition: background-color var(--app-motion-base) ease, color var(--app-motion-base) ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 
   :deep(.t-icon) {
     display: block;
@@ -1626,7 +1454,7 @@ watch(
 }
 
 .members-list-title {
-  font-size: var(--app-text-base);
+  font-size: 14px;
   font-weight: 600;
   color: var(--td-text-color-primary);
 }
@@ -1640,16 +1468,16 @@ watch(
   min-width: 22px;
   height: 20px;
   padding: 0 7px;
-  border-radius: var(--app-radius-lg);
+  border-radius: 10px;
   background-color: var(--td-bg-color-secondarycontainer);
   color: var(--td-text-color-primary);
-  font-size: var(--app-text-sm);
+  font-size: 12px;
   font-weight: 600;
   line-height: 1;
 }
 
 .members-list-filter-hint {
-  font-size: var(--app-text-sm);
+  font-size: 12px;
   color: var(--td-text-color-secondary);
 }
 
@@ -1695,13 +1523,13 @@ watch(
 
 .data-table-shell {
   overflow-x: auto;
-  border-radius: var(--app-radius-lg);
+  border-radius: 10px;
   border: 1px solid var(--td-component-stroke);
   background-color: var(--td-bg-color-container);
 
   &:deep(thead th) {
     font-weight: 600;
-    font-size: var(--app-text-md);
+    font-size: 13px;
   }
 
   &:deep(.t-table td),
@@ -1710,17 +1538,20 @@ watch(
     padding-bottom: 12px;
   }
 
-  /* 角色列：下拉收缩到内容宽度，不再撑满整格。原先 100% 在窄角色
-     名（如"Owner"）下显得空荡且与其他列对不齐。 */
+  /* 角色列：只读教学标签（空间负责人 / 学生） */
   &:deep(.role-cell) {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
     min-width: 0;
     box-sizing: border-box;
   }
 
-  &:deep(.member-role-select.t-select) {
-    width: 100%;
+  &:deep(.role-legacy-hint) {
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--td-warning-color);
   }
 }
 
@@ -1775,13 +1606,13 @@ watch(
     margin-bottom: 16px;
 
     .permissions-compact-title {
-      font-size: var(--app-text-base);
+      font-size: 14px;
       font-weight: 600;
       color: var(--td-text-color-primary);
     }
 
     .permissions-compact-desc {
-      font-size: var(--app-text-md);
+      font-size: 13px;
       color: var(--td-text-color-secondary);
     }
   }
@@ -1794,10 +1625,10 @@ watch(
 
   .perm-role-block {
     border: 1px solid var(--td-component-stroke);
-    border-radius: var(--app-radius-md);
+    border-radius: 8px;
     padding: 14px 16px;
     background: var(--td-bg-color-container);
-    transition: all var(--app-motion-base) ease;
+    transition: all 0.2s ease;
 
     &.is-me {
       border-color: var(--td-brand-color);
@@ -1808,19 +1639,19 @@ watch(
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: var(--app-text-base);
+      font-size: 14px;
       font-weight: 600;
       color: var(--td-text-color-primary);
       margin-bottom: 12px;
 
       .me-badge {
         margin-left: auto;
-        font-size: var(--app-text-sm);
+        font-size: 12px;
         font-weight: 500;
         color: var(--td-brand-color);
         padding: 2px 8px;
         background: var(--td-brand-color-light);
-        border-radius: var(--app-radius-xs);
+        border-radius: 4px;
       }
     }
 
@@ -1833,7 +1664,7 @@ watch(
         display: flex;
         align-items: flex-start;
         gap: 6px;
-        font-size: var(--app-text-md);
+        font-size: 13px;
         line-height: 1.5;
 
         .t-icon {
@@ -1873,11 +1704,11 @@ watch(
       margin-bottom: 10px;
 
       .permissions-compact-title {
-        font-size: var(--app-text-md);
+        font-size: 13px;
       }
 
       .permissions-compact-desc {
-        font-size: var(--app-text-xs);
+        font-size: 11px;
         line-height: 1.4;
       }
     }
@@ -1889,15 +1720,15 @@ watch(
 
     .perm-role-block {
       padding: 8px 10px;
-      border-radius: var(--app-radius-sm);
+      border-radius: 6px;
 
       .perm-role-tag {
-        font-size: var(--app-text-sm);
+        font-size: 12px;
         margin-bottom: 6px;
         gap: 4px;
 
         .me-badge {
-          font-size: var(--app-text-2xs);
+          font-size: 10px;
           padding: 1px 5px;
         }
       }
@@ -1906,7 +1737,7 @@ watch(
         gap: 3px;
 
         .perm-item {
-          font-size: var(--app-text-xs);
+          font-size: 11px;
           line-height: 1.35;
           gap: 4px;
 
@@ -1940,7 +1771,7 @@ watch(
 }
 
 .member-invite-popup-title {
-  font-size: var(--app-text-lg);
+  font-size: 15px;
   font-weight: 600;
   color: var(--td-text-color-primary);
   margin: 0 0 12px;
@@ -1960,7 +1791,7 @@ watch(
 .invite-confirm-body {
   padding: 4px 0 8px;
   color: var(--td-text-color-primary);
-  font-size: var(--app-text-base);
+  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -1990,10 +1821,10 @@ watch(
   min-width: 0;
   padding: 7px 10px;
   border: 1px solid var(--td-component-stroke);
-  border-radius: var(--app-radius-sm);
+  border-radius: 6px;
   background: var(--td-bg-color-page);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--app-text-sm);
+  font-size: 12px;
   color: var(--td-text-color-primary);
   outline: none;
 }
@@ -2032,22 +1863,22 @@ watch(
   }
 
   .pending-invitations-title {
-    font-size: var(--app-text-base);
+    font-size: 14px;
     font-weight: 600;
     color: var(--td-text-color-primary);
   }
 
   .pending-invitations-desc {
-    font-size: var(--app-text-sm);
+    font-size: 12px;
     color: var(--td-text-color-secondary);
   }
 
   .pending-invitations-empty {
     padding: 10px 12px;
     border: 1px dashed var(--td-component-stroke);
-    border-radius: var(--app-radius-md);
+    border-radius: 8px;
     color: var(--td-text-color-secondary);
-    font-size: var(--app-text-md);
+    font-size: 13px;
     background: var(--td-bg-color-container);
   }
 
@@ -2084,13 +1915,13 @@ watch(
   justify-content: space-between;
   background: var(--td-bg-color-secondarycontainer);
   padding: 12px 16px;
-  border-radius: var(--app-radius-md);
+  border-radius: 8px;
   gap: 12px;
 
   .audit-desc {
     flex: 1;
     min-width: 0;
-    font-size: var(--app-text-md);
+    font-size: 13px;
     color: var(--td-text-color-secondary);
   }
 
@@ -2158,13 +1989,13 @@ watch(
   justify-content: center;
   gap: 10px;
   padding: 12px;
-  font-size: var(--app-text-sm);
+  font-size: 12px;
   color: var(--td-text-color-secondary);
 }
 
 .audit-end-hint {
   text-align: center;
-  font-size: var(--app-text-sm);
+  font-size: 12px;
   color: var(--td-text-color-disabled);
   padding: 8px 0 14px;
   margin: 0;
@@ -2177,12 +2008,12 @@ watch(
   line-height: 1.3;
 
   .audit-time-date {
-    font-size: var(--app-text-sm);
+    font-size: 12px;
     color: var(--td-text-color-secondary);
   }
 
   .audit-time-clock {
-    font-size: var(--app-text-md);
+    font-size: 13px;
     font-weight: 500;
     color: var(--td-text-color-primary);
     font-variant-numeric: tabular-nums;
@@ -2197,7 +2028,7 @@ watch(
   min-width: 0;
 
   .audit-actor-name {
-    font-size: var(--app-text-md);
+    font-size: 13px;
     font-weight: 500;
     color: var(--td-text-color-primary);
     overflow: hidden;
@@ -2206,7 +2037,7 @@ watch(
   }
 
   .audit-actor-role {
-    font-size: var(--app-text-sm);
+    font-size: 12px;
     color: var(--td-text-color-secondary);
   }
 }
@@ -2220,15 +2051,15 @@ watch(
   padding: 2px 0;
 
   .audit-target-key {
-    font-size: var(--app-text-md);
+    font-size: 13px;
     color: var(--td-text-color-primary);
     word-break: break-all;
   }
 
   .audit-target-diff {
-    font-size: var(--app-text-sm);
+    font-size: 12px;
     color: var(--td-text-color-secondary);
-    font-family: var(--td-font-family-mono);
+    font-family: var(--td-font-family-mono, monospace);
     word-break: break-all;
     line-height: 1.4;
   }
@@ -2239,8 +2070,8 @@ watch(
 }
 
 .audit-path {
-  font-family: var(--td-font-family-mono);
-  font-size: var(--app-text-sm);
+  font-family: var(--td-font-family-mono, monospace);
+  font-size: 12px;
   color: var(--td-text-color-secondary);
   word-break: break-all;
 
@@ -2277,7 +2108,7 @@ watch(
 }
 
 .audit-expanded-label {
-  font-size: var(--app-text-xs);
+  font-size: 11px;
   font-weight: 600;
   color: var(--td-text-color-secondary);
   text-transform: uppercase;
@@ -2285,7 +2116,7 @@ watch(
 }
 
 .audit-expanded-value {
-  font-size: var(--app-text-sm);
+  font-size: 12px;
   color: var(--td-text-color-primary);
   word-break: break-all;
 }
@@ -2299,12 +2130,12 @@ watch(
 .audit-expanded-json {
   margin: 0;
   padding: 10px 12px;
-  font-size: var(--app-text-sm);
+  font-size: 12px;
   line-height: 1.55;
   color: var(--td-text-color-primary);
   background: var(--td-bg-color-container);
   border: 1px solid var(--td-component-stroke);
-  border-radius: var(--app-radius-sm);
+  border-radius: 6px;
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 280px;
@@ -2312,7 +2143,7 @@ watch(
 }
 
 .mono {
-  font-family: var(--td-font-family-mono);
+  font-family: var(--td-font-family-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
 }
 </style>
 
@@ -2320,6 +2151,20 @@ watch(
 /* 权限说明弹出层（t-popup 挂到 body，须全局样式） */
 .permissions-popup-overlay {
   z-index: 3050 !important;
+
+  .t-popup__content {
+    padding: 0 !important;
+    border-radius: 12px !important;
+    background: var(--td-bg-color-container) !important;
+    border: 0.5px solid var(--td-component-stroke) !important;
+    box-shadow:
+      0 0 0 0.5px rgba(0, 0, 0, 0.03),
+      0 2px 4px rgba(0, 0, 0, 0.04),
+      0 8px 24px rgba(0, 0, 0, 0.1) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    overflow: hidden;
+  }
 
   .permissions-compact.permissions-compact--popover {
     padding: 12px 14px;
@@ -2335,13 +2180,13 @@ watch(
       margin-bottom: 10px;
 
       .permissions-compact-title {
-        font-size: var(--app-text-md);
+        font-size: 13px;
         font-weight: 600;
         color: var(--td-text-color-primary);
       }
 
       .permissions-compact-desc {
-        font-size: var(--app-text-sm);
+        font-size: 12px;
         line-height: 1.45;
         color: var(--td-text-color-secondary);
       }
@@ -2355,7 +2200,7 @@ watch(
 
     .perm-role-block {
       border: 1px solid var(--td-component-stroke);
-      border-radius: var(--app-radius-sm);
+      border-radius: 6px;
       padding: 8px 10px;
       background: var(--td-bg-color-container);
 
@@ -2368,19 +2213,19 @@ watch(
         display: flex;
         align-items: center;
         gap: 4px;
-        font-size: var(--app-text-sm);
+        font-size: 12px;
         font-weight: 600;
         color: var(--td-text-color-primary);
         margin-bottom: 6px;
 
         .me-badge {
           margin-left: auto;
-          font-size: var(--app-text-2xs);
+          font-size: 10px;
           font-weight: 500;
           color: var(--td-brand-color);
           padding: 1px 5px;
           background: var(--td-brand-color-light);
-          border-radius: var(--app-radius-xs);
+          border-radius: 4px;
         }
       }
 
@@ -2393,7 +2238,7 @@ watch(
           display: flex;
           align-items: flex-start;
           gap: 4px;
-          font-size: var(--app-text-xs);
+          font-size: 11px;
           line-height: 1.35;
           color: var(--td-text-color-secondary);
 
@@ -2438,6 +2283,20 @@ watch(
 .member-invite-popup-overlay {
   z-index: 3050 !important;
 
+  .t-popup__content {
+    padding: 14px 16px !important;
+    min-width: 300px;
+    max-width: min(392px, calc(100vw - 24px));
+    border-radius: 12px !important;
+    background: var(--td-bg-color-container) !important;
+    border: 0.5px solid var(--td-component-stroke) !important;
+    box-shadow:
+      0 0 0 0.5px rgba(0, 0, 0, 0.03),
+      0 2px 4px rgba(0, 0, 0, 0.04),
+      0 8px 24px rgba(0, 0, 0, 0.1) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  }
 }
 
 :root[theme-mode='dark'] .member-invite-popup-overlay .t-popup__content {
@@ -2459,7 +2318,7 @@ watch(
     gap: 8px;
   }
   .role-option-icon {
-    font-size: var(--app-text-base);
+    font-size: 14px;
     color: var(--td-text-color-secondary);
   }
 }
@@ -2469,7 +2328,6 @@ watch(
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  max-width: 100vw;
   max-height: 100vh;
   height: 100%;
 }
@@ -2481,10 +2339,5 @@ watch(
   flex-direction: column;
   box-sizing: border-box;
   overflow: hidden !important;
-}
-
-.t-drawer.tenant-members-audit-drawer .setting-drawer__body {
-  flex: 1 1 auto;
-  min-height: 0;
 }
 </style>

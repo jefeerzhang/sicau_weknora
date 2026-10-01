@@ -13,6 +13,9 @@ const access = (role: string | null, unsupported: string[] = [], superuser = fal
   canAccessAllTenants: superuser,
   hasRole: (min: string) => roles.indexOf(role || '') >= roles.indexOf(min),
   isSupported: (capability?: string) => !capability || !unsupported.includes(capability),
+  user: superuser
+    ? { is_system_admin: true }
+    : { is_teacher: true, platform_identity: 'teacher' },
 })
 
 test('toolbox contains only the agreed tools; infrastructure and secrets stay in settings', () => {
@@ -30,6 +33,18 @@ test('toolbox contains only the agreed tools; infrastructure and secrets stay in
 })
 
 test('toolbox preserves role and deployment gates, including workspace switches', () => {
+  const student = (role: string) => ({
+    currentTenantRole: role,
+    canAccessAllTenants: false,
+    hasRole: (min: string) => roles.indexOf(role) >= roles.indexOf(min),
+    isSupported: () => true,
+    user: { platform_identity: 'student' },
+  })
+  for (const role of ['viewer', 'owner']) {
+    assert.equal(canAccessToolboxSection('skills', student(role)), false)
+    assert.equal(canAccessToolboxSection('mcp', student(role)), false)
+    assert.equal(canAccessToolboxSection('browserconnection', student(role)), false)
+  }
   for (const role of ['viewer', 'contributor']) {
     assert.equal(canAccessToolboxSection('skills', access(role)), false)
     assert.equal(canAccessToolboxSection('mcp', access(role)), false)

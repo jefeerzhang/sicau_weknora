@@ -38,6 +38,9 @@ func (s *teacherUserSvc) UpdateUser(_ context.Context, user *types.User) error {
 func (s *teacherUserSvc) ListTeachers(context.Context, int, int) ([]*types.User, int64, error) {
 	return s.listed, int64(len(s.listed)), nil
 }
+func (s *teacherUserSvc) ListUsersPage(context.Context, string, int, int) ([]*types.User, int64, error) {
+	return nil, 0, nil
+}
 
 func TestAppointTeacherIdempotent(t *testing.T) {
 	gin.SetMode(gin.TestMode)

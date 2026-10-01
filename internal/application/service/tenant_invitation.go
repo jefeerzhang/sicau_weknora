@@ -47,6 +47,10 @@ var (
 	// route layer so this error only surfaces on the /me/ paths.
 	ErrInvitationForbidden = errors.New("only the invitee can accept or decline this invitation")
 
+	// ErrInvitationRoleRestrictedToViewer is returned by Create /
+	// CreateShareLink when a caller asks for any role other than viewer.
+	ErrInvitationRoleRestrictedToViewer = errors.New("invitations can only grant the student (viewer) role")
+
 	// ErrInvitationTokenInvalid is returned by LookupByToken /
 	// AcceptByToken when the supplied plaintext token does not match
 	// any active share-link row. The handler maps this to 410 Gone.
@@ -150,6 +154,9 @@ func (s *tenantInvitationService) Create(
 ) (*types.TenantInvitation, error) {
 	if !role.IsValid() {
 		return nil, ErrInvalidTenantRole
+	}
+	if role != types.TenantRoleViewer {
+		return nil, ErrInvitationRoleRestrictedToViewer
 	}
 	if err := rejectAPIKeyOwnerAssignment(ctx, role); err != nil {
 		return nil, err
@@ -460,6 +467,14 @@ func (s *tenantInvitationService) ListTenantInvitationsPage(
 	return rows, total, nil
 }
 
+func (s *tenantInvitationService) GetActiveShareLink(
+	ctx context.Context,
+	tenantID uint64,
+) (*types.TenantInvitation, error) {
+	s.sweep(ctx)
+	return s.repo.GetActiveShareLinkByTenant(ctx, tenantID)
+}
+
 // ListByInvitee sweeps then returns. Same reasoning as ListByTenant.
 func (s *tenantInvitationService) ListByInvitee(
 	ctx context.Context,
@@ -514,8 +529,19 @@ func (s *tenantInvitationService) CreateShareLink(
 	if !role.IsValid() {
 		return nil, "", ErrInvalidTenantRole
 	}
+	if role != types.TenantRoleViewer {
+		return nil, "", ErrInvitationRoleRestrictedToViewer
+	}
 	if err := rejectAPIKeyOwnerAssignment(ctx, role); err != nil {
 		return nil, "", err
+	}
+	s.sweep(ctx)
+	existing, err := s.repo.GetActiveShareLinkByTenant(ctx, tenantID)
+	if err != nil {
+		return nil, "", err
+	}
+	if existing != nil && !existing.IsExpired(s.now()) {
+		return existing, existing.Token, nil
 	}
 	token, err := generateShareLinkToken()
 	if err != nil {

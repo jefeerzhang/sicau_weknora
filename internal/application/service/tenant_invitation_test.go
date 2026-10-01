@@ -267,7 +267,7 @@ func newInvitationSvc() (
 ) {
 	invRepo := newFakeInvitationRepo()
 	memberSvc, _ := newServiceWithRepo()
-	svc := NewTenantInvitationService(nil, invRepo, memberSvc, nil)
+	svc := NewTenantInvitationService(invRepo, memberSvc, nil)
 	return svc, invRepo, memberSvc
 }
 
@@ -287,8 +287,8 @@ func TestInvitationService_Create_APIKeyCannotInviteOwner(t *testing.T) {
 	})
 
 	_, err := svc.Create(ctx, 1, "u-bob", types.TenantRoleOwner, nil, "")
-	if !errors.Is(err, ErrAPIKeyCannotAssignOwner) {
-		t.Fatalf("want ErrAPIKeyCannotAssignOwner, got %v", err)
+	if !errors.Is(err, ErrInvitationRoleRestrictedToViewer) {
+		t.Fatalf("want ErrInvitationRoleRestrictedToViewer, got %v", err)
 	}
 	if len(repo.rows) != 0 {
 		t.Fatalf("API key owner invitation must not be persisted, got %d rows", len(repo.rows))
@@ -609,8 +609,8 @@ func TestInvitationService_CreateShareLink_APIKeyCannotAssignOwner(t *testing.T)
 	})
 
 	_, _, err := svc.CreateShareLink(ctx, 1, types.TenantRoleOwner, nil, "")
-	if !errors.Is(err, ErrAPIKeyCannotAssignOwner) {
-		t.Fatalf("want ErrAPIKeyCannotAssignOwner, got %v", err)
+	if !errors.Is(err, ErrInvitationRoleRestrictedToViewer) {
+		t.Fatalf("want ErrInvitationRoleRestrictedToViewer, got %v", err)
 	}
 	if len(repo.rows) != 0 {
 		t.Fatalf("API key owner invite link must not be persisted, got %d rows", len(repo.rows))

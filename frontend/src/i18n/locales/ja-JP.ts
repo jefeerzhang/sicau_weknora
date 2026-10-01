@@ -7277,6 +7277,7 @@ export default {
     columns: {
       member: '名前とメールアドレス',
       role: 'ロール',
+      identity: '身分',
       joinedAt: '参加日時',
       operations: '操作'
     },
@@ -7285,6 +7286,14 @@ export default {
       admin: '管理者',
       contributor: '編集者',
       viewer: '閲覧者'
+    },
+    teaching: {
+      teacher: '教員',
+      superadmin: 'スーパー管理者',
+      student: '学生',
+      legacyOwner: 'オーナー（要整理）',
+      legacyWarning: '以前の高権限メンバーです。授業スペースではここではロールを変更しません。',
+      unknown: '不明なロール',
     },
     add: {
       button: 'メンバーを招待',

@@ -85,6 +85,9 @@ func (s *stubUserRepoForAuth) ListUsers(context.Context, int, int) ([]*types.Use
 func (s *stubUserRepoForAuth) ListTeachers(context.Context, int, int) ([]*types.User, int64, error) {
 	return nil, 0, nil
 }
+func (s *stubUserRepoForAuth) ListUsersPage(context.Context, string, int, int) ([]*types.User, int64, error) {
+	return nil, 0, nil
+}
 func (s *stubUserRepoForAuth) ListSystemAdmins(context.Context, int, int) ([]*types.User, int64, error) {
 	return nil, 0, nil
 }
