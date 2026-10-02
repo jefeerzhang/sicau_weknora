@@ -340,6 +340,11 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	logger.Debugf(ctx, "[Container] Registering memory service...")
 	must(container.Provide(memory.NewMemoryService))
 
+	// 学生个人模型 must be registered before SessionService: chat pipeline
+	// Invoke builds SessionService, which now depends on TenantPersonalModelService.
+	must(container.Provide(repository.NewTenantPersonalModelRepository))
+	must(container.Provide(service.NewTenantPersonalModelService))
+
 	logger.Debugf(ctx, "[Container] Registering session service...")
 	must(container.Provide(service.NewSessionService))
 	must(container.Provide(service.NewTenantSkillService))
@@ -548,8 +553,6 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(repository.NewTenantNoteRepository))
 	must(container.Provide(service.NewTenantNoteService))
 	must(container.Provide(handler.NewMeNoteHandler))
-	must(container.Provide(repository.NewTenantPersonalModelRepository))
-	must(container.Provide(service.NewTenantPersonalModelService))
 	must(container.Provide(handler.NewMePersonalModelHandler))
 	must(container.Provide(repository.NewTenantAnnouncementRepository))
 	must(container.Provide(service.NewTenantAnnouncementService))
