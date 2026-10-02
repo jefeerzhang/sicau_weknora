@@ -153,6 +153,13 @@ func (f *fakeTenantService) UpdateTenant(ctx context.Context, tenant *types.Tena
 	return nil, nil
 }
 
+func (f *fakeTenantService) UpdateTenantDefaultAgentID(_ context.Context, _ uint64, agentID string) error {
+	if f.tenant != nil {
+		f.tenant.DefaultAgentID = &agentID
+	}
+	return nil
+}
+
 func (f *fakeTenantService) DeleteTenant(ctx context.Context, id uint64) error {
 	return nil
 }

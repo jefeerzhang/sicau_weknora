@@ -90,7 +90,9 @@ func readFrontendDeploymentCapabilityKeys() ([]string, error) {
 
 	var keys []string
 	for _, line := range strings.Split(string(match[1]), "\n") {
-		line = strings.TrimSpace(strings.TrimRight(line, ","))
+		// Windows checkouts retain CRLF on a Docker bind mount. Trim the
+		// line ending before the comma, otherwise the comma survives.
+		line = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(line), ","))
 		if line == "" {
 			continue
 		}

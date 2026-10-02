@@ -40,6 +40,10 @@ func (s *tenantPolicySettingService) GetInt(_ context.Context, _ string, _ strin
 	return def
 }
 
+func (s *tenantPolicySettingService) GetString(_ context.Context, _, _, def string) string {
+	return def
+}
+
 type tenantPolicyUserService struct {
 	interfaces.UserService
 	user *types.User
