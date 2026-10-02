@@ -3038,8 +3038,16 @@ defineExpose({
   </div>
 </template>
 <script lang="ts">
+// 生产构建不会保留 /src/assets 这条开发期路径，必须走 glob 让 Vite 把图标打进产物
+// （小图按 inline 阈值内联成 data URI），与 components/menu.vue 的菜单图标同一套取法。
+const orgIconModules = import.meta.glob('@/assets/img/*.svg', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>
+
 const getImgSrc = (url: string) => {
-  return new URL(`/src/assets/img/${url}`, import.meta.url).href;
+  const key = Object.keys(orgIconModules).find((path) => path.endsWith(`/img/${url}`))
+  return key ? orgIconModules[key] : ''
 }
 </script>
 <style scoped lang="less">
