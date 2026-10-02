@@ -99,7 +99,7 @@ WORKDIR /app
 ARG APK_MIRROR_ARG
 
 # Pairing derives the gateway URL from the user's page origin by default.
-ENV BROWSERSKILL_BINARY=/opt/weknora/browserskill/bsk \
+ENV BROWSERSKILL_BINARY="" \
     BROWSERSKILL_EXTENSION_PATH=/opt/weknora/browserskill/browser-skill-weknora-0.3.1.zip
 COPY --from=browserskill /opt/weknora/browserskill /opt/weknora/browserskill
 

@@ -34,6 +34,9 @@ func readRepoFile(t *testing.T, rel string) string {
 
 func TestEnvExample_TeachingSandboxAndPasswordDefaults(t *testing.T) {
 	text := readRepoFile(t, ".env.example")
+	if !strings.Contains(text, "WEKNORA_AUTH_DEFAULT_TENANT_MODE=tenantless") {
+		t.Fatal(".env.example must keep non-bootstrap accounts tenantless")
+	}
 	if !strings.Contains(text, "WEKNORA_SANDBOX_DOCKER_ENABLED=false") {
 		t.Fatal(".env.example must set WEKNORA_SANDBOX_DOCKER_ENABLED=false")
 	}
@@ -51,10 +54,18 @@ func TestDockerCompose_TeachingDeployDefaults(t *testing.T) {
 		"WEKNORA_AUTH_REGISTRATION_MODE=${WEKNORA_AUTH_REGISTRATION_MODE:-invite_only}",
 		"WEKNORA_AUTH_DEFAULT_TENANT_MODE=${WEKNORA_AUTH_DEFAULT_TENANT_MODE:-tenantless}",
 		"WEKNORA_TENANT_SELF_SERVICE_CREATION_ENABLED=${WEKNORA_TENANT_SELF_SERVICE_CREATION_ENABLED:-false}",
+		"BROWSERSKILL_BINARY=${BROWSERSKILL_BINARY:-}",
 	}
 	for _, n := range needles {
 		if !strings.Contains(text, n) {
 			t.Fatalf("docker-compose.yml missing teaching default %q", n)
 		}
+	}
+}
+
+func TestDockerImage_BrowserSkillDefaultsOff(t *testing.T) {
+	text := readRepoFile(t, "docker/Dockerfile.app")
+	if !strings.Contains(text, `ENV BROWSERSKILL_BINARY=""`) {
+		t.Fatal("Docker image must keep BrowserSkill off even outside compose")
 	}
 }
