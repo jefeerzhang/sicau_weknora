@@ -65,7 +65,7 @@ var versionedSQLiteColumns = map[string][]string{
 	}, // 000028
 }
 
-const expectedSQLiteMigrationVersion = 30
+const expectedSQLiteMigrationVersion = 36
 
 func TestSQLiteMigrationsCreateVersionedSchema(t *testing.T) {
 	repoRoot := sqliteRepoRoot(t)
@@ -303,13 +303,13 @@ func assertSQLiteShareLinkInvitationsWork(t *testing.T, db *sql.DB) {
 	_, err = db.Exec(shareLinkInsert, "token-a", expiresAt)
 	require.NoError(t, err)
 	_, err = db.Exec(shareLinkInsert, "token-b", expiresAt)
-	require.NoError(t, err)
+	require.Error(t, err, "teaching deployment permits only one active share link per tenant")
 
 	var count int
 	require.NoError(t, db.QueryRow(
 		"SELECT COUNT(*) FROM tenant_invitations WHERE tenant_id = 1 AND invitee_user_id = '' AND status = 'pending'",
 	).Scan(&count))
-	require.Equal(t, 2, count)
+	require.Equal(t, 1, count)
 }
 
 func assertSQLiteMCPOAuthPrincipalUpsertWorks(t *testing.T, db *sql.DB) {

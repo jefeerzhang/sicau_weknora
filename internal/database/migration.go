@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -109,15 +111,32 @@ func RunMigrationsWithOptions(dsn string, opts MigrationOptions) error {
 	}
 
 	var m *migrate.Migrate
-	if opts.SQLiteDBPath != "" {
-		sqlDB, err := sql.Open("sqlite3", opts.SQLiteDBPath)
+	var sqliteDB *sql.DB
+	if opts.SQLiteDBPath != "" || strings.HasPrefix(dsn, "sqlite3://") {
+		dbPath := opts.SQLiteDBPath
+		sqliteConfig := &sqlite3migrate.Config{}
+		if dbPath == "" {
+			parsed, err := url.Parse(dsn)
+			if err != nil {
+				return err
+			}
+			dbPath = strings.TrimPrefix(migrate.FilterCustomQuery(parsed).String(), "sqlite3://")
+			sqliteConfig.MigrationsTable = parsed.Query().Get("x-migrations-table")
+			if value := parsed.Query().Get("x-no-tx-wrap"); value != "" {
+				sqliteConfig.NoTxWrap, err = strconv.ParseBool(value)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		sqlDB, err := sql.Open("sqlite3", dbPath)
 		if err != nil {
 			logger.Errorf(ctx, "Failed to open sqlite db for migration: %v", err)
 			wrapped := fmt.Errorf("failed to open sqlite db for migration: %w", err)
 			setMigrationState(0, false, wrapped.Error(), false)
 			return wrapped
 		}
-		driver, err := sqlite3migrate.WithInstance(sqlDB, &sqlite3migrate.Config{})
+		driver, err := sqlite3migrate.WithInstance(sqlDB, sqliteConfig)
 		if err != nil {
 			sqlDB.Close()
 			logger.Errorf(ctx, "Failed to create sqlite3 migrate driver: %v", err)
@@ -125,8 +144,10 @@ func RunMigrationsWithOptions(dsn string, opts MigrationOptions) error {
 			setMigrationState(0, false, wrapped.Error(), false)
 			return wrapped
 		}
-		m, err = migrate.NewWithDatabaseInstance(migrationsPath, "sqlite3", driver)
+		sqliteDB = sqlDB
+		m, err = migrate.NewWithDatabaseInstance(migrationsPath, "sqlite3", &teachingSQLiteDriver{Driver: driver, db: sqlDB})
 		if err != nil {
+			driver.Close()
 			logger.Errorf(ctx, "Failed to create migrate instance: %v", err)
 			wrapped := fmt.Errorf("failed to create migrate instance: %w", err)
 			setMigrationState(0, false, wrapped.Error(), false)
@@ -187,6 +208,12 @@ func RunMigrationsWithOptions(dsn string, opts MigrationOptions) error {
 				forceVersion,
 				forceVersion,
 			))
+		}
+	}
+
+	if sqliteDB != nil && versionErr != migrate.ErrNilVersion {
+		if err := replaySQLiteTeachingCollisions(ctx, sqliteDB, oldVersion); err != nil {
+			return captureMigrationFailure(m, err)
 		}
 	}
 
