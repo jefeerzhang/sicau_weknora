@@ -8,6 +8,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
+	"gorm.io/gorm"
 )
 
 // fakeMemberService is a hand-rolled stand-in for
@@ -137,6 +138,18 @@ func (f *fakeMemberService) UpdateRole(
 }
 func (f *fakeMemberService) RemoveMember(ctx context.Context, userID string, tenantID uint64) error {
 	return nil
+}
+
+func (f *fakeMemberService) GetMembershipTx(ctx context.Context, _ *gorm.DB, userID string, tenantID uint64) (*types.TenantMember, error) {
+	return f.GetMembership(ctx, userID, tenantID)
+}
+
+func (f *fakeMemberService) AddMemberTx(ctx context.Context, _ *gorm.DB, userID string, tenantID uint64, role types.TenantRole, invitedBy *string) (*types.TenantMember, error) {
+	return f.AddMember(ctx, userID, tenantID, role, invitedBy)
+}
+
+func (f *fakeMemberService) MemberUsageStats(context.Context, uint64) ([]types.TenantMemberUsageStat, error) {
+	return nil, nil
 }
 
 var _ interfaces.TenantMemberService = (*fakeMemberService)(nil)

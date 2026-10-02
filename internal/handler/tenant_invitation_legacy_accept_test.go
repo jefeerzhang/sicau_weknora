@@ -43,6 +43,7 @@ func newLegacyInvitationHTTPFixture(t *testing.T, callerID string) (*gin.Engine,
 	auditSvc := service.NewAuditLogService(repository.NewAuditLogRepository(db))
 	memberSvc := service.NewTenantMemberService(repository.NewTenantMemberRepository(db), auditSvc, nil, nil)
 	invSvc := service.NewTenantInvitationService(
+		db,
 		repository.NewTenantInvitationRepository(db),
 		memberSvc,
 		auditSvc,

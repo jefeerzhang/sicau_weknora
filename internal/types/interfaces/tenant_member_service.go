@@ -35,6 +35,8 @@ type TenantMemberService interface {
 	// GetMembership returns the active (user, tenant) membership, or
 	// (nil, nil) if no such row exists.
 	GetMembership(ctx context.Context, userID string, tenantID uint64) (*types.TenantMember, error)
+	// GetMembershipTx reads on the caller's transaction, including with SQLite's single connection.
+	GetMembershipTx(ctx context.Context, tx *gorm.DB, userID string, tenantID uint64) (*types.TenantMember, error)
 
 	// ListByUser returns every active membership owned by the user.
 	ListByUser(ctx context.Context, userID string) ([]*types.TenantMember, error)

@@ -269,6 +269,10 @@ func (s *tenantMemberService) AddMemberTx(
 	return member, nil
 }
 
+func (s *tenantMemberService) GetMembershipTx(ctx context.Context, tx *gorm.DB, userID string, tenantID uint64) (*types.TenantMember, error) {
+	return s.repo.WithTx(tx).Get(ctx, userID, tenantID)
+}
+
 // EnsureOwner is idempotent: if the user already has an active membership
 // in the tenant it is returned unchanged; otherwise a new owner row is
 // created. Used by Register/OIDC paths so re-running Register on an

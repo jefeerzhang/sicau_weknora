@@ -267,7 +267,7 @@ func newInvitationSvc() (
 ) {
 	invRepo := newFakeInvitationRepo()
 	memberSvc, _ := newServiceWithRepo()
-	svc := NewTenantInvitationService(invRepo, memberSvc, nil)
+	svc := NewTenantInvitationService(nil, invRepo, memberSvc, nil)
 	return svc, invRepo, memberSvc
 }
 

@@ -38,10 +38,10 @@ func newInvitationAtomicDB(t *testing.T) *gorm.DB {
 }
 
 type atomicFixture struct {
-	db       *gorm.DB
-	svc      interfaces.TenantInvitationService
+	db        *gorm.DB
+	svc       interfaces.TenantInvitationService
 	memberSvc interfaces.TenantMemberService
-	audit    *flakyAudit
+	audit     *flakyAudit
 }
 
 // flakyAudit wraps the real audit service but fails the transaction-scoped
@@ -65,12 +65,52 @@ func (f *flakyAudit) LogTx(ctx context.Context, tx *gorm.DB, entry *types.AuditL
 func newAtomicFixture(t *testing.T) *atomicFixture {
 	t.Helper()
 	db := newInvitationAtomicDB(t)
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Match Lite deployments: transaction-scoped reads must not borrow a
+	// second connection while the acceptance transaction owns the only one.
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	realAudit := NewAuditLogService(apprepo.NewAuditLogRepository(db))
 	audit := &flakyAudit{AuditLogService: realAudit}
 	memberSvc := NewTenantMemberService(apprepo.NewTenantMemberRepository(db), audit, nil, nil)
 	invRepo := apprepo.NewTenantInvitationRepository(db)
-	svc := NewTenantInvitationService(invRepo, memberSvc, audit)
+	svc := NewTenantInvitationService(db, invRepo, memberSvc, audit)
 	return &atomicFixture{db: db, svc: svc, memberSvc: memberSvc, audit: audit}
+}
+
+func TestAcceptByToken_CounterFailureRollsBackAndRetries(t *testing.T) {
+	f := newAtomicFixture(t)
+	linkID, token := f.seedShareLink(t, types.TenantRoleAdmin)
+	if err := f.db.Exec(`CREATE TRIGGER fail_invitation_usage BEFORE UPDATE OF accepted_count ON tenant_invitations
+		BEGIN SELECT RAISE(FAIL, 'usage write unavailable'); END;`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.AcceptByToken(context.Background(), token, "u-alice"); err == nil {
+		t.Fatal("counter failure must roll back the join")
+	}
+	member, err := f.memberSvc.GetMembership(context.Background(), "u-alice", 1)
+	if err != nil || member != nil {
+		t.Fatalf("unexpected membership after rollback: %v, %v", member, err)
+	}
+	if n := f.auditCount(t, types.AuditActionMemberAdded); n != 0 {
+		t.Fatalf("member audit must roll back, got %d", n)
+	}
+	if err := f.db.Exec("DROP TRIGGER fail_invitation_usage").Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.AcceptByToken(context.Background(), token, "u-alice"); err != nil {
+		t.Fatal(err)
+	}
+	var link types.TenantInvitation
+	if err := f.db.First(&link, linkID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if link.AcceptedCount != 1 {
+		t.Fatalf("retry must count exactly one join, got %d", link.AcceptedCount)
+	}
 }
 
 func (f *atomicFixture) seedEmailInvitation(t *testing.T, invitee string, role types.TenantRole) uint64 {
