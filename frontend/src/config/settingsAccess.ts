@@ -14,6 +14,10 @@ export type SettingsRoleKey = 'viewer' | 'contributor' | 'admin' | 'owner'
  * This is the frontend source of truth for the settings nav and the avatar
  * shortcuts that lead into it. Workspace owner/admin/viewer stay on the
  * server. Hiding a section is not authorization.
+ *
+ * `mymodels` is listed for students/teachers as a capability; Settings.vue
+ * additionally hides it until the workspace KV student-personal-models
+ * switch is on (CONTEXT: 我的模型).
  */
 const STUDENT_SETTINGS = ['general', 'userprofile', 'mymemory', 'mymodels'] as const
 

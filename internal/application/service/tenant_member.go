@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -470,9 +471,11 @@ func (s *tenantMemberService) emitRoleChangeAudit(
 // the removed workspace and revokes outstanding auth tokens. Without
 // this, a tenantless→invited→removed user keeps a stale home pointer
 // and the login path synthesises the removed workspace back into the
-// space switcher (see issue #2586). Cleanup failures are logged but
-// never fail the removal itself: the membership row is already gone
-// and the login-path membership checks act as a second line of defence.
+// space switcher (see issue #2586). Token/home cleanup failures are
+// logged but never fail the removal itself.
+//
+// 学生个人模型销毁 runs *before* soft-delete and fails the leave/remove
+// if credentials cannot be destroyed (ADR-0001 离课销毁).
 func (s *tenantMemberService) RemoveMember(ctx context.Context, userID string, tenantID uint64) error {
 	current, err := s.repo.Get(ctx, userID, tenantID)
 	if err != nil {
@@ -480,6 +483,14 @@ func (s *tenantMemberService) RemoveMember(ctx context.Context, userID string, t
 	}
 	if current == nil {
 		return ErrMembershipNotFound
+	}
+	if s.personalModels != nil {
+		if err := s.personalModels.DeleteAllForUser(ctx, tenantID, userID); err != nil {
+			logger.Errorf(ctx,
+				"RemoveMember: failed to destroy personal models for user %s tenant %d: %v",
+				userID, tenantID, err)
+			return fmt.Errorf("destroy personal models before leave: %w", err)
+		}
 	}
 	if current.Role == types.TenantRoleOwner {
 		err := s.repo.RemoveOwnerAtomically(ctx, userID, tenantID)
@@ -544,14 +555,6 @@ func (s *tenantMemberService) cleanupRemovedMemberState(ctx context.Context, use
 		if err := s.tokenRepo.RevokeTokensByUserID(ctx, userID); err != nil {
 			logger.Warnf(ctx,
 				"RemoveMember cleanup: failed to revoke tokens for user %s after removing tenant %d: %v",
-				userID, tenantID, err)
-		}
-	}
-
-	if s.personalModels != nil {
-		if err := s.personalModels.DeleteAllForUser(ctx, tenantID, userID); err != nil {
-			logger.Warnf(ctx,
-				"RemoveMember cleanup: failed to destroy personal models for user %s tenant %d: %v",
 				userID, tenantID, err)
 		}
 	}

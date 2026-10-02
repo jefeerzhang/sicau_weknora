@@ -217,6 +217,7 @@ import MemoryWorkspaceSettings from './MemoryWorkspaceSettings.vue'
 import VectorStoreSettings from './VectorStoreSettings.vue'
 import ParserEngineSettings from './ParserEngineSettings.vue'
 import StorageBackendSettings from './StorageBackendSettings.vue'
+import { getStudentPersonalModelsConfig } from '@/api/personal-models'
 import SandboxSettings from './SandboxSettings.vue'
 import WeKnoraCloudSettings from './WeKnoraCloudSettings.vue'
 import TenantMembers from './TenantMembers.vue'
@@ -257,6 +258,17 @@ const { t } = useI18n()
 const currentSection = ref<string>('general')
 const currentSubSection = ref<string>('')
 const expandedMenus = ref<string[]>([])
+// CONTEXT: 「我的模型」仅当空间开启学生个人模型时出现。
+const studentPersonalModelsEnabled = ref(false)
+
+async function loadStudentPersonalModelsFlag() {
+  try {
+    const res = await getStudentPersonalModelsConfig()
+    studentPersonalModelsEnabled.value = !!res?.data?.enabled
+  } catch {
+    studentPersonalModelsEnabled.value = false
+  }
+}
 
 type NavItem = {
   key: string
@@ -318,6 +330,9 @@ const canSeeSection = (key: string): boolean => {
   // Platform identity is authoritative for the teaching lockdown. Students
   // only see account settings even when they happen to be a workspace owner.
   // Backend route guards remain the real authorization boundary.
+  if (key === 'mymodels' && !studentPersonalModelsEnabled.value) {
+    return false
+  }
   if (isIntegrationSection(key)) {
     if (shellIdentity.value !== 'superadmin') return false
     const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
@@ -477,6 +492,12 @@ const visible = computed(() => {
   return route.path === '/platform/settings' || uiStore.showSettingsModal
 })
 
+watch(visible, (isVisible) => {
+  if (isVisible) {
+    void loadStudentPersonalModelsFlag()
+  }
+})
+
 // 关闭弹窗
 const handleClose = () => {
   // Blur before unmount so TDesign textarea autosize won't run on a detached node.
@@ -609,7 +630,15 @@ const handleSettingsNav = (e: CustomEvent) => {
 
 onMounted(() => {
   window.addEventListener('settings-nav', handleSettingsNav as EventListener)
+  void loadStudentPersonalModelsFlag()
 })
+
+watch(
+  () => authStore.currentTenantId,
+  () => {
+    void loadStudentPersonalModelsFlag()
+  },
+)
 
 watch(currentSection, () => {
   if (document.activeElement instanceof HTMLElement) {

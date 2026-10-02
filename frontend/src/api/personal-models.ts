@@ -48,6 +48,20 @@ export async function createPersonalModel(body: {
   return post<{ success: boolean; data: PersonalModelItem }>('/api/v1/me/personal-models', body)
 }
 
+export async function updatePersonalModel(
+  id: string,
+  body: {
+    name?: string
+    model_name?: string
+    base_url?: string
+    provider?: string
+    api_key?: string
+    enabled?: boolean
+  },
+) {
+  return put<{ success: boolean; data: PersonalModelItem }>(`/api/v1/me/personal-models/${id}`, body)
+}
+
 export async function deletePersonalModel(id: string) {
   return del<{ success: boolean }>(`/api/v1/me/personal-models/${id}`)
 }

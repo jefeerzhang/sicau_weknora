@@ -445,6 +445,44 @@ func TestTenantMemberService_RemoveMember_DestroysPersonalModels(t *testing.T) {
 	if personal.calls != 1 || personal.deletedTenant != 7 || personal.deletedUser != "student" {
 		t.Fatalf("personal cleanup = %+v, want tenant=7 user=student once", personal)
 	}
+	got, err := memberRepo.Get(ctx, "student", 7)
+	if err != nil {
+		t.Fatalf("Get after remove: %v", err)
+	}
+	if got != nil {
+		t.Fatal("membership should be gone after successful personal-model destroy")
+	}
+}
+
+type failingPersonalModelCleanup struct {
+	interfaces.TenantPersonalModelService
+}
+
+func (f *failingPersonalModelCleanup) DeleteAllForUser(context.Context, uint64, string) error {
+	return errors.New("cipher wipe failed")
+}
+
+func TestTenantMemberService_RemoveMember_BlocksWhenPersonalModelDestroyFails(t *testing.T) {
+	memberRepo := newFakeRepo()
+	svc := NewTenantMemberService(memberRepo, nil, nil, nil, &failingPersonalModelCleanup{})
+	ctx := context.Background()
+
+	if _, err := svc.EnsureOwner(ctx, "owner", 7); err != nil {
+		t.Fatalf("seed owner: %v", err)
+	}
+	if _, err := svc.AddMember(ctx, "student", 7, types.TenantRoleViewer, nil); err != nil {
+		t.Fatalf("seed student: %v", err)
+	}
+	if err := svc.RemoveMember(ctx, "student", 7); err == nil {
+		t.Fatal("expected RemoveMember to fail when personal models cannot be destroyed")
+	}
+	got, err := memberRepo.Get(ctx, "student", 7)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got == nil {
+		t.Fatal("membership must remain when personal-model destroy fails")
+	}
 }
 
 func TestTenantMemberService_AddMember_RejectsInvalidRole(t *testing.T) {

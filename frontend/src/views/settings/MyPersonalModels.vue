@@ -12,7 +12,7 @@
 
     <template v-else>
       <div class="toolbar">
-        <t-button theme="primary" size="small" @click="showAdd = true">
+        <t-button theme="primary" size="small" @click="openCreate">
           <template #icon><t-icon name="add" /></template>
           {{ t('personalModels.add') }}
         </t-button>
@@ -26,19 +26,30 @@
               <div class="model-row__title">{{ m.name || m.model_name }}</div>
               <div class="model-row__meta">{{ m.model_name }} · {{ m.base_url }}</div>
             </div>
-            <t-button theme="danger" variant="text" size="small" @click="onDelete(m.id)">
-              {{ t('common.delete') }}
-            </t-button>
+            <div class="model-row__actions">
+              <t-switch
+                :value="m.enabled"
+                size="small"
+                :loading="togglingId === m.id"
+                @change="(val: boolean) => onToggleEnabled(m, val)"
+              />
+              <t-button theme="default" variant="text" size="small" @click="openEdit(m)">
+                {{ t('personalModels.edit') }}
+              </t-button>
+              <t-button theme="danger" variant="text" size="small" @click="onDelete(m.id)">
+                {{ t('common.delete') }}
+              </t-button>
+            </div>
           </div>
         </div>
       </t-loading>
     </template>
 
     <t-dialog
-      v-model:visible="showAdd"
-      :header="t('personalModels.add')"
+      v-model:visible="dialogVisible"
+      :header="editingId ? t('personalModels.edit') : t('personalModels.add')"
       :confirm-btn="{ content: t('common.save'), loading: saving }"
-      @confirm="onCreate"
+      @confirm="onSave"
     >
       <t-form label-align="top">
         <t-form-item :label="t('personalModels.fields.modelName')">
@@ -48,7 +59,11 @@
           <t-input v-model="form.base_url" placeholder="https://api.siliconflow.cn/v1" />
         </t-form-item>
         <t-form-item :label="t('personalModels.fields.apiKey')">
-          <t-input v-model="form.api_key" type="password" />
+          <t-input
+            v-model="form.api_key"
+            type="password"
+            :placeholder="editingId ? t('personalModels.fields.apiKeyKeep') : ''"
+          />
         </t-form-item>
         <t-form-item :label="t('personalModels.fields.displayName')">
           <t-input v-model="form.name" />
@@ -67,13 +82,16 @@ import {
   deletePersonalModel,
   getStudentPersonalModelsConfig,
   listPersonalModels,
+  updatePersonalModel,
   type PersonalModelItem,
 } from '@/api/personal-models'
 
 const { t } = useI18n()
 const loading = ref(false)
 const saving = ref(false)
-const showAdd = ref(false)
+const dialogVisible = ref(false)
+const editingId = ref<string | null>(null)
+const togglingId = ref<string | null>(null)
 const workspaceEnabled = ref(false)
 const models = ref<PersonalModelItem[]>([])
 const form = reactive({
@@ -82,6 +100,28 @@ const form = reactive({
   base_url: '',
   api_key: '',
 })
+
+function resetForm() {
+  form.name = ''
+  form.model_name = ''
+  form.base_url = ''
+  form.api_key = ''
+}
+
+function openCreate() {
+  editingId.value = null
+  resetForm()
+  dialogVisible.value = true
+}
+
+function openEdit(m: PersonalModelItem) {
+  editingId.value = m.id
+  form.name = m.name || ''
+  form.model_name = m.model_name
+  form.base_url = m.base_url
+  form.api_key = ''
+  dialogVisible.value = true
+}
 
 async function refresh() {
   loading.value = true
@@ -101,24 +141,38 @@ async function refresh() {
   }
 }
 
-async function onCreate() {
-  if (!form.model_name.trim() || !form.base_url.trim() || !form.api_key.trim()) {
+async function onSave() {
+  if (!form.model_name.trim() || !form.base_url.trim()) {
+    MessagePlugin.warning(t('personalModels.requiredFieldsEdit'))
+    return false
+  }
+  if (!editingId.value && !form.api_key.trim()) {
     MessagePlugin.warning(t('personalModels.requiredFields'))
     return false
   }
   saving.value = true
   try {
-    await createPersonalModel({
-      name: form.name.trim(),
-      model_name: form.model_name.trim(),
-      base_url: form.base_url.trim(),
-      api_key: form.api_key.trim(),
-    })
-    showAdd.value = false
-    form.name = ''
-    form.model_name = ''
-    form.base_url = ''
-    form.api_key = ''
+    if (editingId.value) {
+      const body: Parameters<typeof updatePersonalModel>[1] = {
+        name: form.name.trim(),
+        model_name: form.model_name.trim(),
+        base_url: form.base_url.trim(),
+      }
+      if (form.api_key.trim()) {
+        body.api_key = form.api_key.trim()
+      }
+      await updatePersonalModel(editingId.value, body)
+    } else {
+      await createPersonalModel({
+        name: form.name.trim(),
+        model_name: form.model_name.trim(),
+        base_url: form.base_url.trim(),
+        api_key: form.api_key.trim(),
+      })
+    }
+    dialogVisible.value = false
+    editingId.value = null
+    resetForm()
     MessagePlugin.success(t('personalModels.saved'))
     await refresh()
   } catch (e: any) {
@@ -126,6 +180,21 @@ async function onCreate() {
     return false
   } finally {
     saving.value = false
+  }
+}
+
+async function onToggleEnabled(m: PersonalModelItem, enabled: boolean) {
+  togglingId.value = m.id
+  const prev = m.enabled
+  m.enabled = enabled
+  try {
+    await updatePersonalModel(m.id, { enabled })
+    MessagePlugin.success(t('personalModels.saved'))
+  } catch (e: any) {
+    m.enabled = prev
+    MessagePlugin.error(e?.message || t('personalModels.saveFailed'))
+  } finally {
+    togglingId.value = null
   }
 }
 
@@ -173,6 +242,7 @@ onMounted(refresh)
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 12px;
   border: 1px solid var(--td-border-level-1-color);
   border-radius: 8px;
@@ -184,5 +254,11 @@ onMounted(refresh)
   font-size: 12px;
   color: var(--td-text-color-secondary);
   word-break: break-all;
+}
+.model-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 </style>
