@@ -929,6 +929,12 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 		logger.Infof(context.Background(), "Auto-migration is disabled (AUTO_MIGRATE=false)")
 	}
 
+	// Teaching data migration runs after either automatic or external schema
+	// migration. Never serve legacy permissions after a failed teaching phase.
+	if err := ensureTeachingMigrationState(context.Background(), db); err != nil {
+		return nil, err
+	}
+
 	// Get underlying SQL DB object
 	sqlDB, err := db.DB()
 	if err != nil {
