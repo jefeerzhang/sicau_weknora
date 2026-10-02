@@ -30,13 +30,15 @@ func TestTeachingMigrationSQLPresent(t *testing.T) {
 		"migrations/versioned/000114_platform_identity_flags.up.sql",
 		"migrations/versioned/000115_workspace_ownership_anomalies.up.sql",
 		"migrations/versioned/000116_single_active_share_link.up.sql",
-		"migrations/versioned/000117_replay_upstream_schema_behind_teaching_slots.up.sql",
+        "migrations/versioned/000117_replay_upstream_schema_behind_teaching_slots.up.sql",
+		"migrations/versioned/000118_student_personal_models.up.sql",
 		"migrations/sqlite/000031_tenant_default_agent.up.sql",
 		"migrations/sqlite/000032_tenant_notes.up.sql",
 		"migrations/sqlite/000033_announcements.up.sql",
 		"migrations/sqlite/000034_platform_identity_flags.up.sql",
 		"migrations/sqlite/000035_workspace_ownership_anomalies.up.sql",
 		"migrations/sqlite/000036_single_active_share_link.up.sql",
+		"migrations/sqlite/000037_student_personal_models.up.sql",
 	}
 	for _, rel := range required {
 		p := filepath.Join(root, rel)

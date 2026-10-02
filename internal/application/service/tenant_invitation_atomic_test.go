@@ -75,7 +75,7 @@ func newAtomicFixture(t *testing.T) *atomicFixture {
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	realAudit := NewAuditLogService(apprepo.NewAuditLogRepository(db))
 	audit := &flakyAudit{AuditLogService: realAudit}
-	memberSvc := NewTenantMemberService(apprepo.NewTenantMemberRepository(db), audit, nil, nil)
+	memberSvc := NewTenantMemberService(apprepo.NewTenantMemberRepository(db), audit, nil, nil, nil)
 	invRepo := apprepo.NewTenantInvitationRepository(db)
 	svc := NewTenantInvitationService(db, invRepo, memberSvc, audit)
 	return &atomicFixture{db: db, svc: svc, memberSvc: memberSvc, audit: audit}

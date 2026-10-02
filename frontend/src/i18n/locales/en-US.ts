@@ -2132,6 +2132,32 @@ export default {
       errorGeneric: 'An error occurred. Please try again.'
     }
   },
+  personalModels: {
+    myTitle: 'My models',
+    myDescription: 'Configure your own chat models (endpoint, key, model name). When none are set, the course workspace model is used.',
+    workspaceDisabled: 'Personal models are off for this workspace. Ask a workspace admin to enable them under Model settings.',
+    add: 'Add model',
+    empty: 'No personal models yet',
+    saved: 'Saved',
+    saveFailed: 'Save failed',
+    deleted: 'Deleted',
+    deleteFailed: 'Delete failed',
+    loadFailed: 'Failed to load',
+    requiredFields: 'Model name, base URL, and API key are required',
+    fields: {
+      modelName: 'Model name',
+      baseUrl: 'Base URL',
+      apiKey: 'API Key',
+      displayName: 'Display name (optional)',
+    },
+    teacherToggleTitle: 'Allow students to use personal models',
+    teacherToggleDesc: 'When on, students in this course can create their own chat models under My models and override the default course agent chat model. Off by default.',
+    allowedHostsTitle: 'Extra outbound hosts for student models',
+    allowedHostsDesc: 'One host suffix per line. Combined with platform presets and still subject to SSRF policy.',
+    allowedHostsPlaceholder: 'llm.example.edu',
+    metaTitle: 'Student personal models (metadata, no keys)',
+    quickAdd: 'Add personal model',
+  },
   memorySettings: {
     title: 'My memory',
     description: 'What the assistant remembers about you across conversations. You can review, edit and delete anything here; deleted memories are never used again.',

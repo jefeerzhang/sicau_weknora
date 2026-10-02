@@ -125,6 +125,40 @@ func (s *sessionService) restrictTagScopesToAgentScope(
 	return filtered
 }
 
+// attachPersonalChatModel binds 学生个人模型 credentials onto ctx when the
+// request selects one. Failures are returned as-is — callers must not fall
+// back to workspace models (ADR-0001).
+func (s *sessionService) attachPersonalChatModel(ctx context.Context, req *types.QARequest) (context.Context, error) {
+	id := strings.TrimSpace(req.PersonalModelID)
+	if id == "" {
+		if pid, ok := types.ParsePersonalModelRef(req.SummaryModelID); ok {
+			id = pid
+		}
+	}
+	if id == "" {
+		return ctx, nil
+	}
+	if req.SharedAgentReadOnly {
+		return ctx, fmt.Errorf("personal model override is not allowed for shared agents")
+	}
+	if s.personalModelService == nil {
+		return ctx, fmt.Errorf("personal models are not available")
+	}
+	resolved, err := s.personalModelService.ResolveForChat(ctx, id)
+	if err != nil {
+		return ctx, MapPersonalModelError(err)
+	}
+	req.PersonalModelID = id
+	req.SummaryModelID = types.FormatPersonalModelRef(id)
+	return types.WithPersonalChatResolved(ctx, &types.PersonalChatResolved{
+		ID:        resolved.ID,
+		ModelName: resolved.ModelName,
+		BaseURL:   resolved.BaseURL,
+		Provider:  resolved.Provider,
+		APIKey:    resolved.APIKey,
+	}), nil
+}
+
 // resolveChatModelID resolves the effective chat model ID for a QA request.
 //
 // When a user-configured agent is selected, its model configuration must be
@@ -173,6 +207,15 @@ func (s *sessionService) resolveChatModelID(
 
 	summaryModelID = strings.TrimSpace(summaryModelID)
 	if summaryModelID != "" {
+		// Personal model refs are already bound on ctx by attachPersonalChatModel.
+		// Never fall back to workspace models when the student explicitly selected one.
+		if _, ok := types.ParsePersonalModelRef(summaryModelID); ok {
+			if types.PersonalChatResolvedFromContext(ctx) == nil {
+				return "", fmt.Errorf("personal model credentials are not available for this request")
+			}
+			logger.Infof(ctx, "Using student personal model override: %s", summaryModelID)
+			return summaryModelID, nil
+		}
 		if model, err := s.modelService.GetModelByID(ctx, summaryModelID); err == nil && model != nil &&
 			model.Type == types.ModelTypeKnowledgeQA {
 			logger.Infof(ctx, "Using request's summary model override: %s", summaryModelID)

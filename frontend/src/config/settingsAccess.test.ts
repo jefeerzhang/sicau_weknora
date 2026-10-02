@@ -10,7 +10,7 @@ import {
   visibleSettingsSections,
 } from './settingsAccess'
 
-const STUDENT = ['general', 'userprofile', 'mymemory']
+const STUDENT = ['general', 'userprofile', 'mymemory', 'mymodels']
 const TEACHER_EXTRA = ['tenant', 'members', 'chathistory', 'memory', 'models', 'envvars']
 const DEPLOYMENT = [
   'ollama',

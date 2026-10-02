@@ -140,6 +140,8 @@ type sessionService struct {
 	// from sandboxResolver/sandboxMgr.
 	forkSnapshots ForkSnapshotDeleter
 	busyGate      *SessionBusyGate
+	// personalModelService resolves 学生个人模型 chat overrides (ADR-0001). Nil disables that path.
+	personalModelService interfaces.TenantPersonalModelService
 }
 
 // NewSessionService creates a new session service instance with all required dependencies
@@ -166,6 +168,7 @@ func NewSessionService(cfg *config.Config,
 	sandboxConfigRepo repository.TenantSandboxConfigRepository,
 	tenantSkillRepo repository.TenantSkillRepository,
 	busyGate *SessionBusyGate,
+	personalModelService interfaces.TenantPersonalModelService,
 ) interfaces.SessionService {
 	return &sessionService{
 		cfg:                   cfg,
@@ -191,6 +194,7 @@ func NewSessionService(cfg *config.Config,
 		sandboxConfigRepo:     sandboxConfigRepo,
 		tenantSkillRepo:       tenantSkillRepo,
 		busyGate:              busyGate,
+		personalModelService:  personalModelService,
 	}
 }
 

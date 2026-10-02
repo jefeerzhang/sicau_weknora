@@ -15,7 +15,7 @@ export type SettingsRoleKey = 'viewer' | 'contributor' | 'admin' | 'owner'
  * shortcuts that lead into it. Workspace owner/admin/viewer stay on the
  * server. Hiding a section is not authorization.
  */
-const STUDENT_SETTINGS = ['general', 'userprofile', 'mymemory'] as const
+const STUDENT_SETTINGS = ['general', 'userprofile', 'mymemory', 'mymodels'] as const
 
 const TEACHER_SETTINGS = [
   ...STUDENT_SETTINGS,
@@ -83,6 +83,7 @@ export const SETTINGS_SECTION_MIN_ROLE: Record<string, SettingsRoleKey> = {
   tenant: 'viewer',
   members: 'viewer',
   mymemory: 'viewer',
+  mymodels: 'viewer',
   memory: 'admin',
   envvars: 'viewer',
 }

@@ -69,6 +69,11 @@ func (s *sessionService) KnowledgeQA(
 		return err
 	}
 
+	ctx, err = s.attachPersonalChatModel(ctx, req)
+	if err != nil {
+		return err
+	}
+
 	// Resolve chat model ID using shared helper
 	chatModelID, err := s.resolveChatModelID(ctx, req, knowledgeBaseIDs, knowledgeIDs)
 	if err != nil {

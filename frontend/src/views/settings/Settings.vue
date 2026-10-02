@@ -113,6 +113,11 @@
           <MemorySettings />
         </div>
 
+        <!-- 我的模型（学生个人模型） -->
+        <div v-if="currentSection === 'mymodels'" class="section">
+          <MyPersonalModels />
+        </div>
+
         <!-- 沙箱密钥（成员自己的技能 / 沙箱密钥） -->
         <div v-if="currentSection === 'envvars'" class="section">
           <EnvVarSettings />
@@ -206,6 +211,7 @@ import OllamaSettings from './OllamaSettings.vue'
 import WebSearchSettings from './WebSearchSettings.vue'
 import ChatHistorySettings from './ChatHistorySettings.vue'
 import MemorySettings from './MemorySettings.vue'
+import MyPersonalModels from './MyPersonalModels.vue'
 import EnvVarSettings from './EnvVarSettings.vue'
 import MemoryWorkspaceSettings from './MemoryWorkspaceSettings.vue'
 import VectorStoreSettings from './VectorStoreSettings.vue'
@@ -364,6 +370,7 @@ const navItems = computed(() => {
     { key: 'system-audit-log', icon: 'history', label: t('system.globalSettings.audit.tabLabel') },
     { key: 'userprofile', icon: 'user', label: t('userProfile.title') },
     { key: 'mymemory', icon: 'bookmark', label: t('memorySettings.title') },
+    { key: 'mymodels', icon: 'control-platform', label: t('personalModels.myTitle') },
     { key: 'envvars', icon: 'key', label: t('envVarSettings.title') },
     { key: 'tenant', icon: 'user-circle', label: t('settings.tenantInfo') },
     { key: 'members', icon: 'usergroup', label: t('tenantMember.title') },
@@ -389,7 +396,7 @@ const navGroups = computed<NavGroup[]>(() => {
     {
       key: 'account',
       label: t('settings.navGroups.account'),
-      items: pickItems(['general', 'userprofile', 'mymemory', 'envvars']),
+      items: pickItems(['general', 'userprofile', 'mymemory', 'mymodels', 'envvars']),
     },
     {
       key: 'workspace',

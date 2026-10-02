@@ -595,6 +595,31 @@ func (s *modelService) GetChatModel(ctx context.Context, modelId string) (chat.C
 		return nil, errors.New("model ID cannot be empty")
 	}
 
+	if pid, ok := types.ParsePersonalModelRef(modelId); ok {
+		resolved := types.PersonalChatResolvedFromContext(ctx)
+		if resolved == nil || resolved.ID != pid {
+			logger.Error(ctx, "Personal chat model not bound on request context")
+			return nil, errors.New("personal model credentials are not available for this request")
+		}
+		logger.Infof(ctx, "Getting personal chat model: %s", resolved.ModelName)
+		chatModel, err := chat.NewChat(&chat.ChatConfig{
+			Source:    types.ModelSourceRemote,
+			BaseURL:   resolved.BaseURL,
+			ModelName: resolved.ModelName,
+			APIKey:    resolved.APIKey,
+			ModelID:   modelId,
+			Provider:  resolved.Provider,
+		}, s.ollamaService)
+		if err != nil {
+			logger.ErrorWithFields(ctx, err, map[string]interface{}{
+				"model_id":   modelId,
+				"model_name": resolved.ModelName,
+			})
+			return nil, err
+		}
+		return chatModel, nil
+	}
+
 	tenantID := types.MustTenantIDFromContext(ctx)
 
 	// Get the model directly from repository to avoid status checks

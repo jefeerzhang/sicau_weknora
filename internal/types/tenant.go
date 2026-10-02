@@ -123,6 +123,8 @@ type Tenant struct {
 	RetrievalConfig *RetrievalConfig `yaml:"retrieval_config" json:"retrieval_config" gorm:"type:jsonb"`
 	// Memory config: workspace switch for cross-session long-term memory
 	MemoryConfig *MemoryConfig `yaml:"memory_config" json:"memory_config" gorm:"type:jsonb"`
+	// StudentPersonalModels: workspace switch for 学生个人模型 (ADR-0001). Default off.
+	StudentPersonalModels *StudentPersonalModelsConfig `yaml:"student_personal_models" json:"student_personal_models" gorm:"type:jsonb"`
 	// API principal config: controls how X-API-Key requests map to terminal principals.
 	APIPrincipalConfig *APIPrincipalConfig `yaml:"api_principal_config" json:"-" gorm:"type:jsonb"`
 	// Creation time

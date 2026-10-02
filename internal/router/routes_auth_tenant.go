@@ -222,6 +222,25 @@ func RegisterMyNoteRoutes(r *gin.RouterGroup, h *handler.MeNoteHandler) {
 	}
 }
 
+// RegisterMyPersonalModelRoutes registers 学生个人模型 CRUD (/me/personal-models)
+// and Admin metadata listing. Web JWT path ONLY (same rationale as notes).
+func RegisterMyPersonalModelRoutes(r *gin.RouterGroup, h *handler.MePersonalModelHandler, g *rbacGuards) {
+	if h == nil {
+		return
+	}
+	me := r.Group("/me/personal-models")
+	{
+		me.GET("", h.List)
+		me.POST("", h.Create)
+		me.GET("/:id", h.Get)
+		me.PUT("/:id", h.Update)
+		me.DELETE("/:id", h.Delete)
+	}
+	if g != nil {
+		r.GET("/tenants/personal-models", g.Admin(), h.ListMeta)
+	}
+}
+
 // RegisterAnnouncementRoutes registers the course announcement board
 // (sicau-v1). Reads Viewer+; posting Contributor+; deletes author-or-admin
 // (service-enforced). Web JWT path only.

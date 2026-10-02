@@ -33,6 +33,40 @@
           <t-icon name="link" class="link-icon" />
         </a>
       </div>
+
+      <div v-if="authStore.hasRole('admin')" class="student-personal-models-switch">
+        <div class="setting-info">
+          <label>{{ $t('personalModels.teacherToggleTitle') }}</label>
+          <p class="desc">{{ $t('personalModels.teacherToggleDesc') }}</p>
+        </div>
+        <t-switch v-model="studentPersonalEnabled" :loading="studentPersonalSaving" @change="onStudentPersonalToggle" />
+      </div>
+
+      <div v-if="authStore.hasRole('admin') && studentPersonalEnabled" class="student-personal-hosts">
+        <div class="setting-info">
+          <label>{{ $t('personalModels.allowedHostsTitle') }}</label>
+          <p class="desc">{{ $t('personalModels.allowedHostsDesc') }}</p>
+        </div>
+        <t-textarea
+          v-model="studentPersonalHostsDraft"
+          :autosize="{ minRows: 2, maxRows: 6 }"
+          :placeholder="$t('personalModels.allowedHostsPlaceholder')"
+        />
+        <div class="student-personal-hosts__actions">
+          <t-button size="small" theme="primary" :loading="studentPersonalSaving" @click="saveStudentPersonalHosts">
+            {{ $t('common.save') }}
+          </t-button>
+        </div>
+        <div v-if="studentMetaRows.length" class="student-personal-meta">
+          <label>{{ $t('personalModels.metaTitle') }}</label>
+          <div v-for="row in studentMetaRows" :key="row.id" class="student-personal-meta__row">
+            <span>{{ row.user_id }}</span>
+            <span>{{ row.name || row.model_name }}</span>
+            <span>{{ row.provider || row.base_url }}</span>
+            <span>{{ row.enabled ? $t('common.on') : $t('common.off') }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <t-tabs v-model="activeTypeFilter" class="model-type-tabs" data-guide="settings-models">
@@ -298,6 +332,11 @@ import { focusKbEditorSection } from '@/config/contextualGuides'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useModelProvidersStore } from '@/stores/modelProviders'
 import {
+  getStudentPersonalModelsConfig,
+  listTenantPersonalModelMeta,
+  updateStudentPersonalModelsConfig,
+} from '@/api/personal-models'
+import {
   formatContextWindow,
   isDefaultContextWindow,
   effectiveContextWindow,
@@ -320,6 +359,81 @@ const usageConflictModelName = ref('')
 const currentModelType = ref<ModelType>('chat')
 const editingModel = ref<any>(null)
 const loading = ref(true)
+const studentPersonalEnabled = ref(false)
+const studentPersonalHosts = ref<string[]>([])
+const studentPersonalHostsDraft = ref('')
+const studentPersonalSaving = ref(false)
+const studentMetaRows = ref<Array<{
+  id: string
+  user_id: string
+  name: string
+  model_name: string
+  base_url: string
+  provider: string
+  enabled: boolean
+  has_credential: boolean
+}>>([])
+
+const loadStudentPersonalConfig = async () => {
+  if (!authStore.hasRole('admin')) return
+  try {
+    const res = await getStudentPersonalModelsConfig()
+    studentPersonalEnabled.value = !!res?.data?.enabled
+    studentPersonalHosts.value = res?.data?.allowed_hosts || []
+    studentPersonalHostsDraft.value = studentPersonalHosts.value.join('\n')
+    if (studentPersonalEnabled.value) {
+      const meta = await listTenantPersonalModelMeta()
+      studentMetaRows.value = meta?.data?.models || []
+    } else {
+      studentMetaRows.value = []
+    }
+  } catch {
+    studentPersonalEnabled.value = false
+    studentPersonalHosts.value = []
+    studentMetaRows.value = []
+  }
+}
+
+const saveStudentPersonalHosts = async () => {
+  studentPersonalSaving.value = true
+  try {
+    const hosts = studentPersonalHostsDraft.value
+      .split(/[\n,]/)
+      .map((h) => h.trim())
+      .filter(Boolean)
+    const res = await updateStudentPersonalModelsConfig({
+      enabled: studentPersonalEnabled.value,
+      allowed_hosts: hosts,
+    })
+    studentPersonalEnabled.value = !!res?.data?.enabled
+    studentPersonalHosts.value = res?.data?.allowed_hosts || []
+    studentPersonalHostsDraft.value = studentPersonalHosts.value.join('\n')
+    MessagePlugin.success(t('personalModels.saved'))
+  } catch (error: any) {
+    MessagePlugin.error(error?.message || t('personalModels.saveFailed'))
+  } finally {
+    studentPersonalSaving.value = false
+  }
+}
+
+const onStudentPersonalToggle = async (val: boolean) => {
+  studentPersonalSaving.value = true
+  try {
+    const res = await updateStudentPersonalModelsConfig({
+      enabled: val,
+      allowed_hosts: studentPersonalHosts.value,
+    })
+    studentPersonalEnabled.value = !!res?.data?.enabled
+    studentPersonalHosts.value = res?.data?.allowed_hosts || []
+    MessagePlugin.success(t('personalModels.saved'))
+  } catch (error: any) {
+    studentPersonalEnabled.value = !val
+    MessagePlugin.error(error?.message || t('personalModels.saveFailed'))
+  } finally {
+    studentPersonalSaving.value = false
+  }
+}
+
 const activeTypeFilter = ref<FilterType>('all')
 
 const MODEL_TAB_TYPES: FilterType[] = ['chat', 'embedding', 'rerank', 'vllm', 'asr']
@@ -876,6 +990,7 @@ function getModelType(type: ModelType): 'KnowledgeQA' | 'Embedding' | 'Rerank' |
 
 onMounted(() => {
   loadModels()
+  loadStudentPersonalConfig()
 })
 </script>
 
@@ -937,6 +1052,85 @@ onMounted(() => {
 
 .builtin-models-hint .doc-link {
   font-size: var(--app-text-md);
+}
+
+.student-personal-models-switch {
+  margin-top: 16px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-stroke);
+  border-radius: var(--app-radius-sm);
+
+  .setting-info {
+    flex: 1;
+    min-width: 0;
+
+    label {
+      display: block;
+      font-size: var(--app-text-md);
+      font-weight: 500;
+      color: var(--td-text-color-primary);
+    }
+
+    .desc {
+      margin: 4px 0 0;
+      font-size: var(--app-text-sm);
+      line-height: 1.5;
+      color: var(--td-text-color-secondary);
+    }
+  }
+}
+
+.student-personal-hosts {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: var(--app-radius-sm);
+
+  .setting-info {
+    margin-bottom: 8px;
+
+    label {
+      display: block;
+      font-size: var(--app-text-md);
+      font-weight: 500;
+    }
+
+    .desc {
+      margin: 4px 0 0;
+      font-size: var(--app-text-sm);
+      color: var(--td-text-color-secondary);
+    }
+  }
+
+  &__actions {
+    margin-top: 8px;
+  }
+}
+
+.student-personal-meta {
+  margin-top: 12px;
+
+  label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: var(--app-text-sm);
+    font-weight: 500;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1.4fr auto;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: var(--app-text-sm);
+    border-top: 1px solid var(--td-component-stroke);
+    word-break: break-all;
+  }
 }
 
 .model-list-loading {

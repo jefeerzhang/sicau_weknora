@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { getDefaultAgentId } from '@/api/tenant';
-import { ref, onMounted, onBeforeUnmount, onUnmounted, computed, watch, nextTick, h, type PropType } from "vue";
+import { ref, onMounted, onBeforeUnmount, onUnmounted, computed, watch, nextTick, h, reactive, type PropType } from "vue";
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
 import { onBeforeRouteUpdate } from 'vue-router';
@@ -23,6 +23,11 @@ import AgentSelector from './AgentSelector.vue';
 import { getCaretCoordinates } from '@/utils/caret';
 import { getRootZoom, rectToCssPx, cssViewportSize } from '@/utils/zoom';
 import { type ModelConfig } from '@/api/model';
+import {
+  createPersonalModel,
+  getStudentPersonalModelsConfig,
+  listPersonalModels,
+} from '@/api/personal-models';
 import {
   formatContextWindow,
   isDefaultContextWindow,
@@ -73,10 +78,80 @@ const {
   agents,
   disabledOwnAgentIds,
   allModels,
-  chatModels: availableModels,
+  chatModels: workspaceChatModels,
   webSearchProviders,
 } = storeToRefs(chatResources);
 const { t, locale } = useI18n();
+
+const personalModelsEnabled = ref(false)
+const personalModelEntries = ref<Array<{ id: string; name: string; model_name: string; base_url: string }>>([])
+const showPersonalModelQuickAdd = ref(false)
+const personalModelSaving = ref(false)
+const personalModelForm = reactive({
+  name: '',
+  model_name: '',
+  base_url: '',
+  api_key: '',
+})
+
+const availableModels = computed(() => {
+  const personal = personalModelEntries.value.map((m) => ({
+    id: `pm:${m.id}`,
+    name: m.model_name,
+    display_name: m.name || m.model_name,
+    type: 'KnowledgeQA' as const,
+    source: 'remote',
+    parameters: {},
+  }))
+  return [...personal, ...workspaceChatModels.value]
+})
+
+async function refreshPersonalModels() {
+  try {
+    const cfg = await getStudentPersonalModelsConfig()
+    personalModelsEnabled.value = !!cfg?.data?.enabled
+    if (!personalModelsEnabled.value) {
+      personalModelEntries.value = []
+      return
+    }
+    const res = await listPersonalModels()
+    personalModelEntries.value = (res?.data?.models || []).filter((m) => m.enabled !== false)
+  } catch {
+    personalModelsEnabled.value = false
+    personalModelEntries.value = []
+  }
+}
+
+async function submitPersonalModelQuickAdd() {
+  if (!personalModelForm.model_name.trim() || !personalModelForm.base_url.trim() || !personalModelForm.api_key.trim()) {
+    MessagePlugin.warning(t('personalModels.requiredFields'))
+    return
+  }
+  personalModelSaving.value = true
+  try {
+    const created = await createPersonalModel({
+      name: personalModelForm.name.trim(),
+      model_name: personalModelForm.model_name.trim(),
+      base_url: personalModelForm.base_url.trim(),
+      api_key: personalModelForm.api_key.trim(),
+    })
+    await refreshPersonalModels()
+    const id = created?.data?.id
+    if (id) {
+      handleModelChange(`pm:${id}`)
+    }
+    showPersonalModelQuickAdd.value = false
+    personalModelForm.name = ''
+    personalModelForm.model_name = ''
+    personalModelForm.base_url = ''
+    personalModelForm.api_key = ''
+    MessagePlugin.success(t('personalModels.saved'))
+  } catch (e: any) {
+    MessagePlugin.error(e?.message || t('personalModels.saveFailed'))
+  } finally {
+    personalModelSaving.value = false
+  }
+}
 
 let query = ref("");
 const showKbSelector = ref(false);
@@ -1102,6 +1177,11 @@ const handleModelChange = (value: string | number | Array<string | number> | und
   }
   if (val === '__add_model__') {
     selectedModelId.value = readLastChatModelID();
+    if (personalModelsEnabled.value) {
+      showModelSelector.value = false
+      showPersonalModelQuickAdd.value = true
+      return
+    }
     handleGoToConversationModels();
     return;
   }
@@ -1912,6 +1992,7 @@ onMounted(() => {
     loadChatModels(),
     loadAgents(),
     loadMCPServices(),
+    refreshPersonalModels(),
   ]);
   window.addEventListener(CHAT_FILE_DROP_EVENT, handleChatFileDrop as EventListener);
 
@@ -2978,9 +3059,14 @@ defineExpose({
             <div class="model-selector-dropdown" :style="modelDropdownStyle" @click.stop>
               <div class="model-selector-header">
                 <span>{{ $t('conversationSettings.models.chatGroupLabel') }}</span>
-                <button class="model-selector-add" type="button" @click="handleModelChange('__add_model__')">
+                <button
+                  v-if="personalModelsEnabled || authStore.hasRole('admin')"
+                  class="model-selector-add"
+                  type="button"
+                  @click="handleModelChange('__add_model__')"
+                >
                   <span class="add-icon">+</span>
-                  <span class="add-text">{{ $t('input.addModel') }}</span>
+                  <span class="add-text">{{ personalModelsEnabled ? $t('personalModels.quickAdd') : $t('input.addModel') }}</span>
                 </button>
               </div>
               <div class="model-selector-content">
@@ -3008,6 +3094,28 @@ defineExpose({
             </div>
           </div>
         </Teleport>
+
+        <t-dialog
+          v-model:visible="showPersonalModelQuickAdd"
+          :header="t('personalModels.quickAdd')"
+          :confirm-btn="{ content: t('common.save'), loading: personalModelSaving }"
+          @confirm="submitPersonalModelQuickAdd"
+        >
+          <t-form label-align="top">
+            <t-form-item :label="t('personalModels.fields.modelName')">
+              <t-input v-model="personalModelForm.model_name" />
+            </t-form-item>
+            <t-form-item :label="t('personalModels.fields.baseUrl')">
+              <t-input v-model="personalModelForm.base_url" placeholder="https://api.siliconflow.cn/v1" />
+            </t-form-item>
+            <t-form-item :label="t('personalModels.fields.apiKey')">
+              <t-input v-model="personalModelForm.api_key" type="password" />
+            </t-form-item>
+            <t-form-item :label="t('personalModels.fields.displayName')">
+              <t-input v-model="personalModelForm.name" />
+            </t-form-item>
+          </t-form>
+        </t-dialog>
 
         <!-- 右侧控制：回复中且输入为空是停止，一旦输入新内容同一位置变成发送 -->
         <div class="control-right">

@@ -62,6 +62,7 @@ type RouterParams struct {
 	SandboxSkillHandler          *handler.SandboxSkillHandler
 	MeEnvVarHandler              *handler.MeEnvVarHandler
 	MeNoteHandler                *handler.MeNoteHandler
+	MePersonalModelHandler       *handler.MePersonalModelHandler
 	MeAnnouncementHandler        *handler.MeAnnouncementHandler
 	EvaluationHandler            *handler.EvaluationHandler
 	AuthHandler                  *handler.AuthHandler
@@ -306,6 +307,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterSandboxConfigRoutes(v1, params.SandboxConfigHandler, params.SandboxSkillHandler, rbacGuards)
 		RegisterMyEnvVarRoutes(v1, params.MeEnvVarHandler, rbacGuards)
 		RegisterMyNoteRoutes(v1, params.MeNoteHandler)
+		RegisterMyPersonalModelRoutes(v1, params.MePersonalModelHandler, rbacGuards)
 		RegisterAnnouncementRoutes(v1, params.MeAnnouncementHandler, rbacGuards)
 		v1.GET("/me/browser", rbacGuards.Contributor(), params.SessionHandler.BrowserSkillAccount)
 		v1.GET("/me/browser/extension", rbacGuards.Contributor(), params.SessionHandler.BrowserSkillDownload)

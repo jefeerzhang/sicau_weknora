@@ -264,7 +264,7 @@ func newServiceWithRepo() (interfaces.TenantMemberService, *fakeTenantMemberRepo
 	// tests pre-date PR 6 and exercise membership invariants only. The
 	// service's audit and RemoveMember-cleanup hooks are nil-safe, so
 	// passing nil keeps existing coverage intact without forcing stubs.
-	return NewTenantMemberService(r, nil, nil, nil), r
+	return NewTenantMemberService(r, nil, nil, nil, nil), r
 }
 
 // cleanupUserRepo is a minimal UserRepository used to assert that
@@ -354,7 +354,7 @@ func TestTenantMemberService_RemoveMember_ClearsStaleHomeAndRevokesTokens(t *tes
 		},
 	}}
 	tokenRepo := &cleanupTokenRepo{}
-	svc := NewTenantMemberService(memberRepo, nil, userRepo, tokenRepo)
+	svc := NewTenantMemberService(memberRepo, nil, userRepo, tokenRepo, nil)
 	ctx := context.Background()
 
 	if _, err := svc.EnsureOwner(ctx, "owner", 7); err != nil {
@@ -391,7 +391,7 @@ func TestTenantMemberService_RemoveMember_RevokesTokensEvenWhenHomeUnchanged(t *
 		"contrib": {ID: "contrib", TenantID: 1},
 	}}
 	tokenRepo := &cleanupTokenRepo{}
-	svc := NewTenantMemberService(memberRepo, nil, userRepo, tokenRepo)
+	svc := NewTenantMemberService(memberRepo, nil, userRepo, tokenRepo, nil)
 	ctx := context.Background()
 
 	if _, err := svc.EnsureOwner(ctx, "owner", 7); err != nil {
@@ -410,6 +410,40 @@ func TestTenantMemberService_RemoveMember_RevokesTokensEvenWhenHomeUnchanged(t *
 	}
 	if len(tokenRepo.revoked) != 1 || tokenRepo.revoked[0] != "contrib" {
 		t.Fatalf("revoked users = %v, want [contrib]", tokenRepo.revoked)
+	}
+}
+
+type capturePersonalModelCleanup struct {
+	interfaces.TenantPersonalModelService
+	deletedTenant uint64
+	deletedUser   string
+	calls         int
+}
+
+func (c *capturePersonalModelCleanup) DeleteAllForUser(_ context.Context, tenantID uint64, userID string) error {
+	c.calls++
+	c.deletedTenant = tenantID
+	c.deletedUser = userID
+	return nil
+}
+
+func TestTenantMemberService_RemoveMember_DestroysPersonalModels(t *testing.T) {
+	memberRepo := newFakeRepo()
+	personal := &capturePersonalModelCleanup{}
+	svc := NewTenantMemberService(memberRepo, nil, nil, nil, personal)
+	ctx := context.Background()
+
+	if _, err := svc.EnsureOwner(ctx, "owner", 7); err != nil {
+		t.Fatalf("seed owner: %v", err)
+	}
+	if _, err := svc.AddMember(ctx, "student", 7, types.TenantRoleViewer, nil); err != nil {
+		t.Fatalf("seed student: %v", err)
+	}
+	if err := svc.RemoveMember(ctx, "student", 7); err != nil {
+		t.Fatalf("RemoveMember: %v", err)
+	}
+	if personal.calls != 1 || personal.deletedTenant != 7 || personal.deletedUser != "student" {
+		t.Fatalf("personal cleanup = %+v, want tenant=7 user=student once", personal)
 	}
 }
 

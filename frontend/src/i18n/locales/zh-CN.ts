@@ -5285,6 +5285,32 @@ export default {
       saveFailed: '保存配置失败: {message}'
     }
   },
+  personalModels: {
+    myTitle: '我的模型',
+    myDescription: '为自己配置对话模型（地址、密钥、模型名）。未配置时回落使用课程空间模型。',
+    workspaceDisabled: '当前空间尚未开启学生个人模型，请联系空间负责人在「模型管理」中打开。',
+    add: '添加模型',
+    empty: '还没有个人模型',
+    saved: '已保存',
+    saveFailed: '保存失败',
+    deleted: '已删除',
+    deleteFailed: '删除失败',
+    loadFailed: '加载失败',
+    requiredFields: '请填写模型名、接口地址和 API Key',
+    fields: {
+      modelName: '模型名',
+      baseUrl: '接口地址',
+      apiKey: 'API Key',
+      displayName: '显示名称（可选）',
+    },
+    teacherToggleTitle: '允许学生使用个人模型',
+    teacherToggleDesc: '开启后，本课学生可在「我的模型」中自建对话模型并覆盖默认课程助手的对话模型。默认关闭。',
+    allowedHostsTitle: '学生模型出站追加域名',
+    allowedHostsDesc: '每行一个域名后缀，与平台预置厂商域名合并后仍受 SSRF 约束。',
+    allowedHostsPlaceholder: 'llm.sicau.edu.cn',
+    metaTitle: '学生个人模型（元数据，不含密钥）',
+    quickAdd: '添加个人模型',
+  },
   memorySettings: {
     title: '我的记忆',
     description: '这里是助手跨会话记住的关于你的内容。你可以随时查看、修改和删除，删除后不会再被使用。',

@@ -1351,6 +1351,9 @@ func (h *TenantHandler) GetTenantKV(c *gin.Context) {
 	case "memory-config":
 		h.GetTenantMemoryConfig(c)
 		return
+	case "student-personal-models":
+		h.GetTenantStudentPersonalModels(c)
+		return
 	default:
 		logger.Info(ctx, "KV key not supported", "key", key)
 		c.Error(errors.NewBadRequestError("unsupported key"))
@@ -1404,6 +1407,9 @@ func (h *TenantHandler) UpdateTenantKV(c *gin.Context) {
 		return
 	case "memory-config":
 		h.updateTenantMemoryConfigInternal(c)
+		return
+	case "student-personal-models":
+		h.updateTenantStudentPersonalModelsInternal(c)
 		return
 	default:
 		logger.Info(ctx, "KV key not supported", "key", key)
@@ -1975,6 +1981,69 @@ func (h *TenantHandler) updateTenantMemoryConfigInternal(c *gin.Context) {
 		"success": true,
 		"data":    updatedTenant.MemoryConfig,
 		"message": "Memory configuration updated successfully",
+	})
+}
+
+// GetTenantStudentPersonalModels returns the workspace 学生个人模型 switch.
+func (h *TenantHandler) GetTenantStudentPersonalModels(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenant, _ := types.TenantInfoFromContext(ctx)
+	if tenant == nil {
+		logger.Error(ctx, "Workspace is empty")
+		c.Error(errors.NewBadRequestError("Workspace is empty"))
+		return
+	}
+	data := types.EffectiveStudentPersonalModels(tenant.StudentPersonalModels)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    data,
+	})
+}
+
+func (h *TenantHandler) updateTenantStudentPersonalModelsInternal(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var cfg types.StudentPersonalModelsConfig
+	if err := c.ShouldBindJSON(&cfg); err != nil {
+		logger.Error(ctx, "Failed to parse request parameters", err)
+		c.Error(errors.NewValidationError("Invalid request data").WithDetails(err.Error()))
+		return
+	}
+	cfg.Normalize()
+	if len(cfg.AllowedHosts) > 64 {
+		c.Error(errors.NewBadRequestError("allowed_hosts is too long"))
+		return
+	}
+	for _, host := range cfg.AllowedHosts {
+		if len(host) > 253 {
+			c.Error(errors.NewBadRequestError("allowed_hosts entry is too long"))
+			return
+		}
+	}
+
+	tenant, _ := types.TenantInfoFromContext(ctx)
+	if tenant == nil {
+		logger.Error(ctx, "Workspace is empty")
+		c.Error(errors.NewBadRequestError("Workspace is empty"))
+		return
+	}
+
+	tenant.StudentPersonalModels = &cfg
+	updatedTenant, err := h.service.UpdateTenant(ctx, tenant)
+	if err != nil {
+		if appErr, ok := errors.IsAppError(err); ok {
+			c.Error(appErr)
+		} else {
+			logger.ErrorWithFields(ctx, err, nil)
+			c.Error(errors.NewInternalServerError("Failed to update student personal models config").WithDetails(err.Error()))
+		}
+		return
+	}
+	out := types.EffectiveStudentPersonalModels(updatedTenant.StudentPersonalModels)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    out,
+		"message": "Student personal models configuration updated successfully",
 	})
 }
 

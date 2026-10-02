@@ -79,6 +79,9 @@ type tenantMemberService struct {
 	audit     interfaces.AuditLogService     // optional; nil ⇒ no audit, business ops still succeed
 	userRepo  interfaces.UserRepository      // optional; used to clear stale home-tenant pointers
 	tokenRepo interfaces.AuthTokenRepository // optional; used to revoke sessions after removal
+	// personalModels is optional; when set, RemoveMember destroys that user's
+	// 学生个人模型 rows for the workspace (ADR-0001 离课销毁).
+	personalModels interfaces.TenantPersonalModelService
 }
 
 // NewTenantMemberService constructs the service. Wired up via the DI
@@ -95,17 +98,21 @@ type tenantMemberService struct {
 // sessions so the removed user cannot keep a JWT scoped to a workspace
 // they no longer belong to. Passing nil keeps unit tests that only
 // exercise membership invariants free of extra stubs.
+//
+// personalModels is optional and destroys 学生个人模型 on leave/remove.
 func NewTenantMemberService(
 	repo interfaces.TenantMemberRepository,
 	audit interfaces.AuditLogService,
 	userRepo interfaces.UserRepository,
 	tokenRepo interfaces.AuthTokenRepository,
+	personalModels interfaces.TenantPersonalModelService,
 ) interfaces.TenantMemberService {
 	return &tenantMemberService{
-		repo:      repo,
-		audit:     audit,
-		userRepo:  userRepo,
-		tokenRepo: tokenRepo,
+		repo:           repo,
+		audit:          audit,
+		userRepo:       userRepo,
+		tokenRepo:      tokenRepo,
+		personalModels: personalModels,
 	}
 }
 
@@ -533,13 +540,20 @@ func (s *tenantMemberService) cleanupRemovedMemberState(ctx context.Context, use
 		}
 	}
 
-	if s.tokenRepo == nil {
-		return
+	if s.tokenRepo != nil {
+		if err := s.tokenRepo.RevokeTokensByUserID(ctx, userID); err != nil {
+			logger.Warnf(ctx,
+				"RemoveMember cleanup: failed to revoke tokens for user %s after removing tenant %d: %v",
+				userID, tenantID, err)
+		}
 	}
-	if err := s.tokenRepo.RevokeTokensByUserID(ctx, userID); err != nil {
-		logger.Warnf(ctx,
-			"RemoveMember cleanup: failed to revoke tokens for user %s after removing tenant %d: %v",
-			userID, tenantID, err)
+
+	if s.personalModels != nil {
+		if err := s.personalModels.DeleteAllForUser(ctx, tenantID, userID); err != nil {
+			logger.Warnf(ctx,
+				"RemoveMember cleanup: failed to destroy personal models for user %s tenant %d: %v",
+				userID, tenantID, err)
+		}
 	}
 }
 

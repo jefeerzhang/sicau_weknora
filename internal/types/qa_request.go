@@ -56,6 +56,9 @@ type QARequest struct {
 	Query               string             // User query text
 	AssistantMessageID  string             // Pre-created assistant message ID
 	SummaryModelID      string             // Optional model override; empty = use agent/KB default
+	// PersonalModelID selects a 学生个人模型 for this turn (ADR-0001). When set,
+	// chat uses that row's credentials; failures must not fall back to workspace models.
+	PersonalModelID     string
 	ReasoningEffort     string             // Optional per-request override; empty = use agent default
 	CustomAgent         *CustomAgent       // Optional custom agent for config override
 	SharedAgentReadOnly bool               // True only when access came from an agent share; source-workspace writes are forbidden

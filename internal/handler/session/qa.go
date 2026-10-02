@@ -54,6 +54,7 @@ type qaRequestContext struct {
 	mcpServiceIDs         []string
 	skillNames            []string
 	summaryModelID        string
+	personalModelID       string
 	reasoningEffort       string
 	localBrowserEnabled   bool
 	webSearchEnabled      bool
@@ -109,6 +110,7 @@ func (rc *qaRequestContext) buildQARequest() *types.QARequest {
 		Query:               rc.query,
 		AssistantMessageID:  rc.assistantMessage.ID,
 		SummaryModelID:      rc.summaryModelID,
+		PersonalModelID:     rc.personalModelID,
 		ReasoningEffort:     rc.reasoningEffort,
 		CustomAgent:         rc.customAgent,
 		SharedAgentReadOnly: rc.sharedAgentReadOnly,
@@ -251,6 +253,7 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 	// models; it would also be stored as the message's model for follow-ups.
 	if effectiveTenantID != 0 && effectiveTenantID != c.GetUint64(types.TenantIDContextKey.String()) {
 		request.SummaryModelID = ""
+		request.PersonalModelID = ""
 	}
 
 	if request.LocalBrowserEnabled && (customAgent == nil || !customAgent.IsAgentMode()) {
@@ -401,6 +404,20 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 	tagIDs := dedupRequestStrings(append(request.TagIDs, mentionedIDsByType(request.MentionedItems, "tag")...))
 	mcpServiceIDs := dedupRequestStrings(append(request.MCPServiceIDs, mentionedIDsByType(request.MentionedItems, "mcp")...))
 	skillNames := dedupRequestStrings(append(request.SkillNames, mentionedIDsByType(request.MentionedItems, "skill")...))
+
+	personalModelID := strings.TrimSpace(request.PersonalModelID)
+	summaryModelID := strings.TrimSpace(request.SummaryModelID)
+	if personalModelID == "" {
+		if pid, ok := types.ParsePersonalModelRef(summaryModelID); ok {
+			personalModelID = pid
+		}
+	}
+	if personalModelID != "" {
+		summaryModelID = types.FormatPersonalModelRef(personalModelID)
+		request.PersonalModelID = personalModelID
+		request.SummaryModelID = summaryModelID
+	}
+
 	executionContext, agentID, agentTenantID, modelID := buildMessageExecutionContext(
 		ctx,
 		customAgent,
@@ -445,6 +462,7 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		mcpServiceIDs:         secutils.SanitizeForLogArray(mcpServiceIDs),
 		skillNames:            secutils.SanitizeForLogArray(skillNames),
 		summaryModelID:        secutils.SanitizeForLog(request.SummaryModelID),
+		personalModelID:       personalModelID,
 		reasoningEffort:       request.ReasoningEffort,
 		webSearchEnabled:      request.WebSearchEnabled,
 		localBrowserEnabled:   request.LocalBrowserEnabled,
