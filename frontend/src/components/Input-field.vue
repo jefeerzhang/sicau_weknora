@@ -55,6 +55,7 @@ import {
 import { formatLocalizedList } from '@/utils/format-list';
 import { SKILL_ICON, type MentionItem, type MentionItemType, type MentionRequestItem } from '@/types/mention';
 import { toolboxLocation } from '@/config/toolbox';
+import { shellIdentityOf } from '@/config/settingsAccess';
 import { supportedLevels, levelLabelKey, levelFromLegacy, clampLevel, type ReasoningLevel } from '@/utils/reasoningEffort';
 
 const route = useRoute();
@@ -62,6 +63,7 @@ const router = useRouter();
 const settingsStore = useSettingsStore();
 const browserConnection = useBrowserConnectionStore();
 const authStore = useAuthStore();
+const canUseLocalBrowser = computed(() => shellIdentityOf(authStore.user) !== 'student' && authStore.hasRole('contributor'));
 const uiStore = useUIStore();
 const orgStore = useOrganizationStore();
 const menuStore = useMenuStore();
@@ -880,6 +882,7 @@ const openBrowserConnectionSettings = () => {
 };
 
 const toggleBrowserSource = () => {
+  if (!canUseLocalBrowser.value) return;
   showMention.value = false;
   showModelSelector.value = false;
   showAgentModeSelector.value = false;
@@ -1899,7 +1902,7 @@ onMounted(() => {
   // Embed 渠道由宿主注入 agent/KB，勿拉取需 JWT 的平台资源
   if (props.embeddedMode) return;
 
-  browserConnection.watchStatus();
+  if (canUseLocalBrowser.value) browserConnection.watchStatus();
 
   // 并行拉取；若 platform 已预取且缓存未过期则直接复用
   initChatModelSelection();
@@ -1996,7 +1999,7 @@ watch(() => uiStore.showSettingsModal, (visible, prevVisible) => {
   if (prevVisible && !visible) {
     loadWebSearchConfig(true);
     loadChatModels(true);
-    if (!props.embeddedMode) void browserConnection.refresh();
+    if (!props.embeddedMode && canUseLocalBrowser.value) void browserConnection.refresh();
   }
 });
 
@@ -2799,7 +2802,7 @@ defineExpose({
             :currentAgentId="selectedAgentId" :agents="enabledAgents" :all-models="allModels"
             @close="closeAgentModeSelector" @select="handleSelectAgent" @not-ready="handleAgentNotReady" />
 
-          <t-tooltip v-if="settingsStore.isAgentStreamMode" placement="top" theme="light"
+          <t-tooltip v-if="canUseLocalBrowser && browserConnection.enabled && settingsStore.isAgentStreamMode" placement="top" theme="light"
             :popupProps="{ overlayClassName: 'input-field-tooltip' }">
             <template #content>
               <div v-if="!browserConnection.knownOffline" class="browser-source-tooltip">

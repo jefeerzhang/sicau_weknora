@@ -153,6 +153,9 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		logger.Error(ctx, "Failed to parse request data", err)
 		return nil, nil, errors.NewBadRequestError(err.Error())
 	}
+	if request.LocalBrowserEnabled && !canUseBrowserSkill(ctx) {
+		return nil, nil, errors.NewForbiddenError("Local browser requires teacher capability")
+	}
 
 	level, validEffort := api.ParseReasoningEffort(request.ReasoningEffort)
 	if !validEffort {

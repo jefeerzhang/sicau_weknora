@@ -71,8 +71,8 @@ func RegisterSessionRoutes(
 		sessions.POST("/:session_id/sandbox/terminal-ticket", handler.IssueSandboxTerminalTicket)
 		sessions.POST("/:session_id/sandbox/desktop-ticket", handler.IssueSandboxDesktopTicket)
 		sessions.POST("/:session_id/sandbox/desktop/activity", handler.ReportSandboxDesktopActivity)
-		sessions.GET("/:id/local-browser", handler.BrowserSkillConnection)
-		sessions.POST("/:session_id/local-browser", handler.BrowserSkillConnection)
+		sessions.GET("/:id/local-browser", g.Contributor(), handler.BrowserSkillConnection)
+		sessions.POST("/:session_id/local-browser", g.Contributor(), handler.BrowserSkillConnection)
 		// Mid-run message injection: append a user message to the turn that is
 		// currently generating. Accepts even when no run is live (the client
 		// then falls back to a normal send), mirroring StopSession's ownership

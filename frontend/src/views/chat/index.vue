@@ -173,7 +173,7 @@
                 </div>
             </div>
             <div v-if="!embeddedMode" class="chat_overlays">
-                <BrowserTaskPreview v-if="session_id" :key="session_id" :session-id="session_id" />
+                <BrowserTaskPreview v-if="session_id && canUseLocalBrowser" :key="session_id" :session-id="session_id" />
                 <ChatQuestionMinimap :scroll-container="scrollContainer" :messages="messagesList"
                     @jump="jumpToQuestion" />
             </div>
@@ -242,6 +242,8 @@ import { useSessionActivityStore } from '@/stores/sessionActivity';
 import { provideChatSandboxPanel } from '@/composables/useChatSandboxPanel';
 import SandboxSidePanel from '@/components/chat/SandboxSidePanel.vue';
 import BrowserTaskPreview from './components/BrowserTaskPreview.vue';
+import { useAuthStore } from '@/stores/auth';
+import { shellIdentityOf } from '@/config/settingsAccess';
 import { collectSessionArtifacts, markSessionArtifactDeleted } from '@/utils/sessionArtifacts';
 import { isCollectingSkillArtifacts } from '@/utils/skillArtifacts';
 const referencesDrawer = provideChatReferencesDrawer();
@@ -258,6 +260,8 @@ const props = defineProps({
 
 const usemenuStore = useMenuStore();
 const useSettingsStoreInstance = useSettingsStore();
+const authStore = useAuthStore();
+const canUseLocalBrowser = computed(() => shellIdentityOf(authStore.user) !== 'student' && authStore.hasRole('contributor'));
 
 // Whether the active chat session is using the Agent pipeline (not quick-answer).
 const isAgentStreamSession = () => {
@@ -1538,7 +1542,7 @@ const sendMsg = async (value, modelId = '', mentionedItems = [], imageFiles = []
         agent_id: selectedAgentId,
         agent_source_tenant_id: selectedAgentSourceTenantId,
         web_search_enabled: webSearchEnabled,
-        local_browser_enabled: !props.embeddedMode && agentEnabled && useSettingsStoreInstance.isLocalBrowserEnabled && !useBrowserConnectionStore().knownOffline,
+        local_browser_enabled: canUseLocalBrowser.value && !props.embeddedMode && agentEnabled && useSettingsStoreInstance.isLocalBrowserEnabled && !useBrowserConnectionStore().knownOffline,
         summary_model_id: modelId,
         reasoning_effort: reasoningEffort,
         mcp_service_ids: requestMcpServiceIds,

@@ -16,8 +16,26 @@ func browserSkillScope(ctx context.Context) browserskill.Scope {
 	return browserskill.Scope{Tenant: tenant, User: user}
 }
 
+// Platform identity is independent of the tenant role. A legacy elevated
+// membership must not give an unappointed student browser automation.
+func canUseBrowserSkill(ctx context.Context) bool {
+	user, _ := ctx.Value(types.UserContextKey).(*types.User)
+	return user.HasTeacherCapability()
+}
+
+func requireBrowserSkillTeacher(c *gin.Context) bool {
+	if !canUseBrowserSkill(c.Request.Context()) {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "local browser requires teacher capability"})
+		return false
+	}
+	return true
+}
+
 // BrowserSkillConnection exposes task status and user controls for an owned conversation.
 func (h *Handler) BrowserSkillConnection(c *gin.Context) {
+	if !requireBrowserSkillTeacher(c) {
+		return
+	}
 	id := c.Param("session_id")
 	if id == "" {
 		id = c.Param("id")
@@ -95,6 +113,9 @@ func (h *Handler) BrowserSkillAccount(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "login required"})
 		return
 	}
+	if !requireBrowserSkillTeacher(c) {
+		return
+	}
 	c.Header("Cache-Control", "no-store")
 	if c.Request.Method == http.MethodGet {
 		status, err := h.browserSkill.Account(ctx, scope)
@@ -154,5 +175,8 @@ func (h *Handler) BrowserSkillInternal(c *gin.Context) {
 
 // BrowserSkillDownload serves the extension archive for installation.
 func (h *Handler) BrowserSkillDownload(c *gin.Context) {
+	if !requireBrowserSkillTeacher(c) {
+		return
+	}
 	h.browserSkill.DownloadExtension(c.Writer, c.Request)
 }
